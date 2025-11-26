@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory } from '../types';
 import { INITIAL_TOPPINGS, DELIVERY_ZONES, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays } from 'lucide-react';
 import { getPizzaRecommendation } from '../services/geminiService';
 
 export const CustomerView: React.FC = () => {
@@ -37,6 +37,7 @@ export const CustomerView: React.FC = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
+  const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>('today');
 
   // Location / Distance
   const [distance, setDistance] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export const CustomerView: React.FC = () => {
   // Custom Pizza Name State
   const [customName, setCustomName] = useState('');
   
-  const timeSlots = generateTimeSlots();
+  const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
   useEffect(() => {
     if (customer?.address) {
@@ -139,14 +140,24 @@ export const CustomerView: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
-    if (!isStoreOpen) {
+    const isFutureOrder = orderDate === 'tomorrow' || (pickupTime && pickupTime !== 'ASAP');
+    
+    // Only block if store is closed AND user is trying to order ASAP for today
+    if (!isStoreOpen && (!isFutureOrder || orderDate === 'today')) {
         alert(closedMessage || t('storeClosedMsg'));
         return;
     }
 
+    let finalPickupTime = pickupTime;
+    if (orderDate === 'tomorrow' && !pickupTime) {
+         // Default to first slot if tomorrow is selected but no time picked
+         finalPickupTime = timeSlots[0];
+    }
+    const displayTime = orderDate === 'tomorrow' ? `Tomorrow ${finalPickupTime}` : (finalPickupTime || 'ASAP');
+
     const commonDetails = {
        paymentMethod,
-       pickupTime: orderType === 'online' ? (pickupTime || timeSlots[0]) : undefined
+       pickupTime: displayTime
     };
 
     setIsSubmitting(true);
@@ -423,19 +434,21 @@ export const CustomerView: React.FC = () => {
         ) : (
             filteredMenu.map(item => {
                 const localized = getLocalizedItem(item);
-                const isActuallyAvailable = item.available && isStoreOpen;
+                const isActuallyAvailable = item.available && (isStoreOpen || orderDate === 'tomorrow'); // Allow viewing if closed but ordering for tomorrow might be possible? Better to keep simple: Only add if store open OR custom logic. 
+                // Actually, let users browse and add to cart even if closed, just block checkout for TODAY ASAP.
+                
                 return (
                 <div 
                     key={item.id} 
-                    onClick={() => isActuallyAvailable && handleCustomize(item)}
-                    className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden h-32 md:h-auto md:flex-col cursor-pointer active:scale-95 transition hover:shadow-md ${!isActuallyAvailable ? 'opacity-60 grayscale' : ''}`}
+                    onClick={() => item.available && handleCustomize(item)}
+                    className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden h-32 md:h-auto md:flex-col cursor-pointer active:scale-95 transition hover:shadow-md ${!item.available ? 'opacity-60 grayscale' : ''}`}
                 >
                     <div className="w-32 md:w-full md:h-48 h-full relative flex-shrink-0">
                         <img src={item.image} alt={localized.name} className="w-full h-full object-cover" />
-                        {!isActuallyAvailable && (
+                        {!item.available && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                 <span className="text-white text-xs font-bold bg-red-600 px-2 py-1 rounded">
-                                    {!isStoreOpen ? t('storeClosed') : t('soldOut')}
+                                    {t('soldOut')}
                                 </span>
                             </div>
                         )}
@@ -448,7 +461,7 @@ export const CustomerView: React.FC = () => {
                         </div>
                         <p className="text-gray-500 text-xs mt-1 line-clamp-2">{localized.description}</p>
                     </div>
-                    {isActuallyAvailable && <span className="text-xs font-bold text-brand-600 flex items-center gap-1 self-end bg-brand-50 px-2 py-1 rounded-full mt-2"><Plus size={12}/> {t('addToOrder')}</span>}
+                    {item.available && <span className="text-xs font-bold text-brand-600 flex items-center gap-1 self-end bg-brand-50 px-2 py-1 rounded-full mt-2"><Plus size={12}/> {t('addToOrder')}</span>}
                     </div>
                 </div>
                 )
@@ -528,22 +541,39 @@ export const CustomerView: React.FC = () => {
                       </div>
 
                       {/* Pickup Specifics */}
-                      {orderType === 'online' && (
-                          <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{t('pickupTime')}</label>
-                             <select 
-                                value={pickupTime}
-                                onChange={(e) => setPickupTime(e.target.value)}
-                                className="w-full p-2 bg-gray-50 border rounded text-sm"
-                             >
-                                 <option value="">{t('asap')}</option>
-                                 {timeSlots.map(time => (
-                                     <option key={time} value={time}>{time}</option>
-                                 ))}
-                                 <option value="Later">{t('later')}</option>
-                             </select>
-                          </div>
-                      )}
+                      <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
+                           <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t('pickupTime')}</label>
+                           
+                           {/* Date Toggle */}
+                           <div className="flex gap-2 mb-2">
+                               <button 
+                                   onClick={() => setOrderDate('today')}
+                                   className={`flex-1 py-1.5 rounded text-xs font-bold border transition ${orderDate === 'today' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-500'}`}
+                               >
+                                   Today
+                               </button>
+                               <button 
+                                   onClick={() => setOrderDate('tomorrow')}
+                                   className={`flex-1 py-1.5 rounded text-xs font-bold border transition ${orderDate === 'tomorrow' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-500'}`}
+                               >
+                                   Tomorrow
+                               </button>
+                           </div>
+
+                           <select 
+                            value={pickupTime}
+                            onChange={(e) => setPickupTime(e.target.value)}
+                            className="w-full p-2 bg-gray-50 border rounded text-sm"
+                           >
+                               {orderDate === 'today' && <option value="ASAP">{t('asap')}</option>}
+                               {timeSlots.map(time => (
+                                   <option key={time} value={time}>{time}</option>
+                               ))}
+                               {timeSlots.length === 0 && orderDate === 'today' && (
+                                   <option disabled>No more slots today</option>
+                               )}
+                           </select>
+                      </div>
 
                       {/* Delivery Specifics */}
                       {orderType === 'delivery' && (
@@ -630,8 +660,8 @@ export const CustomerView: React.FC = () => {
 
                       <button 
                         onClick={handlePlaceOrder}
-                        disabled={isSubmitting || !isStoreOpen}
-                        className={`w-full py-3 rounded-xl font-bold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-brand-200 ${isSubmitting || !isStoreOpen ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700'}`}
+                        disabled={isSubmitting || (!isStoreOpen && orderDate === 'today' && (!pickupTime || pickupTime === 'ASAP'))}
+                        className={`w-full py-3 rounded-xl font-bold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-brand-200 ${isSubmitting || (!isStoreOpen && orderDate === 'today' && (!pickupTime || pickupTime === 'ASAP')) ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700'}`}
                       >
                          {isSubmitting ? t('thinking') : (orderType === 'delivery' ? <Truck size={20} /> : <ShoppingBag size={20} />)}
                          {orderType === 'delivery' ? t('confirmDelivery') : t('placeOrder')}

@@ -60,7 +60,7 @@ interface StoreContextType {
   isHoliday: boolean;
   closedMessage: string;
   toggleStoreStatus: (isOpen: boolean, message?: string) => Promise<void>;
-  generateTimeSlots: () => string[];
+  generateTimeSlots: (dateOffset?: number) => string[];
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -366,6 +366,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return false;
     }
 
+    // Allow order if future date/time is selected, OR if store is currently open
+    // If store is closed, and pickupTime is 'ASAP' (default), then block.
+    // We assume 'pickupTime' contains a specific time if selected for later.
+    const isFutureOrder = details?.pickupTime && details.pickupTime !== 'ASAP (approx 20 mins)' && details.pickupTime.includes(':'); // Rudimentary check if it's a specific time string
+
+    if (!isStoreOpen && !isFutureOrder && (type === 'online' || type === 'delivery')) {
+        alert(closedMessage || t('storeClosedMsg'));
+        return false;
+    }
+
     const subTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
     const deliveryFee = details?.delivery?.fee || 0;
     const totalAmount = subTotal + deliveryFee;
@@ -484,10 +494,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
      }).eq('id', 'global');
   };
 
-  const generateTimeSlots = () => {
+  // dateOffset: 0 = Today, 1 = Tomorrow
+  const generateTimeSlots = (dateOffset: number = 0) => {
       const slots = [];
       let time = OPERATING_HOURS.open;
+      const now = new Date();
+      const currentDecimalTime = now.getHours() + (now.getMinutes() / 60);
+
       while (time < OPERATING_HOURS.close) {
+          // If dateOffset is 0 (Today), skip times that have passed or are too close
+          // Add 30 min buffer
+          if (dateOffset === 0 && time < currentDecimalTime + 0.5) {
+              time += 0.5;
+              continue;
+          }
+
           const hours = Math.floor(time);
           const minutes = (time % 1) * 60;
           const timeStr = `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}`;
