@@ -2,12 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory } from '../types';
-import { INITIAL_TOPPINGS, DELIVERY_ZONES, CATEGORIES } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft } from 'lucide-react';
+import { INITIAL_TOPPINGS, DELIVERY_ZONES, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe } from 'lucide-react';
 import { getPizzaRecommendation } from '../services/geminiService';
 
 export const CustomerView: React.FC = () => {
-  const { menu, addToCart, cart, cartTotal, customer, setCustomer, placeOrder, removeFromCart, navigateTo, addToFavorites, orders, reorderItem, claimReward, shopLogo } = useStore();
+  const { 
+    menu, addToCart, cart, cartTotal, customer, setCustomer, placeOrder, removeFromCart, navigateTo, 
+    addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
+    language, toggleLanguage, t, getLocalizedItem 
+  } = useStore();
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -32,6 +36,11 @@ export const CustomerView: React.FC = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
+
+  // Location / Distance
+  const [distance, setDistance] = useState<string | null>(null);
+  const [checkingLocation, setCheckingLocation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // AI State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -68,15 +77,17 @@ export const CustomerView: React.FC = () => {
     const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
     
     // Ensure custom pizzas have a name
-    let finalName = selectedPizza.name;
+    const localizedPizza = getLocalizedItem(selectedPizza);
+    let finalName = localizedPizza.name;
     if (selectedPizza.name === "Create Your Own Pizza") {
-        finalName = customName ? `Custom: ${customName}` : "Custom Pizza";
+        finalName = customName ? `${t('nameCreation')}: ${customName}` : localizedPizza.name;
     }
 
     const item: CartItem = {
       id: Date.now().toString() + Math.random().toString(),
       pizzaId: selectedPizza.id,
       name: finalName,
+      nameTh: language === 'th' ? finalName : undefined, // Keep current lang as name
       basePrice: selectedPizza.basePrice,
       selectedToppings: selectedToppings,
       quantity: 1,
@@ -87,7 +98,7 @@ export const CustomerView: React.FC = () => {
     setSelectedToppings([]);
   };
 
-  const handleSaveFavorite = () => {
+  const handleSaveFavorite = async () => {
       if (!selectedPizza) return;
       
       if (!customer) {
@@ -98,21 +109,18 @@ export const CustomerView: React.FC = () => {
 
       let name = customName;
       if (!name) {
-          if (selectedPizza.name === "Create Your Own Pizza") {
-              name = "My Custom Pizza";
-          } else {
-              name = selectedPizza.name + (selectedToppings.length > 0 ? " (Custom)" : "");
-          }
+          const localizedPizza = getLocalizedItem(selectedPizza);
+          name = localizedPizza.name;
       }
       
-      addToFavorites(name, selectedPizza.id, selectedToppings);
+      await addToFavorites(name, selectedPizza.id, selectedToppings);
       alert("Saved to Favorites!");
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regName && regPhone) {
-      setCustomer({ 
+      await setCustomer({ 
         name: regName, 
         phone: regPhone, 
         favoritePizza: regFav,
@@ -127,31 +135,34 @@ export const CustomerView: React.FC = () => {
     }
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     const commonDetails = {
        paymentMethod,
        pickupTime: orderType === 'online' ? (pickupTime || 'ASAP') : undefined
     };
 
+    setIsSubmitting(true);
     let success = false;
     if (orderType === 'delivery') {
       const zone = DELIVERY_ZONES.find(z => z.id === selectedZoneId);
       if (!deliveryAddress) {
         alert("Please enter a delivery address");
+        setIsSubmitting(false);
         return;
       }
-      success = placeOrder('delivery', {
+      success = await placeOrder('delivery', {
         ...commonDetails,
         delivery: {
             address: deliveryAddress,
-            zoneName: zone?.name || 'Standard',
+            zoneName: zone ? (language === 'th' && zone.nameTh ? zone.nameTh : zone.name) : 'Standard',
             fee: zone?.fee || 0
         }
       });
     } else {
-      success = placeOrder('online', commonDetails);
+      success = await placeOrder('online', commonDetails);
     }
 
+    setIsSubmitting(false);
     if (success) {
         setIsCartOpen(false);
         setShowReviewModal(true);
@@ -163,6 +174,52 @@ export const CustomerView: React.FC = () => {
           setIsCartOpen(true);
           // Trigger confetti logic ideally, but alert is fine for now
       }
+  };
+  
+  const handleLuckyPizza = () => {
+    const lucky = generateLuckyPizza();
+    if (lucky) {
+        setSelectedPizza(lucky.pizza);
+        setSelectedToppings(lucky.toppings);
+        setCustomName('My Lucky Pizza');
+        // Small delay to let modal open then animate
+        setTimeout(() => {
+            alert("🎲 " + t('fateDecide') + "\n" + lucky.toppings.map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ') + "!");
+        }, 500);
+    }
+  };
+
+  const checkDistance = () => {
+      if (!navigator.geolocation) {
+          alert("Geolocation is not supported by your browser");
+          return;
+      }
+      setCheckingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+          (position) => {
+              const lat1 = position.coords.latitude;
+              const lon1 = position.coords.longitude;
+              const lat2 = RESTAURANT_LOCATION.lat;
+              const lon2 = RESTAURANT_LOCATION.lng;
+              
+              // Haversine Formula
+              const R = 6371; // km
+              const dLat = (lat2 - lat1) * Math.PI / 180;
+              const dLon = (lon2 - lon1) * Math.PI / 180;
+              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              const d = R * c; // Distance in km
+              
+              setDistance(d.toFixed(1) + ' km');
+              setCheckingLocation(false);
+          },
+          () => {
+              alert("Unable to retrieve your location");
+              setCheckingLocation(false);
+          }
+      );
   };
 
   const askAiChef = async () => {
@@ -179,6 +236,12 @@ export const CustomerView: React.FC = () => {
     const cat = item.category || 'pizza';
     return cat === activeCategory;
   });
+  
+  // Get recent orders unique pizzas
+  const uniqueRecentOrders = customer?.orderHistory?.map(oid => orders.find(o => o.id === oid))
+        .filter(o => o)
+        .flatMap(o => o?.items)
+        .slice(0, 3) || [];
 
   const deliveryFee = orderType === 'delivery' ? (DELIVERY_ZONES.find(z => z.id === selectedZoneId)?.fee || 0) : 0;
   const finalTotal = cartTotal + deliveryFee;
@@ -203,7 +266,10 @@ export const CustomerView: React.FC = () => {
                </div>
            )}
         </div>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-2 items-center">
+            <button onClick={toggleLanguage} className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg text-sm font-bold hover:bg-black/30">
+               <Globe size={16} /> {language === 'en' ? 'EN' : 'TH'}
+            </button>
             {activeOrders.length > 0 && (
                 <button onClick={() => setShowTracker(true)} className="p-2 bg-green-500 rounded-full animate-pulse shadow-lg text-white">
                     <Clock size={20} />
@@ -232,7 +298,7 @@ export const CustomerView: React.FC = () => {
                 <div>
                     <span className="text-gray-900 font-bold block leading-tight">{customer.name}</span>
                     <span className="text-xs text-brand-600 font-medium">
-                        {customer.loyaltyPoints} Points • {(customer.loyaltyPoints / 10) * 100}% to Free Pizza
+                        {customer.loyaltyPoints} {t('points')} • {(customer.loyaltyPoints / 10) * 100}% {t('toFreePizza')}
                     </span>
                 </div>
             </div>
@@ -242,11 +308,42 @@ export const CustomerView: React.FC = () => {
           </div>
         ) : (
           <div className="bg-brand-50 p-3 rounded-lg border border-brand-100 flex items-center justify-between">
-             <span className="text-brand-800 font-medium text-sm">Tap to Login / Register</span>
+             <span className="text-brand-800 font-medium text-sm">{t('loginRegister')}</span>
              <User size={16} className="text-brand-600"/>
           </div>
         )}
       </div>
+      
+      {/* Quick Reorder Section (If Logged In) */}
+      {customer && uniqueRecentOrders.length > 0 && (
+          <div className="bg-white p-4 pb-0">
+              <h3 className="text-sm font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                  <History size={14} /> {t('buyAgain')}
+              </h3>
+              <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                  {uniqueRecentOrders.map((item, idx) => {
+                      const name = language === 'th' && item?.nameTh ? item.nameTh : item?.name;
+                      return (
+                      <div key={idx} className="flex-shrink-0 bg-gray-50 border border-gray-100 rounded-lg p-3 w-40 flex flex-col justify-between">
+                          <div>
+                              <p className="font-bold text-sm text-gray-800 line-clamp-1">{name}</p>
+                              <p className="text-xs text-gray-500 mb-2">{item?.selectedToppings.length || 0} toppings</p>
+                          </div>
+                          <button 
+                             onClick={(e) => { 
+                                 e.stopPropagation(); 
+                                 addToCart({...item!, id: Date.now().toString()}); 
+                                 setIsCartOpen(true); 
+                             }}
+                             className="text-xs bg-white border border-gray-200 text-brand-600 font-bold py-1.5 rounded hover:bg-brand-50"
+                          >
+                              {t('addToOrder')} ฿{item?.totalPrice}
+                          </button>
+                      </div>
+                  )})}
+              </div>
+          </div>
+      )}
 
       {/* Category Navigation */}
       <div className="bg-white px-4 pt-2 pb-4 overflow-x-auto scrollbar-hide border-b border-gray-100 sticky top-16 z-10 shadow-sm">
@@ -262,7 +359,7 @@ export const CustomerView: React.FC = () => {
                     }`}
                 >
                     {cat.id === 'promotion' && <Sparkles size={14} className="text-yellow-400" />}
-                    {cat.label}
+                    {language === 'th' ? cat.labelTh : cat.label}
                 </button>
             ))}
          </div>
@@ -270,19 +367,37 @@ export const CustomerView: React.FC = () => {
 
       {/* Promotion Banner */}
       {activeCategory === 'promotion' && (
-          <div className="p-4 pb-0 animate-fade-in">
+          <div className="p-4 pb-0 animate-fade-in space-y-4">
               <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                   <div className="relative z-10">
-                      <h2 className="text-2xl font-bold mb-1">Combo of the Month</h2>
+                      <h2 className="text-2xl font-bold mb-1">{t('comboMonth')}</h2>
                       <p className="text-white/90 text-sm mb-4">Get the Family Set and save 20%!</p>
                       <button onClick={() => {}} className="bg-white text-brand-600 px-4 py-2 rounded-full font-bold text-sm shadow-md">
-                          Order Now
+                          {t('orderNow')}
                       </button>
                   </div>
                   <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-white/10 -skew-x-12"></div>
                   <Sparkles className="absolute top-4 right-4 text-yellow-300 animate-pulse" />
               </div>
           </div>
+      )}
+      
+      {/* Gamification / Lucky Pizza */}
+      {activeCategory === 'pizza' && (
+           <div className="px-4 pt-4 animate-fade-in">
+               <div 
+                  onClick={handleLuckyPizza}
+                  className="bg-purple-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between cursor-pointer active:scale-95 transition"
+               >
+                   <div>
+                       <h3 className="font-bold text-lg flex items-center gap-2"><Dices /> {t('feelingLucky')}</h3>
+                       <p className="text-purple-100 text-sm">{t('fateDecide')}</p>
+                   </div>
+                   <div className="bg-white/20 p-2 rounded-full">
+                       <ArrowRight size={20} />
+                   </div>
+               </div>
+           </div>
       )}
 
       {/* Menu Grid */}
@@ -292,32 +407,35 @@ export const CustomerView: React.FC = () => {
                  <p>No items in this category yet.</p>
              </div>
         ) : (
-            filteredMenu.map(item => (
-            <div 
-                key={item.id} 
-                onClick={() => handleCustomize(item)}
-                className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden h-32 md:h-auto md:flex-col cursor-pointer active:scale-95 transition hover:shadow-md ${!item.available ? 'opacity-60 grayscale' : ''}`}
-            >
-                <div className="w-32 md:w-full md:h-48 h-full relative flex-shrink-0">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                    {!item.available && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <span className="text-white text-xs font-bold bg-red-600 px-2 py-1 rounded">SOLD OUT</span>
-                        </div>
-                    )}
-                </div>
-                <div className="p-3 flex-1 flex flex-col justify-between">
-                <div>
-                    <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-800 leading-tight">{item.name}</h3>
-                        <span className="text-brand-600 font-bold text-sm">฿{item.basePrice}</span>
+            filteredMenu.map(item => {
+                const localized = getLocalizedItem(item);
+                return (
+                <div 
+                    key={item.id} 
+                    onClick={() => handleCustomize(item)}
+                    className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden h-32 md:h-auto md:flex-col cursor-pointer active:scale-95 transition hover:shadow-md ${!item.available ? 'opacity-60 grayscale' : ''}`}
+                >
+                    <div className="w-32 md:w-full md:h-48 h-full relative flex-shrink-0">
+                        <img src={item.image} alt={localized.name} className="w-full h-full object-cover" />
+                        {!item.available && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <span className="text-white text-xs font-bold bg-red-600 px-2 py-1 rounded">{t('soldOut')}</span>
+                            </div>
+                        )}
                     </div>
-                    <p className="text-gray-500 text-xs mt-1 line-clamp-2">{item.description}</p>
+                    <div className="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-gray-800 leading-tight">{localized.name}</h3>
+                            <span className="text-brand-600 font-bold text-sm">฿{item.basePrice}</span>
+                        </div>
+                        <p className="text-gray-500 text-xs mt-1 line-clamp-2">{localized.description}</p>
+                    </div>
+                    {item.available && <span className="text-xs font-bold text-brand-600 flex items-center gap-1 self-end bg-brand-50 px-2 py-1 rounded-full mt-2"><Plus size={12}/> {t('addToOrder')}</span>}
+                    </div>
                 </div>
-                {item.available && <span className="text-xs font-bold text-brand-600 flex items-center gap-1 self-end bg-brand-50 px-2 py-1 rounded-full mt-2"><Plus size={12}/> ADD</span>}
-                </div>
-            </div>
-            ))
+                )
+            })
         )}
       </main>
 
@@ -326,11 +444,11 @@ export const CustomerView: React.FC = () => {
         <p className="mb-2">© 2024 Pizza Damac Nonthaburi</p>
         <div className="flex justify-center gap-4 opacity-50 hover:opacity-100 transition duration-200">
             <button onClick={() => navigateTo('kitchen')} className="hover:text-brand-600 underline flex items-center gap-1">
-                <ChefHat size={12} /> Kitchen
+                <ChefHat size={12} /> {t('kitchen')}
             </button>
             <span className="text-gray-300">|</span>
             <button onClick={() => navigateTo('pos')} className="hover:text-brand-600 underline flex items-center gap-1">
-                <Banknote size={12} /> POS System
+                <Banknote size={12} /> {t('pos')}
             </button>
         </div>
       </footer>
@@ -340,7 +458,7 @@ export const CustomerView: React.FC = () => {
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-start">
               <div className="bg-white w-full max-w-sm h-full shadow-2xl overflow-y-auto animate-slide-in-left p-6">
                   <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold">My Profile</h2>
+                      <h2 className="text-2xl font-bold">{t('myProfile')}</h2>
                       <button onClick={() => setShowProfile(false)} className="p-2 bg-gray-100 rounded-full"><X size={20}/></button>
                   </div>
                   
@@ -351,7 +469,7 @@ export const CustomerView: React.FC = () => {
                               <p className="text-brand-100 text-sm font-medium mb-1">Pizza Damac Rewards</p>
                               <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-white/30">{customer.tier || 'Bronze'} Member</span>
                           </div>
-                          <h3 className="text-3xl font-bold mb-4">{customer.loyaltyPoints} <span className="text-lg font-normal">Points</span></h3>
+                          <h3 className="text-3xl font-bold mb-4">{customer.loyaltyPoints} <span className="text-lg font-normal">{t('points')}</span></h3>
                           <div className="w-full bg-black/20 rounded-full h-2 mb-2">
                               <div className="bg-yellow-400 h-2 rounded-full transition-all duration-1000" style={{width: `${Math.min((customer.loyaltyPoints / 10) * 100, 100)}%`}}></div>
                           </div>
@@ -365,7 +483,7 @@ export const CustomerView: React.FC = () => {
                                 onClick={handleClaimReward}
                                 className="mt-4 w-full bg-white text-brand-600 font-bold py-2 rounded-lg shadow flex items-center justify-center gap-2 animate-bounce-short"
                              >
-                                <Gift size={16} /> Claim Free Pizza
+                                <Gift size={16} /> {t('claimReward')}
                              </button>
                           )}
                       </div>
@@ -374,7 +492,7 @@ export const CustomerView: React.FC = () => {
 
                   {/* Favorites */}
                   <div className="mb-8">
-                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Heart size={18} className="text-red-500" /> Saved Favorites</h3>
+                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Heart size={18} className="text-red-500" /> {t('savedFavorites')}</h3>
                       {(!customer.savedFavorites || customer.savedFavorites.length === 0) ? (
                           <p className="text-gray-400 text-sm">No saved pizzas yet.</p>
                       ) : (
@@ -390,11 +508,13 @@ export const CustomerView: React.FC = () => {
                                             // Reconstruct cart item from favorite
                                             const pizza = menu.find(p => p.id === fav.pizzaId);
                                             if(pizza) {
+                                                const localized = getLocalizedItem(pizza);
                                                 const price = pizza.basePrice + fav.toppings.reduce((s,t) => s + t.price, 0);
                                                 addToCart({
                                                     id: Date.now().toString(),
                                                     pizzaId: pizza.id,
                                                     name: fav.name,
+                                                    nameTh: fav.name, 
                                                     basePrice: pizza.basePrice,
                                                     selectedToppings: fav.toppings,
                                                     quantity: 1,
@@ -407,7 +527,7 @@ export const CustomerView: React.FC = () => {
                                         }}
                                         className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-full font-bold"
                                       >
-                                          Order
+                                          {t('orderNow')}
                                       </button>
                                   </div>
                               ))}
@@ -417,7 +537,7 @@ export const CustomerView: React.FC = () => {
 
                   {/* History */}
                   <div>
-                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={18} className="text-blue-500" /> Recent Orders</h3>
+                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={18} className="text-blue-500" /> {t('recentOrders')}</h3>
                       {(!customer.orderHistory || customer.orderHistory.length === 0) ? (
                           <p className="text-gray-400 text-sm">No past orders.</p>
                       ) : (
@@ -432,13 +552,13 @@ export const CustomerView: React.FC = () => {
                                                   <span className="text-xs text-gray-400 block">{new Date(order.createdAt).toLocaleDateString()}</span>
                                                   <span className="font-bold text-gray-800 text-sm">฿{order.totalAmount}</span>
                                               </div>
-                                              <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">{order.status}</span>
+                                              <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">{t(order.status as any)}</span>
                                           </div>
                                           <button 
                                             onClick={() => { reorderItem(order.id); setIsCartOpen(true); setShowProfile(false); }}
                                             className="w-full text-center text-xs text-brand-600 font-bold border border-brand-100 py-1.5 rounded hover:bg-brand-50"
                                           >
-                                              Reorder Again
+                                              {t('reorder')}
                                           </button>
                                       </div>
                                   )
@@ -448,7 +568,7 @@ export const CustomerView: React.FC = () => {
                   </div>
                   
                   <button onClick={() => { setCustomer({ ...customer, name: '', phone: '' } as any); window.location.reload(); }} className="mt-8 text-center w-full text-gray-400 text-xs underline">
-                      Log Out
+                      {t('logout')}
                   </button>
               </div>
           </div>
@@ -459,7 +579,7 @@ export const CustomerView: React.FC = () => {
           <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
               <div className="p-4 border-b flex items-center gap-4 bg-gray-900 text-white">
                   <button onClick={() => setShowTracker(false)}><ArrowLeft /></button>
-                  <h2 className="font-bold text-lg">Order Tracker</h2>
+                  <h2 className="font-bold text-lg">{t('trackOrder')}</h2>
               </div>
               <div className="flex-1 bg-gray-50 p-4 overflow-y-auto">
                   {activeOrders.length === 0 ? (
@@ -496,20 +616,22 @@ export const CustomerView: React.FC = () => {
                                                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 ${idx <= currentStepIndex ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300 text-gray-300'}`}>
                                                           {idx + 1}
                                                       </div>
-                                                      <span className="text-[10px] font-bold uppercase">{step === 'acknowledged' ? 'Prep' : step}</span>
+                                                      <span className="text-[10px] font-bold uppercase">{step === 'acknowledged' ? t('acknowledged') : t(step as any)}</span>
                                                   </div>
                                               ))}
                                           </div>
                                       </div>
 
                                       <div className="bg-gray-50 p-4 rounded-xl">
-                                          <h4 className="font-bold text-sm mb-2 text-gray-700">Order Details</h4>
+                                          <h4 className="font-bold text-sm mb-2 text-gray-700">{t('yourOrder')}</h4>
                                           <ul className="space-y-1 text-sm text-gray-600">
-                                              {order.items.map((item, i) => (
+                                              {order.items.map((item, i) => {
+                                                  const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                                                  return (
                                                   <li key={i} className="flex justify-between">
-                                                      <span>{item.quantity}x {item.name}</span>
+                                                      <span>{item.quantity}x {name}</span>
                                                   </li>
-                                              ))}
+                                              )})}
                                           </ul>
                                       </div>
                                   </div>
@@ -533,9 +655,9 @@ export const CustomerView: React.FC = () => {
                         🎉 You've unlocked a FREE Pizza Reward!
                     </div>
                 )}
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Order Received! 🍕</h2>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('orderReceived')} 🍕</h2>
                 <p className="text-gray-600 mb-6 text-sm">
-                    Thank you for your order. Tracking is now available in your profile.
+                    {t('thankYouOrder')}
                 </p>
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6">
                     <p className="font-bold text-brand-600 mb-2 text-sm uppercase">Support Us</p>
@@ -546,7 +668,7 @@ export const CustomerView: React.FC = () => {
                         className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-blue-700 transition"
                     >
                         <Star size={16} fill="white" />
-                        Review on Google Maps
+                        {t('reviewGoogle')}
                         <ExternalLink size={14} />
                     </a>
                 </div>
@@ -555,7 +677,7 @@ export const CustomerView: React.FC = () => {
                     onClick={() => { setShowReviewModal(false); setShowTracker(true); }}
                     className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold text-sm"
                 >
-                    Track Order Status
+                    {t('trackOrder')}
                 </button>
            </div>
         </div>
@@ -569,15 +691,15 @@ export const CustomerView: React.FC = () => {
                 <img src={selectedPizza.image} className="w-full h-full object-cover rounded-t-2xl sm:rounded-t-2xl" />
                 <button onClick={() => setSelectedPizza(null)} className="absolute top-4 right-4 bg-black/50 text-white p-1 rounded-full"><X size={20}/></button>
                 <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <h3 className="font-bold text-2xl text-white">{selectedPizza.name}</h3>
-                    <p className="text-white/80 text-sm">{selectedPizza.description}</p>
+                    <h3 className="font-bold text-2xl text-white">{getLocalizedItem(selectedPizza).name}</h3>
+                    <p className="text-white/80 text-sm">{getLocalizedItem(selectedPizza).description}</p>
                 </div>
             </div>
             
             <div className="p-5">
-               {selectedPizza.name === "Create Your Own Pizza" && (
+               {(selectedPizza.name === "Create Your Own Pizza" || selectedPizza.name.includes("Lucky")) && (
                    <div className="mb-4">
-                       <label className="text-xs font-bold text-gray-500 uppercase">Name your creation</label>
+                       <label className="text-xs font-bold text-gray-500 uppercase">{t('nameCreation')}</label>
                        <input 
                            type="text" 
                            placeholder="e.g. My Super Cheese" 
@@ -590,17 +712,18 @@ export const CustomerView: React.FC = () => {
 
                {selectedPizza.category === 'pizza' && (
                <div className="mb-6">
-                 <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">Customize Toppings</h4>
+                 <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">{t('customizeToppings')}</h4>
                  <div className="grid grid-cols-2 gap-2">
                    {INITIAL_TOPPINGS.map(topping => {
                      const isSelected = !!selectedToppings.find(t => t.id === topping.id);
+                     const toppingName = language === 'th' && topping.nameTh ? topping.nameTh : topping.name;
                      return (
                         <button 
                             key={topping.id} 
                             onClick={() => toggleTopping(topping)}
                             className={`flex items-center justify-between p-3 border rounded-lg text-sm transition ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-700 font-medium' : 'border-gray-200 text-gray-600'}`}
                         >
-                            <span>{topping.name}</span>
+                            <span>{toppingName}</span>
                             <span className="text-xs opacity-70">+฿{topping.price}</span>
                         </button>
                      );
@@ -617,7 +740,7 @@ export const CustomerView: React.FC = () => {
                     onClick={handleAddToCart}
                     className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 transition flex justify-between px-6 items-center shadow-lg shadow-brand-200"
                    >
-                     <span>Add to Order</span>
+                     <span>{t('addToOrder')}</span>
                      <span>฿{selectedPizza.basePrice + selectedToppings.reduce((s, t) => s + t.price, 0)}</span>
                    </button>
                </div>
@@ -630,8 +753,8 @@ export const CustomerView: React.FC = () => {
       {showRegister && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-xs p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-4 text-center">Join Pizza Damac</h2>
-            <p className="text-xs text-center text-gray-500 mb-4">Register to earn points and save favorites!</p>
+            <h2 className="text-xl font-bold mb-4 text-center">{t('joinDamac')}</h2>
+            <p className="text-xs text-center text-gray-500 mb-4">{t('registerDesc')}</p>
             <form onSubmit={handleRegister}>
               <div className="space-y-3">
                 <input 
@@ -668,9 +791,9 @@ export const CustomerView: React.FC = () => {
                 </div>
               </div>
               <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold mt-4">
-                Start Earning Points
+                {t('startEarning')}
               </button>
-              <button onClick={() => setShowRegister(false)} type="button" className="w-full text-gray-400 py-2 text-sm">Cancel</button>
+              <button onClick={() => setShowRegister(false)} type="button" className="w-full text-gray-400 py-2 text-sm">{t('cancel')}</button>
             </form>
           </div>
         </div>
@@ -685,13 +808,13 @@ export const CustomerView: React.FC = () => {
                 <div className="bg-brand-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 text-brand-600">
                     <ChefHat size={24} />
                 </div>
-                <h2 className="font-bold text-lg">Chef's Recommendation</h2>
+                <h2 className="font-bold text-lg">{t('chefRec')}</h2>
              </div>
              
              <textarea 
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="What are you in the mood for? (e.g. spicy, creamy, vegetarian)"
+                placeholder={t('whatMood')}
                 className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none resize-none h-24 bg-gray-50 text-sm mb-4"
              />
              
@@ -700,7 +823,7 @@ export const CustomerView: React.FC = () => {
                 disabled={isThinking || !aiPrompt}
                 className="w-full py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 transition disabled:opacity-50"
              >
-                {isThinking ? 'Thinking...' : 'Ask Chef'}
+                {isThinking ? t('thinking') : t('askChef')}
              </button>
 
              {aiRecommendation && (
@@ -717,33 +840,35 @@ export const CustomerView: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-40 flex justify-end backdrop-blur-sm">
            <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-slide-in">
               <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                  <h2 className="font-bold text-lg">Your Order</h2>
+                  <h2 className="font-bold text-lg">{t('yourOrder')}</h2>
                   <button onClick={() => setIsCartOpen(false)}><X /></button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {cart.length === 0 ? (
-                      <div className="text-center text-gray-500 mt-20">Cart is empty</div>
+                      <div className="text-center text-gray-500 mt-20">{t('cartEmpty')}</div>
                   ) : (
                       <>
                         <div className="space-y-4">
-                            {cart.map(item => (
+                            {cart.map(item => {
+                                const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                                return (
                                 <div key={item.id} className="flex justify-between border-b border-dashed pb-4">
                                     <div>
-                                        <h4 className="font-bold text-gray-800">{item.name}</h4>
+                                        <h4 className="font-bold text-gray-800">{name}</h4>
                                         <p className="text-xs text-gray-500">
                                             {item.basePrice === 0 ? 'Reward' : ''}
                                             {item.selectedToppings.length > 0 
-                                                ? `+ ${item.selectedToppings.map(t => t.name).join(', ')}` 
+                                                ? `+ ${item.selectedToppings.map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ')}` 
                                                 : ''}
                                         </p>
                                     </div>
                                     <div className="flex flex-col items-end gap-1">
                                         <span className="font-medium">฿{item.totalPrice}</span>
-                                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[10px] font-bold uppercase">Remove</button>
+                                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[10px] font-bold uppercase">{t('delete')}</button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                       </>
                   )}
@@ -770,16 +895,16 @@ export const CustomerView: React.FC = () => {
                       {/* Pickup Specifics */}
                       {orderType === 'online' && (
                           <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Pickup Time</label>
+                             <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{t('pickupTime')}</label>
                              <select 
                                 value={pickupTime}
                                 onChange={(e) => setPickupTime(e.target.value)}
                                 className="w-full p-2 bg-gray-50 border rounded text-sm"
                              >
-                                 <option value="">ASAP (approx 20 mins)</option>
+                                 <option value="">{t('asap')}</option>
                                  <option value="30 mins">In 30 mins</option>
                                  <option value="1 hour">In 1 hour</option>
-                                 <option value="Later">Later today</option>
+                                 <option value="Later">{t('later')}</option>
                              </select>
                           </div>
                       )}
@@ -788,47 +913,63 @@ export const CustomerView: React.FC = () => {
                       {orderType === 'delivery' && (
                           <div className="mb-4 space-y-3 bg-white p-3 rounded-lg border border-gray-200">
                               <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Zone</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryZone')}</label>
                                 <select 
                                     className="w-full p-2 border rounded text-sm bg-gray-50 mt-1"
                                     value={selectedZoneId}
                                     onChange={(e) => setSelectedZoneId(e.target.value)}
                                 >
                                     {DELIVERY_ZONES.map(z => (
-                                        <option key={z.id} value={z.id}>{z.name} (+฿{z.fee})</option>
+                                        <option key={z.id} value={z.id}>{language === 'th' ? z.nameTh : z.name} (+฿{z.fee})</option>
                                     ))}
                                 </select>
                               </div>
                               <div>
-                                  <label className="text-xs font-bold text-gray-500 uppercase">Address</label>
+                                  <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
                                   <textarea 
                                     className="w-full p-2 border rounded text-sm bg-gray-50 mt-1"
-                                    placeholder="Enter full delivery address..."
+                                    placeholder="..."
                                     rows={2}
                                     value={deliveryAddress}
                                     onChange={(e) => setDeliveryAddress(e.target.value)}
                                   />
+                              </div>
+                              {/* Location Check */}
+                              <div>
+                                  <div className="flex justify-between items-center mb-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('checkDistance')}</label>
+                                    <a href={RESTAURANT_LOCATION.googleMapsUrl} target="_blank" className="text-[10px] text-blue-500 underline flex items-center gap-1"><MapPin size={10} /> Map</a>
+                                  </div>
+                                  <button 
+                                    onClick={checkDistance} 
+                                    className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100 flex items-center justify-center gap-1"
+                                  >
+                                    {checkingLocation ? t('calculating') : <><Navigation size={12} /> {t('checkDistance')}</>}
+                                  </button>
+                                  {distance && (
+                                      <p className="text-xs text-center mt-1 text-gray-600">{t('distanceFromShop', { dist: distance })}</p>
+                                  )}
                               </div>
                           </div>
                       )}
 
                        {/* Payment Method */}
                        <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                            <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Payment Method</label>
+                            <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t('paymentMethod')}</label>
                             <div className="grid grid-cols-2 gap-2">
                                 <button 
                                     onClick={() => setPaymentMethod('qr_transfer')}
                                     className={`flex flex-col items-center justify-center p-2 border rounded-lg ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
                                 >
                                     <QrCode size={20} className="mb-1"/>
-                                    <span className="text-xs font-bold">QR / Transfer</span>
+                                    <span className="text-xs font-bold">{t('qrTransfer')}</span>
                                 </button>
                                 <button 
                                     onClick={() => setPaymentMethod('cash')}
                                     className={`flex flex-col items-center justify-center p-2 border rounded-lg ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
                                 >
                                     <Banknote size={20} className="mb-1"/>
-                                    <span className="text-xs font-bold">Cash</span>
+                                    <span className="text-xs font-bold">{t('cash')}</span>
                                 </button>
                             </div>
                        </div>
@@ -836,27 +977,28 @@ export const CustomerView: React.FC = () => {
                       {/* Summary */}
                       <div className="space-y-2 mb-4">
                          <div className="flex justify-between items-center text-sm text-gray-600">
-                              <span>Subtotal</span>
+                              <span>{t('subtotal')}</span>
                               <span>฿{cartTotal}</span>
                          </div>
                          {orderType === 'delivery' && (
                              <div className="flex justify-between items-center text-sm text-gray-600">
-                                  <span>Delivery Fee</span>
+                                  <span>{t('deliveryFee')}</span>
                                   <span>+฿{deliveryFee}</span>
                              </div>
                          )}
                          <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t">
-                              <span>Total</span>
+                              <span>{t('total')}</span>
                               <span>฿{finalTotal}</span>
                          </div>
                       </div>
 
                       <button 
                         onClick={handlePlaceOrder}
-                        className="w-full py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 transition flex items-center justify-center gap-2 shadow-lg shadow-brand-200"
+                        disabled={isSubmitting}
+                        className={`w-full py-3 rounded-xl font-bold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-brand-200 ${isSubmitting ? 'bg-gray-400' : 'bg-brand-600 hover:bg-brand-700'}`}
                       >
-                         {orderType === 'delivery' ? <Truck size={20} /> : <ShoppingBag size={20} />}
-                         {orderType === 'delivery' ? `Confirm Delivery` : `Place Order`}
+                         {isSubmitting ? t('thinking') : (orderType === 'delivery' ? <Truck size={20} /> : <ShoppingBag size={20} />)}
+                         {orderType === 'delivery' ? t('confirmDelivery') : t('placeOrder')}
                       </button>
                   </div>
               )}

@@ -5,7 +5,7 @@ import { Order, OrderStatus } from '../types';
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout } = useStore();
+  const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
 
   const getStatusColor = (status: OrderStatus) => {
       switch(status) {
@@ -38,20 +38,20 @@ export const KitchenView: React.FC = () => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-gray-700 pb-4 gap-4">
         <div className="flex-1">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <Utensils className="text-brand-500"/> Kitchen Display System
+                <Utensils className="text-brand-500"/> {t('kitchenDisplay')}
             </h1>
-            <p className="text-gray-400 text-sm mt-1">Real-time Order Tracking</p>
+            <p className="text-gray-400 text-sm mt-1">{t('realtimeTracking')}</p>
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
-                <span className="text-gray-400 text-sm block">Active</span>
+                <span className="text-gray-400 text-sm block">{t('active')}</span>
                 <span className="text-2xl font-bold text-brand-400">{activeOrders.filter(o => o.status !== 'completed').length}</span>
             </div>
             <button 
                 onClick={adminLogout} 
                 className="bg-gray-700 hover:bg-red-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition border border-gray-600 hover:border-red-700"
             >
-                <LogOut size={16} /> Logout
+                <LogOut size={16} /> {t('logout')}
             </button>
         </div>
       </header>
@@ -65,7 +65,7 @@ export const KitchenView: React.FC = () => {
                       <div className="flex items-center gap-2 mb-1">
                           <span className="font-bold text-lg text-gray-900">#{order.id.slice(-4)}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${getStatusColor(order.status)}`}>
-                            {order.status}
+                            {t(order.status as any)}
                           </span>
                       </div>
                       <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
@@ -88,7 +88,7 @@ export const KitchenView: React.FC = () => {
                       {order.paymentMethod && (
                           <div className="flex items-center gap-1 justify-end text-xs mt-1 text-gray-400">
                               {order.paymentMethod === 'cash' ? <Banknote size={12}/> : <QrCode size={12}/>}
-                              {order.paymentMethod === 'cash' ? 'Pay Cash' : 'Paid QR'}
+                              {order.paymentMethod === 'cash' ? t('cash') : t('qrTransfer')}
                           </div>
                       )}
                   </div>
@@ -99,7 +99,7 @@ export const KitchenView: React.FC = () => {
                   <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-start gap-2">
                       <MapPin size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
                       <div>
-                          <p className="text-xs font-bold text-blue-800 uppercase mb-0.5">Delivery To:</p>
+                          <p className="text-xs font-bold text-blue-800 uppercase mb-0.5">{t('deliveryAddress')}:</p>
                           <p className="text-sm text-gray-800 leading-snug">{order.deliveryAddress}</p>
                       </div>
                   </div>
@@ -108,17 +108,19 @@ export const KitchenView: React.FC = () => {
               {/* Items */}
               <div className="p-4 bg-white flex-1 min-h-[150px]">
                   <ul className="space-y-4">
-                      {order.items.map((item, idx) => (
+                      {order.items.map((item, idx) => {
+                          const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                          return (
                           <li key={idx} className="flex flex-col border-b border-dashed border-gray-100 pb-3 last:border-0 last:pb-0">
                               <div className="flex items-start gap-3">
                                   <span className="bg-gray-900 text-white w-8 h-8 flex items-center justify-center rounded-lg text-lg font-bold flex-shrink-0">{item.quantity}</span> 
                                   <div>
-                                      <span className="font-bold text-gray-800 text-lg leading-tight block">{item.name}</span>
+                                      <span className="font-bold text-gray-800 text-lg leading-tight block">{name}</span>
                                       {item.selectedToppings.length > 0 && (
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {item.selectedToppings.map(t => (
                                                 <span key={t.id} className="text-sm font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
-                                                    + {t.name}
+                                                    + {language === 'th' && t.nameTh ? t.nameTh : t.name}
                                                 </span>
                                             ))}
                                         </div>
@@ -126,7 +128,7 @@ export const KitchenView: React.FC = () => {
                                   </div>
                               </div>
                           </li>
-                      ))}
+                      )})}
                   </ul>
                   {order.note && (
                       <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 italic font-medium">
@@ -139,34 +141,34 @@ export const KitchenView: React.FC = () => {
               <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
                 {order.status === 'pending' && (
                     <>
-                        <button onClick={() => updateOrderStatus(order.id, 'cancelled')} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded font-semibold text-sm">Reject</button>
+                        <button onClick={() => updateOrderStatus(order.id, 'cancelled')} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded font-semibold text-sm">{t('reject')}</button>
                         <button onClick={() => updateOrderStatus(order.id, 'confirmed')} className="flex-1 bg-brand-600 text-white px-4 py-3 rounded-lg shadow hover:bg-brand-700 font-bold text-lg flex items-center justify-center gap-2 animate-bounce-short">
-                            <Bell size={20} /> Confirm
+                            <Bell size={20} /> {t('confirm')}
                         </button>
                     </>
                 )}
                 {order.status === 'confirmed' && (
                     <button onClick={() => updateOrderStatus(order.id, 'acknowledged')} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg shadow hover:bg-blue-700 font-bold text-lg flex items-center justify-center gap-2">
-                        <ChefHat size={20} /> Acknowledge (Prep)
+                        <ChefHat size={20} /> {t('acknowledged')}
                     </button>
                 )}
                 {order.status === 'acknowledged' && (
                     <button onClick={() => updateOrderStatus(order.id, 'cooking')} className="flex-1 bg-orange-500 text-white px-4 py-3 rounded-lg shadow hover:bg-orange-600 font-bold text-lg flex items-center justify-center gap-2">
-                        <Flame size={20} /> Start Cooking
+                        <Flame size={20} /> {t('startCooking')}
                     </button>
                 )}
                 {order.status === 'cooking' && (
                     <button onClick={() => updateOrderStatus(order.id, 'ready')} className="flex-1 bg-green-500 text-white px-4 py-3 rounded-lg shadow hover:bg-green-600 font-bold text-lg flex items-center justify-center gap-2">
-                        <CheckCircle size={20} /> Mark Ready
+                        <CheckCircle size={20} /> {t('markReady')}
                     </button>
                 )}
                 {order.status === 'ready' && (
                     <button onClick={() => updateOrderStatus(order.id, 'completed')} className="flex-1 bg-gray-800 text-white px-4 py-3 rounded-lg shadow hover:bg-gray-900 font-bold text-lg">
-                        Complete Order
+                        {t('completeOrder')}
                     </button>
                 )}
                  {order.status === 'completed' && (
-                    <span className="text-gray-400 text-sm font-medium w-full text-center py-2">Order Closed</span>
+                    <span className="text-gray-400 text-sm font-medium w-full text-center py-2">{t('completed')}</span>
                 )}
               </div>
            </div>

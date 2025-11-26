@@ -2,6 +2,7 @@
 export interface Topping {
   id: string;
   name: string;
+  nameTh?: string; // Thai Name
   price: number;
 }
 
@@ -10,8 +11,10 @@ export type ProductCategory = 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'drink
 export interface Pizza {
   id: string;
   name: string;
+  nameTh?: string; // Thai Name
   basePrice: number;
   description: string;
+  descriptionTh?: string; // Thai Description
   image: string;
   available: boolean;
   category: ProductCategory;
@@ -21,6 +24,7 @@ export interface CartItem {
   id: string;
   pizzaId: string;
   name: string;
+  nameTh?: string; // Store localized name in cart
   basePrice: number;
   selectedToppings: Topping[];
   quantity: number;
@@ -30,6 +34,7 @@ export interface CartItem {
 export interface DeliveryZone {
   id: string;
   name: string;
+  nameTh?: string;
   fee: number;
 }
 
@@ -45,7 +50,9 @@ export interface CustomerProfile {
   phone: string;
   favoritePizza?: string;
   address?: string;
+  birthday?: string;
   loyaltyPoints: number; // 1 point per pizza ordered
+  tier?: 'Bronze' | 'Silver' | 'Gold';
   savedFavorites: SavedFavorite[];
   orderHistory: string[]; // List of Order IDs
 }
@@ -55,6 +62,7 @@ export type OrderSource = 'store' | 'grab' | 'lineman' | 'robinhood' | 'foodpand
 export type OrderStatus = 'pending' | 'confirmed' | 'acknowledged' | 'cooking' | 'ready' | 'completed' | 'cancelled';
 export type PaymentMethod = 'cash' | 'qr_transfer';
 export type AppView = 'customer' | 'kitchen' | 'pos';
+export type Language = 'en' | 'th';
 
 export interface Order {
   id: string;
@@ -78,4 +86,16 @@ export interface Order {
   tableNumber?: string;
   paymentMethod?: PaymentMethod;
   pickupTime?: string;
+}
+
+// Accounting
+export type ExpenseCategory = 'COGS' | 'Labor' | 'Rent' | 'Utilities' | 'Marketing' | 'Maintenance' | 'Other';
+
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  date: string;
+  note?: string;
 }
