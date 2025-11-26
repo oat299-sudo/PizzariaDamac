@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language } from '../types';
-import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS } from '../constants';
+import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings } from '../types';
+import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS } from '../constants';
 import { supabase } from '../services/supabaseClient';
 
 interface StoreContextType {
@@ -54,6 +54,13 @@ interface StoreContextType {
   expenses: Expense[];
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  
+  // Store Settings
+  isStoreOpen: boolean;
+  isHoliday: boolean;
+  closedMessage: string;
+  toggleStoreStatus: (isOpen: boolean, message?: string) => Promise<void>;
+  generateTimeSlots: () => string[];
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -131,13 +138,38 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return saved ? JSON.parse(saved) : null;
   });
 
+  // --- Store Settings State ---
+  const [isHoliday, setIsHoliday] = useState(false);
+  const [closedMessage, setClosedMessage] = useState('');
+  // Derived state: Open if NOT holiday AND within hours
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
+
+  const checkOperatingHours = () => {
+    const now = new Date();
+    // Convert to Bangkok Time if needed, but assuming browser local time for simplicity
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    const isOpenHours = currentHour >= OPERATING_HOURS.open && currentHour < OPERATING_HOURS.close;
+    return isOpenHours;
+  };
+
+  useEffect(() => {
+     // Re-eval open status whenever holiday or time changes
+     const openHours = checkOperatingHours();
+     setIsStoreOpen(!isHoliday && openHours);
+     
+     const interval = setInterval(() => {
+         const openHours = checkOperatingHours();
+         setIsStoreOpen(!isHoliday && openHours);
+     }, 60000); // Check every minute
+     return () => clearInterval(interval);
+  }, [isHoliday]);
+
   // --- 1. Fetch Initial Data from Supabase ---
   useEffect(() => {
     const fetchData = async () => {
       // Menu
       const { data: menuData } = await supabase.from('menu_items').select('*');
       if (menuData && menuData.length > 0) {
-        // Map snake_case DB to camelCase Types
         const mappedMenu: Pizza[] = menuData.map((m: any) => ({
           id: m.id, name: m.name, nameTh: m.name_th, 
           description: m.description, descriptionTh: m.description_th,
@@ -172,19 +204,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Expenses
       const { data: expData } = await supabase.from('expenses').select('*').order('date', { ascending: false });
       if (expData) setExpenses(expData);
+
+      // Store Settings
+      const { data: settingsData } = await supabase.from('store_settings').select('*').eq('id', 'global').single();
+      if (settingsData) {
+          setIsHoliday(!settingsData.is_open);
+          setClosedMessage(settingsData.closed_message || '');
+      }
     };
 
     fetchData();
 
     // --- 2. Realtime Subscriptions ---
     const channel = supabase.channel('realtime_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-          // Simplest way: just re-fetch orders on any change to keep it consistent
-          // In a larger app, you'd merge the payload
-          fetchData(); 
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, (payload) => {
-          fetchData();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, (payload) => {
+          if (payload.new) {
+             setIsHoliday(!payload.new.is_open);
+             setClosedMessage(payload.new.closed_message);
+          }
       })
       .subscribe();
 
@@ -193,9 +232,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // --- Menu Actions ---
   const addPizza = async (pizza: Pizza) => {
-    // Optimistic UI update
     setMenu(prev => [...prev, pizza]);
-    // DB Update
     await supabase.from('menu_items').insert([{
         id: pizza.id, name: pizza.name, name_th: pizza.nameTh,
         description: pizza.description, description_th: pizza.descriptionTh,
@@ -435,6 +472,31 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return { pizza: pizzaBase, toppings: selected };
   };
 
+  // --- Store Settings ---
+  const toggleStoreStatus = async (isOpen: boolean, message?: string) => {
+     setIsHoliday(!isOpen);
+     if (message !== undefined) setClosedMessage(message);
+     
+     // Update DB
+     await supabase.from('store_settings').update({ 
+         is_open: isOpen, 
+         closed_message: message ?? closedMessage 
+     }).eq('id', 'global');
+  };
+
+  const generateTimeSlots = () => {
+      const slots = [];
+      let time = OPERATING_HOURS.open;
+      while (time < OPERATING_HOURS.close) {
+          const hours = Math.floor(time);
+          const minutes = (time % 1) * 60;
+          const timeStr = `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}`;
+          slots.push(timeStr);
+          time += 0.5;
+      }
+      return slots;
+  };
+
   return (
     <StoreContext.Provider value={{
       language, toggleLanguage, t, getLocalizedItem,
@@ -446,7 +508,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
       customer, setCustomer, addToFavorites, claimReward,
       orders, placeOrder, updateOrderStatus, reorderItem,
-      expenses, addExpense, deleteExpense
+      expenses, addExpense, deleteExpense,
+      isStoreOpen, isHoliday, closedMessage, toggleStoreStatus, generateTimeSlots
     }}>
       {children}
     </StoreContext.Provider>

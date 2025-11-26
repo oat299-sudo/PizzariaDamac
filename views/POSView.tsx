@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, INITIAL_TOPPINGS, GP_RATES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Clock, Settings, User, X, ChevronRight, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, PenTool, Menu, Camera, Calculator, PieChart, FileText, Globe } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Clock, Settings, User, X, ChevronRight, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, PenTool, Menu, Camera, Calculator, PieChart, FileText, Globe, ToggleLeft, ToggleRight, MessageSquare } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -12,7 +12,8 @@ export const POSView: React.FC = () => {
         toppings, addTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
         expenses, addExpense, deleteExpense,
-        t, toggleLanguage, language, getLocalizedItem
+        t, toggleLanguage, language, getLocalizedItem,
+        isStoreOpen, toggleStoreStatus, closedMessage
     } = useStore();
     
     const [activeTab, setActiveTab] = useState<'order' | 'sales' | 'expenses'>('order');
@@ -27,6 +28,9 @@ export const POSView: React.FC = () => {
     const [priceEditId, setPriceEditId] = useState<string | null>(null);
     const [tempPrice, setTempPrice] = useState<string>('');
     const [tableNumber, setTableNumber] = useState('');
+    
+    // Store Status Msg
+    const [tempClosedMsg, setTempClosedMsg] = useState(closedMessage);
     
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
@@ -224,8 +228,6 @@ export const POSView: React.FC = () => {
 
     // Sales Calculation (For Accountant)
     const today = new Date().toDateString();
-    // Filter orders by today for daily view, but Accountant Report should probably show All Time or Monthly
-    // For simplicity in this demo, we'll do All Time in the report table, but Daily in the cards
     const todaysOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today && o.status !== 'cancelled');
     
     // All Time Stats for Report
@@ -360,27 +362,53 @@ export const POSView: React.FC = () => {
                         <div className="flex-1 flex flex-col overflow-hidden relative">
                             <div className="p-4 md:p-6 pb-2">
                                 <div className="flex justify-between items-center mb-4 md:mb-6">
-                                    <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-                                        {isEditMode ? (
-                                            <div className="flex flex-wrap items-center gap-2 md:gap-4">
-                                                <span className="flex items-center gap-2 text-red-600 text-sm md:text-base">
-                                                    <Settings className="animate-spin-slow" size={20} /> {t('managerMode')}
-                                                </span>
-                                                <button onClick={handleOpenAddModal} className="bg-brand-600 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-brand-700 shadow-sm">
-                                                    <Plus size={14} /> {t('addItem')}
-                                                </button>
-                                                <button onClick={() => setShowToppingsModal(true)} className="bg-blue-600 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-blue-700 shadow-sm">
-                                                    <Edit2 size={14} /> {t('manageToppings')}
-                                                </button>
-                                                <label className="bg-gray-700 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-gray-800 shadow-sm cursor-pointer">
-                                                    <Upload size={14} /> {t('uploadLogo')}
-                                                    <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
-                                                </label>
-                                            </div>
-                                        ) : (
-                                            t('tableService')
-                                        )}
-                                    </h2>
+                                    <div className="flex items-center gap-4">
+                                        <h2 className="text-xl md:text-2xl font-bold text-gray-800">
+                                            {isEditMode ? (
+                                                <div className="flex flex-wrap items-center gap-2 md:gap-4">
+                                                    <span className="flex items-center gap-2 text-red-600 text-sm md:text-base">
+                                                        <Settings className="animate-spin-slow" size={20} /> {t('managerMode')}
+                                                    </span>
+                                                    <button onClick={handleOpenAddModal} className="bg-brand-600 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-brand-700 shadow-sm">
+                                                        <Plus size={14} /> {t('addItem')}
+                                                    </button>
+                                                    <button onClick={() => setShowToppingsModal(true)} className="bg-blue-600 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-blue-700 shadow-sm">
+                                                        <Edit2 size={14} /> {t('manageToppings')}
+                                                    </button>
+                                                    <label className="bg-gray-700 text-white px-2 py-1.5 rounded text-xs md:text-sm font-bold flex items-center gap-1 hover:bg-gray-800 shadow-sm cursor-pointer">
+                                                        <Upload size={14} /> {t('uploadLogo')}
+                                                        <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                                                    </label>
+                                                </div>
+                                            ) : (
+                                                t('tableService')
+                                            )}
+                                        </h2>
+                                        
+                                        {/* Store Toggle */}
+                                        <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-200">
+                                            <button 
+                                                onClick={() => toggleStoreStatus(!isStoreOpen)} 
+                                                className={`flex items-center gap-2 text-sm font-bold px-2 py-1 rounded transition ${isStoreOpen ? 'text-green-600' : 'text-red-500'}`}
+                                            >
+                                                {isStoreOpen ? <ToggleRight size={24} className="fill-current"/> : <ToggleLeft size={24} className="fill-current"/>}
+                                                {isStoreOpen ? 'Store OPEN' : 'Store CLOSED'}
+                                            </button>
+                                            {!isStoreOpen && (
+                                                <div className="flex items-center gap-1 border-l pl-2">
+                                                    <MessageSquare size={14} className="text-gray-400"/>
+                                                    <input 
+                                                        className="text-xs border-none outline-none w-32 bg-transparent text-gray-600"
+                                                        placeholder={t('holidayMsg')}
+                                                        value={tempClosedMsg}
+                                                        onChange={(e) => setTempClosedMsg(e.target.value)}
+                                                        onBlur={() => toggleStoreStatus(false, tempClosedMsg)}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
                                     <span className="text-gray-500 text-xs md:text-sm font-mono hidden md:inline">{new Date().toLocaleString()}</span>
                                 </div>
                                 

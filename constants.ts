@@ -9,6 +9,12 @@ export const RESTAURANT_LOCATION = {
   googleMapsUrl: "https://maps.app.goo.gl/b6QHKHpAhtFbiUbX6"
 };
 
+// Operating Hours (24h format)
+export const OPERATING_HOURS = {
+  open: 11.0, // 11:00 AM
+  close: 20.5 // 8:30 PM
+};
+
 // GP Rates (The % the app takes)
 export const GP_RATES: Record<OrderSource, number> = {
   store: 0,
@@ -88,6 +94,8 @@ export const TRANSLATIONS = {
         chefRec: "Chef's Recommendation",
         whatMood: "What are you in the mood for?",
         thinking: "Thinking...",
+        storeClosed: "Store Closed",
+        storeClosedMsg: "We are currently closed. Open 11:00 - 20:30.",
         
         // POS
         tableService: "Table Service",
@@ -117,6 +125,8 @@ export const TRANSLATIONS = {
         recordExpense: "Record New Expense",
         addExpense: "Add Expense",
         note: "Note",
+        storeStatus: "Store Status",
+        holidayMsg: "Holiday Message",
         
         // Kitchen
         pending: "Pending",
@@ -204,6 +214,8 @@ export const TRANSLATIONS = {
         chefRec: "เมนูแนะนำจากเชฟ",
         whatMood: "วันนี้อยากทานรสชาติแบบไหน? (เช่น เผ็ด, ชีสเยอะ, มังสวิรัติ)",
         thinking: "กำลังคิด...",
+        storeClosed: "ร้านปิด",
+        storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น.",
 
         // POS
         tableService: "บริการที่โต๊ะ",
@@ -233,6 +245,8 @@ export const TRANSLATIONS = {
         recordExpense: "บันทึกค่าใช้จ่ายใหม่",
         addExpense: "เพิ่มค่าใช้จ่าย",
         note: "หมายเหตุ",
+        storeStatus: "สถานะร้าน",
+        holidayMsg: "ข้อความวันหยุด",
 
         // Kitchen
         pending: "รอรับออเดอร์",

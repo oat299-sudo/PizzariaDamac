@@ -99,3 +99,8 @@ export interface Expense {
   date: string;
   note?: string;
 }
+
+export interface StoreSettings {
+  isOpen: boolean;
+  closedMessage: string;
+}
