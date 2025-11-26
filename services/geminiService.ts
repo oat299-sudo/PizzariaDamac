@@ -1,12 +1,25 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Pizza } from '../types';
 
 let genAI: GoogleGenAI | null = null;
 
 try {
-  // Graceful handling if API Key is not set in environment during dev, though mandated by prompt guidelines
-  if (process.env.API_KEY) {
-    genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Safe check for process.env to avoid "ReferenceError: process is not defined" in some browsers
+  // We prioritize process.env.API_KEY as per guidelines, but safely.
+  let apiKey = '';
+  
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    apiKey = process.env.API_KEY;
+  } else {
+    // Fallback for Vite environments if process is missing
+    try {
+       apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
+    } catch (e) {}
+  }
+
+  if (apiKey) {
+    genAI = new GoogleGenAI({ apiKey: apiKey });
   }
 } catch (error) {
   console.error("Failed to initialize Gemini Client", error);

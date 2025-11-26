@@ -1,13 +1,23 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Vite uses import.meta.env for environment variables
-// Using type assertion to bypass "Property 'env' does not exist on type 'ImportMeta'" error
-const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
+// SAFE INITIALIZATION
+// We check if the keys exist. If not, we use "dummy" values so the app doesn't crash on boot.
+// The app will open, but database requests will fail gracefully until you add the keys in Netlify.
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // We log a warning but don't crash, allowing the app to load (albeit without data)
-  console.warn("Supabase URL or Key is missing! Check your .env file or Netlify settings.");
+const getEnvVar = (key: string) => {
+  try {
+    return (import.meta as any).env[key];
+  } catch (e) {
+    return '';
+  }
+};
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || 'https://placeholder.supabase.co';
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || 'placeholder-key';
+
+if (supabaseUrl === 'https://placeholder.supabase.co') {
+  console.warn("⚠️ SUPABASE KEYS MISSING: App is running in safe mode. Database features will not work.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
