@@ -95,12 +95,37 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   // --- View Navigation ---
-  const [currentView, setCurrentView] = useState<AppView>('customer');
+  // Initialize from URL params so direct links work
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get('view');
+      return (view === 'kitchen' || view === 'pos') ? view : 'customer';
+    }
+    return 'customer';
+  });
+
+  // Handle Browser Back/Forward Buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get('view');
+      setCurrentView((view === 'kitchen' || view === 'pos') ? view : 'customer');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const navigateTo = (view: AppView) => {
     setCurrentView(view);
-    if (window.history.pushState) {
-        const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-        window.history.pushState({path:newurl},'',newurl);
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (view === 'customer') {
+            url.searchParams.delete('view');
+        } else {
+            url.searchParams.set('view', view);
+        }
+        window.history.pushState({}, '', url.toString());
     }
   };
 
