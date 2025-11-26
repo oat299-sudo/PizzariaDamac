@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, INITIAL_TOPPINGS, GP_RATES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Clock, Settings, User, X, ChevronRight, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, PenTool, Menu, Camera, Calculator, PieChart, FileText, Globe, ToggleLeft, ToggleRight, MessageSquare, List } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Clock, Settings, User, X, ChevronRight, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, PenTool, Menu, Camera, Calculator, PieChart, FileText, Globe, ToggleLeft, ToggleRight, MessageSquare, List, ChevronUp } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -68,6 +68,8 @@ export const POSView: React.FC = () => {
             setSelectedPizza(pizza);
             setSelectedToppings(item.selectedToppings);
             setEditingCartItem(item);
+            // If on mobile, close the cart drawer to show the modal
+            if (window.innerWidth < 768) setShowMobileCart(false);
         }
     };
 
@@ -107,6 +109,8 @@ export const POSView: React.FC = () => {
         setSelectedPizza(null);
         setSelectedToppings([]);
         setEditingCartItem(null);
+        // On mobile, re-open cart after edit
+        if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
 
     const handlePriceUpdate = () => {
@@ -235,10 +239,8 @@ export const POSView: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row">
             
-            {/* --- MOBILE LAYOUT --- */}
-            
-            {/* Mobile Top Header (Minimal) */}
-            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md">
+            {/* --- MOBILE LAYOUT HEADER --- */}
+            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0">
                 <div className="flex items-center gap-2">
                     {shopLogo ? (
                         <img src={shopLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover" />
@@ -258,10 +260,9 @@ export const POSView: React.FC = () => {
                  </div>
             </div>
 
-            {/* Desktop Sidebar (Hidden on Mobile) */}
-            <aside className="hidden md:flex w-20 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between">
+            {/* --- DESKTOP SIDEBAR --- */}
+            <aside className="hidden md:flex w-20 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0">
                 <div className="flex flex-col items-center gap-6 w-full">
-                    {/* Logo Area */}
                     <div className="mb-2 relative group cursor-pointer">
                         {shopLogo ? (
                             <img src={shopLogo} alt="Logo" className="w-12 h-12 rounded-xl object-cover border-2 border-brand-500" />
@@ -270,7 +271,6 @@ export const POSView: React.FC = () => {
                                 <DollarSign size={24} strokeWidth={3} />
                             </div>
                         )}
-                        {/* Desktop Quick Upload */}
                         <label className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white cursor-pointer">
                              <Camera size={16} />
                              <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
@@ -303,15 +303,15 @@ export const POSView: React.FC = () => {
                 </div>
             </aside>
 
-            {/* Main Content Area */}
-            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0">
+            {/* --- MAIN CONTENT --- */}
+            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0 h-full">
                 
                 {/* VIEW: ORDER */}
                 {activeTab === 'order' && (
                     <>
-                        <div className="flex-1 flex flex-col overflow-hidden relative">
-                            {/* Desktop Header for Order (Hidden on Mobile to save space) */}
-                            <div className="hidden md:block p-6 pb-2">
+                        <div className="flex-1 flex flex-col overflow-hidden relative h-full">
+                            {/* Desktop Header */}
+                            <div className="hidden md:block p-6 pb-2 shrink-0">
                                 <div className="flex justify-between items-center mb-6">
                                     <div className="flex items-center gap-4">
                                         <h2 className="text-2xl font-bold text-gray-800">
@@ -324,7 +324,6 @@ export const POSView: React.FC = () => {
                                             ) : t('tableService')}
                                         </h2>
                                         
-                                        {/* Desktop Store Status */}
                                         <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-200">
                                             <button onClick={() => toggleStoreStatus(!isStoreOpen)} className={`flex items-center gap-2 text-sm font-bold px-2 py-1 rounded transition ${isStoreOpen ? 'text-green-600' : 'text-red-500'}`}>
                                                 {isStoreOpen ? <ToggleRight size={24} className="fill-current"/> : <ToggleLeft size={24} className="fill-current"/>}
@@ -340,8 +339,8 @@ export const POSView: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Categories Sticky Bar */}
-                            <div className="bg-white/95 backdrop-blur z-10 sticky top-0 md:static shadow-sm md:shadow-none p-2 md:p-6 md:pt-0">
+                            {/* Categories Bar */}
+                            <div className="bg-white/95 backdrop-blur z-10 sticky top-0 shadow-sm md:shadow-none p-2 md:p-6 md:pt-0 shrink-0">
                                 <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                                     {CATEGORIES.map(cat => (
                                         <button
@@ -355,7 +354,8 @@ export const POSView: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-2 md:p-6 pt-2 pb-20 md:pb-20">
+                            {/* Menu Grid */}
+                            <div className="flex-1 overflow-y-auto p-2 md:p-6 pt-2 pb-24 md:pb-20">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
@@ -366,11 +366,11 @@ export const POSView: React.FC = () => {
                                             onClick={() => !isEditMode && item.available && handleCustomize(item)}
                                         >
                                             {/* Image */}
-                                            <div className="w-28 md:w-full h-full md:h-32 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                            <div className="w-24 md:w-full h-full md:h-32 rounded-lg overflow-hidden flex-shrink-0 relative">
                                                 <img src={item.image} className="w-full h-full object-cover" />
                                                 {!item.available && (
                                                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                        <span className="text-white text-[10px] md:text-xs font-bold bg-red-600 px-2 py-1 rounded">OUT OF STOCK</span>
+                                                        <span className="text-white text-[10px] md:text-xs font-bold bg-red-600 px-2 py-1 rounded">SOLD OUT</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -408,7 +408,7 @@ export const POSView: React.FC = () => {
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className="bg-white text-brand-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-sm font-extrabold">{cart.reduce((a,c) => a+c.quantity, 0)}</span>
-                                            <span>{t('yourOrder')}</span>
+                                            <span className="flex items-center gap-1">View Order <ChevronUp size={16}/></span>
                                         </div>
                                         <span>฿{cartTotal}</span>
                                     </button>
@@ -419,13 +419,13 @@ export const POSView: React.FC = () => {
                         {/* Order Summary / Cart - Responsive Layout */}
                         <div className={`bg-white border-l shadow-xl flex flex-col z-40 transition-transform duration-300 md:w-96 md:static ${showMobileCart ? 'fixed inset-0 w-full translate-y-0' : 'fixed inset-0 w-full translate-y-full md:hidden'}`}>
                              {/* Mobile Cart Header */}
-                             <div className="md:hidden p-4 border-b flex justify-between items-center bg-gray-50 shadow-sm">
+                             <div className="md:hidden p-4 border-b flex justify-between items-center bg-gray-50 shadow-sm shrink-0">
                                 <h3 className="font-bold text-lg">{t('yourOrder')}</h3>
                                 <button onClick={() => setShowMobileCart(false)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X size={20}/></button>
                              </div>
 
                              {/* Desktop Cart Header */}
-                             <div className="hidden md:block p-6 border-b bg-gray-50">
+                             <div className="hidden md:block p-6 border-b bg-gray-50 shrink-0">
                                  <h3 className="font-bold text-xl text-gray-800 mb-2">{t('placeOrder')}</h3>
                                  <div className="flex items-center gap-2">
                                      <User size={18} className="text-gray-500"/>
@@ -440,7 +440,7 @@ export const POSView: React.FC = () => {
                              </div>
                              
                              {/* Mobile Table Input */}
-                             <div className="md:hidden p-4 bg-gray-50 border-b">
+                             <div className="md:hidden p-4 bg-gray-50 border-b shrink-0">
                                  <div className="flex items-center gap-2">
                                      <User size={18} className="text-gray-500"/>
                                      <input type="text" placeholder="Table Number" className="bg-white border border-gray-300 rounded px-2 py-2 text-base w-full outline-none" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/>
@@ -459,8 +459,10 @@ export const POSView: React.FC = () => {
                                         return (
                                         <div key={item.id} className="flex flex-col border border-gray-100 rounded-lg p-3 shadow-sm bg-white">
                                             <div className="flex justify-between items-start mb-3">
-                                                <div className="flex-1" onClick={() => handleEditCartItem(item)}>
-                                                    <div className="font-bold text-gray-800 text-sm md:text-base">{name}</div>
+                                                <div className="flex-1 cursor-pointer" onClick={() => handleEditCartItem(item)}>
+                                                    <div className="font-bold text-gray-800 text-sm md:text-base flex items-center gap-2">
+                                                        {name} <Edit2 size={12} className="text-gray-400"/>
+                                                    </div>
                                                     <div className="text-xs text-gray-500 mt-0.5">
                                                         {item.selectedToppings.length > 0 && `+ ${item.selectedToppings.map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ')}`}
                                                     </div>
@@ -469,18 +471,18 @@ export const POSView: React.FC = () => {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <div className="flex items-center gap-4">
-                                                    <button onClick={() => updateCartItemQuantity(item.id, -1)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200" disabled={item.quantity <= 1}><Minus size={14}/></button>
-                                                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                                                    <button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"><Plus size={14}/></button>
+                                                    <button onClick={() => updateCartItemQuantity(item.id, -1)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200 border border-gray-200" disabled={item.quantity <= 1}><Minus size={18}/></button>
+                                                    <span className="text-lg font-bold w-6 text-center">{item.quantity}</span>
+                                                    <button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200 border border-gray-200"><Plus size={18}/></button>
                                                 </div>
-                                                <button onClick={() => removeFromCart(item.id)} className="text-red-500 p-2"><Trash2 size={18} /></button>
+                                                <button onClick={() => removeFromCart(item.id)} className="text-red-500 p-2"><Trash2 size={20} /></button>
                                             </div>
                                         </div>
                                     )})
                                 )}
                              </div>
 
-                             <div className="p-4 bg-gray-50 border-t pb-safe">
+                             <div className="p-4 bg-gray-50 border-t pb-safe shrink-0">
                                  <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
                                      <span>{t('subtotal')}</span>
                                      <span>฿{cartTotal}</span>
@@ -625,7 +627,7 @@ export const POSView: React.FC = () => {
             </main>
 
             {/* Mobile Bottom Navigation (Updated) */}
-            <div className="md:hidden bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="md:hidden bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0">
                 <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); setIsEditMode(false) }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
                     <ShoppingBag size={22} className={activeTab === 'order' ? 'fill-current' : ''} />
                     <span className="text-[10px] font-bold mt-1">Order</span>
@@ -640,7 +642,7 @@ export const POSView: React.FC = () => {
                 </button>
                 <button onClick={() => { setActiveTab('manage'); setShowMobileCart(false); }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
                     <Settings size={22} className={activeTab === 'manage' ? 'fill-current' : ''} />
-                    <span className="text-[10px] font-bold mt-1">Admin</span>
+                    <span className="text-[10px] font-bold mt-1">Manage</span>
                 </button>
             </div>
 

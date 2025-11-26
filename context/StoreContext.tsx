@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings } from '../types';
 import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS } from '../constants';
-import { supabase } from '../services/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface StoreContextType {
   language: Language;
@@ -126,6 +126,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             url.searchParams.set('view', view);
         }
         window.history.pushState({}, '', url.toString());
+        // Scroll to top on view change
+        window.scrollTo(0, 0);
     }
   };
 
@@ -191,6 +193,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // --- 1. Fetch Initial Data from Supabase ---
   useEffect(() => {
+    // If not configured, don't try to fetch to avoid errors in console unless necessary
+    if (!isSupabaseConfigured) return;
+
     const fetchData = async () => {
       // Menu
       const { data: menuData } = await supabase.from('menu_items').select('*');
@@ -258,31 +263,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Menu Actions ---
   const addPizza = async (pizza: Pizza) => {
     setMenu(prev => [...prev, pizza]);
-    await supabase.from('menu_items').insert([{
-        id: pizza.id, name: pizza.name, name_th: pizza.nameTh,
-        description: pizza.description, description_th: pizza.descriptionTh,
-        base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category
-    }]);
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').insert([{
+            id: pizza.id, name: pizza.name, name_th: pizza.nameTh,
+            description: pizza.description, description_th: pizza.descriptionTh,
+            base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category
+        }]);
+    }
   };
 
   const updatePizza = async (updatedPizza: Pizza) => {
     setMenu(prev => prev.map(p => p.id === updatedPizza.id ? updatedPizza : p));
-    await supabase.from('menu_items').update({
-        name: updatedPizza.name, name_th: updatedPizza.nameTh,
-        description: updatedPizza.description, description_th: updatedPizza.descriptionTh,
-        base_price: updatedPizza.basePrice, image: updatedPizza.image, 
-        available: updatedPizza.available, category: updatedPizza.category
-    }).eq('id', updatedPizza.id);
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').update({
+            name: updatedPizza.name, name_th: updatedPizza.nameTh,
+            description: updatedPizza.description, description_th: updatedPizza.descriptionTh,
+            base_price: updatedPizza.basePrice, image: updatedPizza.image, 
+            available: updatedPizza.available, category: updatedPizza.category
+        }).eq('id', updatedPizza.id);
+    }
   };
 
   const deletePizza = async (id: string) => {
     setMenu(prev => prev.filter(p => p.id !== id));
-    await supabase.from('menu_items').delete().eq('id', id);
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').delete().eq('id', id);
+    }
   };
 
   const updatePizzaPrice = async (id: string, newPrice: number) => {
     setMenu(prev => prev.map(p => p.id === id ? { ...p, basePrice: newPrice } : p));
-    await supabase.from('menu_items').update({ base_price: newPrice }).eq('id', id);
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').update({ base_price: newPrice }).eq('id', id);
+    }
   };
 
   const togglePizzaAvailability = async (id: string) => {
@@ -290,20 +303,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!item) return;
     const newVal = !item.available;
     setMenu(prev => prev.map(p => p.id === id ? { ...p, available: newVal } : p));
-    await supabase.from('menu_items').update({ available: newVal }).eq('id', id);
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').update({ available: newVal }).eq('id', id);
+    }
   };
 
   // --- Topping Actions ---
   const addTopping = async (topping: Topping) => {
     setToppings(prev => [...prev, topping]);
-    await supabase.from('toppings').insert([{
-        id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
-    }]);
+    if(isSupabaseConfigured) {
+        await supabase.from('toppings').insert([{
+            id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
+        }]);
+    }
   };
 
   const deleteTopping = async (id: string) => {
     setToppings(prev => prev.filter(t => t.id !== id));
-    await supabase.from('toppings').delete().eq('id', id);
+    if(isSupabaseConfigured) {
+        await supabase.from('toppings').delete().eq('id', id);
+    }
   };
 
   // --- Cart ---
@@ -337,19 +356,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('damac_customer', JSON.stringify(profile));
     
     // Check if exists in DB, if not insert, else update
-    const { data } = await supabase.from('customers').select('phone').eq('phone', profile.phone).single();
-    if (data) {
-        await supabase.from('customers').update({
-            name: profile.name, address: profile.address, birthday: profile.birthday,
-            loyalty_points: profile.loyaltyPoints, saved_favorites: profile.savedFavorites, 
-            order_history: profile.orderHistory
-        }).eq('phone', profile.phone);
-    } else {
-        await supabase.from('customers').insert([{
-            phone: profile.phone, name: profile.name, address: profile.address, birthday: profile.birthday,
-            loyalty_points: profile.loyaltyPoints, tier: 'Bronze',
-            saved_favorites: profile.savedFavorites || [], order_history: profile.orderHistory || []
-        }]);
+    if(isSupabaseConfigured) {
+        const { data } = await supabase.from('customers').select('phone').eq('phone', profile.phone).single();
+        if (data) {
+            await supabase.from('customers').update({
+                name: profile.name, address: profile.address, birthday: profile.birthday,
+                loyalty_points: profile.loyaltyPoints, saved_favorites: profile.savedFavorites, 
+                order_history: profile.orderHistory
+            }).eq('phone', profile.phone);
+        } else {
+            await supabase.from('customers').insert([{
+                phone: profile.phone, name: profile.name, address: profile.address, birthday: profile.birthday,
+                loyalty_points: profile.loyaltyPoints, tier: 'Bronze',
+                saved_favorites: profile.savedFavorites || [], order_history: profile.orderHistory || []
+            }]);
+        }
     }
   };
 
@@ -385,6 +406,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       source?: OrderSource;
     }
   ): Promise<boolean> => {
+    // 1. Check DB Connection
+    if (!isSupabaseConfigured) {
+        alert("Database not connected. Please check Netlify settings (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).");
+        return false;
+    }
+
     if (cart.length === 0) return false;
     if ((type === 'online' || type === 'delivery') && !customer) {
       alert("Please register first.");
@@ -442,7 +469,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     if (error) {
         console.error("Order Error:", error);
-        alert("Failed to place order. Please try again.");
+        alert("Failed to place order. Please check internet connection.");
         return false;
     }
 
@@ -471,7 +498,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    await supabase.from('orders').update({ status }).eq('id', orderId);
+    if(isSupabaseConfigured) {
+        await supabase.from('orders').update({ status }).eq('id', orderId);
+    }
   };
 
   const reorderItem = (orderId: string) => {
@@ -486,16 +515,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Expenses ---
   const addExpense = async (expense: Expense) => {
     setExpenses(prev => [expense, ...prev]);
-    await supabase.from('expenses').insert([{
-        id: expense.id, description: expense.description,
-        amount: expense.amount, category: expense.category,
-        date: expense.date, note: expense.note
-    }]);
+    if(isSupabaseConfigured) {
+        await supabase.from('expenses').insert([{
+            id: expense.id, description: expense.description,
+            amount: expense.amount, category: expense.category,
+            date: expense.date, note: expense.note
+        }]);
+    }
   };
 
   const deleteExpense = async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
-    await supabase.from('expenses').delete().eq('id', id);
+    if(isSupabaseConfigured) {
+        await supabase.from('expenses').delete().eq('id', id);
+    }
   };
 
   const generateLuckyPizza = () => {
@@ -513,10 +546,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
      if (message !== undefined) setClosedMessage(message);
      
      // Update DB
-     await supabase.from('store_settings').update({ 
-         is_open: isOpen, 
-         closed_message: message ?? closedMessage 
-     }).eq('id', 'global');
+     if(isSupabaseConfigured) {
+         await supabase.from('store_settings').update({ 
+             is_open: isOpen, 
+             closed_message: message ?? closedMessage 
+         }).eq('id', 'global');
+     }
   };
 
   // dateOffset: 0 = Today, 1 = Tomorrow

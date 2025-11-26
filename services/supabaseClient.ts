@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // SAFE INITIALIZATION
@@ -16,7 +15,9 @@ const getEnvVar = (key: string) => {
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || 'https://placeholder.supabase.co';
 const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || 'placeholder-key';
 
-if (supabaseUrl === 'https://placeholder.supabase.co') {
+export const isSupabaseConfigured = supabaseUrl !== 'https://placeholder.supabase.co';
+
+if (!isSupabaseConfigured) {
   console.warn("⚠️ SUPABASE KEYS MISSING: App is running in safe mode. Database features will not work.");
 }
 
