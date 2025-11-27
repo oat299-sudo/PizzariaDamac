@@ -22,7 +22,7 @@ interface StoreContextType {
   deletePizza: (id: string) => Promise<void>;
   updatePizzaPrice: (id: string, newPrice: number) => Promise<void>;
   togglePizzaAvailability: (id: string) => Promise<void>;
-  toggleBestSeller: (id: string) => Promise<void>; // New
+  toggleBestSeller: (id: string) => Promise<void>;
   generateLuckyPizza: () => { pizza: Pizza; toppings: Topping[] } | null;
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
@@ -36,6 +36,7 @@ interface StoreContextType {
   cartTotal: number;
   customer: CustomerProfile | null;
   setCustomer: (profile: CustomerProfile) => Promise<void>;
+  customerLogin: (phone: string, password: string) => Promise<boolean>;
   addToFavorites: (name: string, pizzaId: string, toppings: Topping[]) => Promise<void>;
   claimReward: () => boolean;
   orders: Order[];
@@ -60,10 +61,11 @@ interface StoreContextType {
   isStoreOpen: boolean;
   isHoliday: boolean;
   closedMessage: string;
-  storeSettings: StoreSettings; // New: Full settings object
+  storeSettings: StoreSettings;
   toggleStoreStatus: (isOpen: boolean, message?: string) => Promise<void>;
-  updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>; // New
+  updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   generateTimeSlots: (dateOffset?: number) => string[];
+  canOrderForToday: () => boolean; // Helper to check if ordering for today is possible
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -184,341 +186,401 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const isOpenHours = currentHour >= OPERATING_HOURS.open && currentHour < OPERATING_HOURS.close;
     return isOpenHours;
   };
+  
+  const canOrderForToday = () => {
+      const now = new Date();
+      const currentHour = now.getHours() + now.getMinutes() / 60;
+      // Can order today if we haven't passed the closing time yet
+      return currentHour < OPERATING_HOURS.close;
+  };
 
   useEffect(() => {
      // Check if explicit holiday in DB OR manually closed
      const isScheduledHoliday = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
-     const effectiveHoliday = isScheduledHoliday || !storeSettings.isOpen; // Logic: settings.isOpen acts as "Manual Override"
-
-     setIsHoliday(effectiveHoliday);
-
-     const openHours = checkOperatingHours();
-     // Store is Open IF (Not Holiday) AND (Within Hours)
-     // BUT if manually closed via toggle (isOpen=false), it stays closed.
-     setIsStoreOpen(storeSettings.isOpen && !isScheduledHoliday && openHours);
+     const effectiveHoliday = isScheduledHoliday || !storeSettings.isOpen;
      
-     const interval = setInterval(() => {
-         const openHours = checkOperatingHours();
-         const isScheduled = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
-         setIsStoreOpen(storeSettings.isOpen && !isScheduled && openHours);
-     }, 60000); 
-     return () => clearInterval(interval);
+     // Store is "Open" if no holiday/manual close AND within hours
+     const withinHours = checkOperatingHours();
+     
+     setIsHoliday(isScheduledHoliday);
+     // Note: isStoreOpen tracks "Currently accepting ASAP orders". 
+     // If closed (morning), you can still preorder for today.
+     setIsStoreOpen(!effectiveHoliday && withinHours);
   }, [storeSettings]);
 
-  // --- 1. Fetch Initial Data ---
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-
-    const fetchData = async () => {
-      // Menu
-      const { data: menuData } = await supabase.from('menu_items').select('*');
-      if (menuData && menuData.length > 0) {
-        const mappedMenu: Pizza[] = menuData.map((m: any) => ({
-          id: m.id, name: m.name, nameTh: m.name_th, 
-          description: m.description, descriptionTh: m.description_th,
-          basePrice: m.base_price, image: m.image, available: m.available, category: m.category,
-          isBestSeller: m.is_best_seller // New field
-        }));
-        setMenu(mappedMenu);
+  // DB Sync
+  const fetchMenu = async () => {
+      if (!isSupabaseConfigured) return;
+      const { data, error } = await supabase.from('menu_items').select('*');
+      if (!error && data) {
+         setMenu(data.map(d => ({
+             ...d, 
+             basePrice: d.base_price, 
+             nameTh: d.name_th, 
+             descriptionTh: d.description_th, 
+             isBestSeller: d.is_best_seller,
+             comboCount: d.combo_count || 0
+         })));
       }
-
-      // Toppings
-      const { data: toppingsData } = await supabase.from('toppings').select('*');
-      if (toppingsData && toppingsData.length > 0) {
-        const mappedToppings: Topping[] = toppingsData.map((t: any) => ({
-          id: t.id, name: t.name, nameTh: t.name_th, price: t.price
-        }));
-        setToppings(mappedToppings);
+  };
+  const fetchToppings = async () => {
+      if (!isSupabaseConfigured) return;
+      const { data, error } = await supabase.from('toppings').select('*');
+      if (!error && data) setToppings(data.map(d => ({...d, nameTh: d.name_th})));
+  };
+  const fetchOrders = async () => {
+      if (!isSupabaseConfigured) return;
+      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      if (error) {
+          if (error.code === '42P01') {
+              console.warn("Table 'orders' missing. Please run SQL script.");
+              return;
+          }
       }
-
-      // Orders
-      const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
-      if (ordersData) {
-        const mappedOrders: Order[] = ordersData.map((o: any) => ({
-          id: o.id, customerName: o.customer_name, customerPhone: o.customer_phone,
-          type: o.type, source: o.source, status: o.status,
-          totalAmount: o.total_amount, netAmount: o.net_amount, createdAt: o.created_at,
-          note: o.note, deliveryAddress: o.delivery_address, deliveryZone: o.delivery_zone,
-          deliveryFee: o.delivery_fee, paymentMethod: o.payment_method, pickupTime: o.pickup_time,
-          tableNumber: o.table_number, items: o.items
-        }));
-        setOrders(mappedOrders);
-      }
-
-      // Settings
-      const { data: settingsData } = await supabase.from('store_settings').select('*').eq('id', 'global').single();
-      if (settingsData) {
+      if (data) setOrders(data.map(d => ({
+          ...d, 
+          customerName: d.customer_name, 
+          customerPhone: d.customer_phone, 
+          totalAmount: d.total_amount,
+          netAmount: d.net_amount || d.total_amount,
+          createdAt: d.created_at,
+          deliveryAddress: d.delivery_address,
+          deliveryZone: d.delivery_zone,
+          deliveryFee: d.delivery_fee,
+          paymentMethod: d.payment_method,
+          pickupTime: d.pickup_time,
+          tableNumber: d.table_number
+      })));
+  };
+  const fetchSettings = async () => {
+      if (!isSupabaseConfigured) return;
+      const { data } = await supabase.from('store_settings').select('*').single();
+      if (data) {
           setStoreSettings({
-              isOpen: settingsData.is_open,
-              closedMessage: settingsData.closed_message || '',
-              promoBannerUrl: settingsData.promo_banner_url,
-              promoContentType: settingsData.promo_content_type || 'image',
-              holidayStart: settingsData.holiday_start,
-              holidayEnd: settingsData.holiday_end
+              isOpen: data.is_open,
+              closedMessage: data.closed_message,
+              promoBannerUrl: data.promo_banner_url,
+              promoContentType: data.promo_content_type,
+              holidayStart: data.holiday_start,
+              holidayEnd: data.holiday_end
           });
       }
-    };
-
-    fetchData();
-
-    // --- 2. Realtime Subscriptions ---
-    const channel = supabase.channel('realtime_updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, (payload) => {
-          if (payload.new) {
-             setStoreSettings({
-                 isOpen: payload.new.is_open,
-                 closedMessage: payload.new.closed_message,
-                 promoBannerUrl: payload.new.promo_banner_url,
-                 promoContentType: payload.new.promo_content_type,
-                 holidayStart: payload.new.holiday_start,
-                 holidayEnd: payload.new.holiday_end
-             });
-          }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); }
+  };
+  const fetchCustomerProfile = async () => {
+      if (!isSupabaseConfigured || !customer) return;
+      // Fetch latest profile including addresses
+      const { data } = await supabase.from('customers').select('*').eq('phone', customer.phone).single();
+      if (data) {
+          const updatedProfile: CustomerProfile = {
+              name: data.name,
+              phone: data.phone,
+              password: data.password,
+              address: data.address,
+              birthday: data.birthday,
+              loyaltyPoints: data.loyalty_points,
+              tier: data.tier,
+              savedFavorites: data.saved_favorites || [],
+              orderHistory: data.order_history || [],
+              pdpaAccepted: data.pdpa_accepted,
+              savedAddresses: data.saved_addresses || []
+          };
+          setCustState(updatedProfile);
+          localStorage.setItem('damac_customer', JSON.stringify(updatedProfile));
+      }
+  }
+  
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+        fetchMenu();
+        fetchToppings();
+        fetchOrders();
+        fetchSettings();
+        
+        const subscription = supabase.channel('realtime_updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, fetchSettings)
+        .subscribe();
+        
+        return () => { subscription.unsubscribe(); }
+    }
   }, []);
 
-  // --- Menu Actions ---
+  // Update customer profile on load if logged in
+  useEffect(() => {
+      if (isSupabaseConfigured && customer) {
+          fetchCustomerProfile();
+      }
+  }, []);
+
+  // Actions
   const addPizza = async (pizza: Pizza) => {
-    setMenu(prev => [...prev, pizza]);
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').insert([{
-            id: pizza.id, name: pizza.name, name_th: pizza.nameTh,
-            description: pizza.description, description_th: pizza.descriptionTh,
-            base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-            is_best_seller: pizza.isBestSeller
-        }]);
-    }
+      if (isSupabaseConfigured) {
+          await supabase.from('menu_items').insert([{
+              id: pizza.id, name: pizza.name, name_th: pizza.nameTh, 
+              description: pizza.description, description_th: pizza.descriptionTh,
+              base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
+              combo_count: pizza.comboCount
+          }]);
+      } else {
+          setMenu(prev => [...prev, pizza]);
+      }
   };
-
-  const updatePizza = async (updatedPizza: Pizza) => {
-    setMenu(prev => prev.map(p => p.id === updatedPizza.id ? updatedPizza : p));
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').update({
-            name: updatedPizza.name, name_th: updatedPizza.nameTh,
-            description: updatedPizza.description, description_th: updatedPizza.descriptionTh,
-            base_price: updatedPizza.basePrice, image: updatedPizza.image, 
-            available: updatedPizza.available, category: updatedPizza.category,
-            is_best_seller: updatedPizza.isBestSeller
-        }).eq('id', updatedPizza.id);
-    }
+  const updatePizza = async (pizza: Pizza) => {
+      if (isSupabaseConfigured) {
+          await supabase.from('menu_items').update({
+              name: pizza.name, name_th: pizza.nameTh, 
+              description: pizza.description, description_th: pizza.descriptionTh,
+              base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
+              combo_count: pizza.comboCount
+          }).eq('id', pizza.id);
+      } else {
+          setMenu(prev => prev.map(p => p.id === pizza.id ? pizza : p));
+      }
   };
-
   const deletePizza = async (id: string) => {
-    setMenu(prev => prev.filter(p => p.id !== id));
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').delete().eq('id', id);
-    }
+      if (isSupabaseConfigured) await supabase.from('menu_items').delete().eq('id', id);
+      else setMenu(prev => prev.filter(p => p.id !== id));
   };
-
   const updatePizzaPrice = async (id: string, newPrice: number) => {
-    setMenu(prev => prev.map(p => p.id === id ? { ...p, basePrice: newPrice } : p));
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').update({ base_price: newPrice }).eq('id', id);
-    }
+      const p = menu.find(i => i.id === id);
+      if (p) await updatePizza({ ...p, basePrice: newPrice });
+  };
+  const togglePizzaAvailability = async (id: string) => {
+      const p = menu.find(i => i.id === id);
+      if (p) await updatePizza({ ...p, available: !p.available });
+  };
+  const toggleBestSeller = async (id: string) => {
+      const p = menu.find(i => i.id === id);
+      if (p) {
+          const newVal = !p.isBestSeller;
+          if (isSupabaseConfigured) {
+              await supabase.from('menu_items').update({ is_best_seller: newVal }).eq('id', id);
+          } else {
+              setMenu(prev => prev.map(item => item.id === id ? {...item, isBestSeller: newVal} : item));
+          }
+      }
+  }
+
+  const generateLuckyPizza = () => {
+      const pizzaBase = menu.find(p => p.name.includes("Create Your Own"));
+      if (!pizzaBase) return null;
+      
+      const randomToppings: Topping[] = [];
+      const numToppings = Math.floor(Math.random() * 3) + 2; // 2-4 toppings
+      const shuffled = [...toppings].sort(() => 0.5 - Math.random());
+      
+      for(let i=0; i<numToppings; i++) {
+          if (shuffled[i]) randomToppings.push(shuffled[i]);
+      }
+      return { pizza: pizzaBase, toppings: randomToppings };
   };
 
-  const togglePizzaAvailability = async (id: string) => {
-    const item = menu.find(p => p.id === id);
-    if (!item) return;
-    const newVal = !item.available;
-    setMenu(prev => prev.map(p => p.id === id ? { ...p, available: newVal } : p));
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').update({ available: newVal }).eq('id', id);
-    }
+  const addTopping = async (topping: Topping) => {
+      if (isSupabaseConfigured) {
+          await supabase.from('toppings').insert([{
+              id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
+          }]);
+      } else {
+          setToppings(prev => [...prev, topping]);
+      }
+  };
+  const deleteTopping = async (id: string) => {
+      if (isSupabaseConfigured) await supabase.from('toppings').delete().eq('id', id);
+      else setToppings(prev => prev.filter(t => t.id !== id));
   };
   
-  const toggleBestSeller = async (id: string) => {
-    const item = menu.find(p => p.id === id);
-    if (!item) return;
-    const newVal = !item.isBestSeller;
-    setMenu(prev => prev.map(p => p.id === id ? { ...p, isBestSeller: newVal } : p));
-    if(isSupabaseConfigured) {
-        await supabase.from('menu_items').update({ is_best_seller: newVal }).eq('id', id);
-    }
-  };
-
-  // --- Topping Actions ---
-  const addTopping = async (topping: Topping) => {
-    setToppings(prev => [...prev, topping]);
-    if(isSupabaseConfigured) {
-        await supabase.from('toppings').insert([{
-            id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
-        }]);
-    }
-  };
-
-  const deleteTopping = async (id: string) => {
-    setToppings(prev => prev.filter(t => t.id !== id));
-    if(isSupabaseConfigured) {
-        await supabase.from('toppings').delete().eq('id', id);
-    }
-  };
-
-  // --- Cart ---
+  // Cart
   const addToCart = (item: CartItem) => setCart(prev => [...prev, item]);
   const updateCartItemQuantity = (itemId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-        if (item.id === itemId) {
-            const newQuantity = Math.max(1, item.quantity + delta);
-            const unitPrice = item.basePrice + item.selectedToppings.reduce((sum, t) => sum + t.price, 0);
-            return { ...item, quantity: newQuantity, totalPrice: unitPrice * newQuantity };
-        }
-        return item;
-    }));
+      setCart(prev => prev.map(item => {
+          if (item.id === itemId) {
+              const newQty = Math.max(1, item.quantity + delta);
+              return { ...item, quantity: newQty, totalPrice: (item.totalPrice / item.quantity) * newQty };
+          }
+          return item;
+      }));
   };
   const updateCartItem = (updatedItem: CartItem) => {
-    setCart(prev => prev.map(item => {
-        if (item.id === updatedItem.id) {
-             const unitPrice = updatedItem.basePrice + updatedItem.selectedToppings.reduce((sum, t) => sum + t.price, 0);
-             return { ...updatedItem, totalPrice: unitPrice * updatedItem.quantity };
-        }
-        return item;
-    }));
+      setCart(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
   };
-  const removeFromCart = (itemId: string) => setCart(prev => prev.filter(i => i.id !== itemId));
+  const removeFromCart = (itemId: string) => setCart(prev => prev.filter(item => item.id !== itemId));
   const clearCart = () => setCart([]);
   const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
-  // --- Customer & Auth ---
+  // Customer
   const setCustomer = async (profile: CustomerProfile) => {
-    setCustState(profile);
-    localStorage.setItem('damac_customer', JSON.stringify(profile));
-    
-    if(isSupabaseConfigured) {
-        const { data } = await supabase.from('customers').select('phone').eq('phone', profile.phone).single();
-        if (data) {
-            await supabase.from('customers').update({
-                name: profile.name, address: profile.address, birthday: profile.birthday,
-                loyalty_points: profile.loyaltyPoints, saved_favorites: profile.savedFavorites, 
-                order_history: profile.orderHistory
-            }).eq('phone', profile.phone);
-        } else {
-            await supabase.from('customers').insert([{
-                phone: profile.phone, name: profile.name, address: profile.address, birthday: profile.birthday,
-                loyalty_points: profile.loyaltyPoints, tier: 'Bronze',
-                saved_favorites: profile.savedFavorites || [], order_history: profile.orderHistory || []
-            }]);
-        }
-    }
+      setCustState(profile);
+      localStorage.setItem('damac_customer', JSON.stringify(profile));
+      // Sync to DB
+      if (isSupabaseConfigured) {
+          const payload: any = {
+              phone: profile.phone, 
+              name: profile.name, 
+              address: profile.address, 
+              birthday: profile.birthday,
+              password: profile.password, // Save password
+              loyalty_points: profile.loyaltyPoints, 
+              tier: profile.tier,
+              saved_favorites: profile.savedFavorites, 
+              order_history: profile.orderHistory
+          };
+          
+          if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
+          if (profile.savedAddresses !== undefined) payload.saved_addresses = profile.savedAddresses;
+
+          await supabase.from('customers').upsert(payload);
+      }
+  };
+  
+  const customerLogin = async (phone: string, password: string): Promise<boolean> => {
+      if (!isSupabaseConfigured) {
+          alert("Database not connected.");
+          return false;
+      }
+      const { data, error } = await supabase.from('customers')
+          .select('*')
+          .eq('phone', phone)
+          .eq('password', password)
+          .single();
+      
+      if (data && !error) {
+          const profile: CustomerProfile = {
+              name: data.name,
+              phone: data.phone,
+              password: data.password,
+              address: data.address,
+              birthday: data.birthday,
+              loyaltyPoints: data.loyalty_points,
+              tier: data.tier,
+              savedFavorites: data.saved_favorites || [],
+              orderHistory: data.order_history || [],
+              pdpaAccepted: data.pdpa_accepted,
+              savedAddresses: data.saved_addresses || []
+          };
+          setCustState(profile);
+          localStorage.setItem('damac_customer', JSON.stringify(profile));
+          return true;
+      }
+      return false;
   };
 
-  const addToFavorites = async (name: string, pizzaId: string, tops: Topping[]) => {
+  const addToFavorites = async (name: string, pizzaId: string, toppings: Topping[]) => {
       if (!customer) return;
-      const newFav: SavedFavorite = { id: 'fav' + Date.now(), name, pizzaId, toppings: tops };
-      const updatedProfile = { ...customer, savedFavorites: [...(customer.savedFavorites || []), newFav] };
-      await setCustomer(updatedProfile);
+      const newFav: SavedFavorite = {
+          id: Date.now().toString(),
+          name, pizzaId, toppings
+      };
+      const updated = { ...customer, savedFavorites: [...(customer.savedFavorites || []), newFav] };
+      await setCustomer(updated);
   };
-
+  const reorderItem = (orderId: string) => {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+          order.items.forEach(item => {
+              addToCart({ ...item, id: Date.now().toString() + Math.random() }); // New ID for new cart item
+          });
+          alert(t('cartEmpty') === 'Cart is empty' ? 'Items added to cart!' : 'เพิ่มรายการลงตะกร้าแล้ว');
+      }
+  };
   const claimReward = () => {
       if (!customer || customer.loyaltyPoints < 10) return false;
-      const rewardPizza = menu.find(p => p.name === "Pizza Damac") || menu[0];
+      const pizza = menu.find(p => p.basePrice <= 380 && p.category === 'pizza') || menu[0];
       addToCart({
-          id: 'reward-' + Date.now(), pizzaId: rewardPizza.id,
-          name: rewardPizza.name + " (Reward)", nameTh: (rewardPizza.nameTh || rewardPizza.name) + " (รางวัลฟรี)",
-          basePrice: 0, quantity: 1, selectedToppings: [], totalPrice: 0
+          id: 'reward-' + Date.now(),
+          pizzaId: pizza.id,
+          name: `🏆 FREE ${pizza.name}`,
+          nameTh: `🏆 ฟรี ${pizza.nameTh || pizza.name}`,
+          basePrice: 0,
+          selectedToppings: [],
+          quantity: 1,
+          totalPrice: 0
       });
-      const updatedProfile = { ...customer, loyaltyPoints: customer.loyaltyPoints - 10 };
-      setCustomer(updatedProfile);
+      // Deduct points
+      const updated = { ...customer, loyaltyPoints: customer.loyaltyPoints - 10 };
+      setCustomer(updated);
       return true;
   };
 
-  // --- Orders ---
-  const placeOrder = async (
-    type: OrderType, 
-    details?: {
-      note?: string;
-      delivery?: { address: string; zoneName: string; fee: number };
-      paymentMethod?: PaymentMethod;
-      pickupTime?: string;
-      tableNumber?: string;
-      source?: OrderSource;
-    }
-  ): Promise<boolean> => {
+  // Orders
+  const placeOrder = async (type: OrderType, details: any = {}): Promise<boolean> => {
     if (!isSupabaseConfigured) {
-        alert("Database not connected.");
+        alert("Database not connected. Please check Netlify settings.");
         return false;
     }
 
-    if (cart.length === 0) return false;
-    if ((type === 'online' || type === 'delivery') && !customer) {
-      alert("Please register first.");
-      return false;
-    }
-
-    // Logic: If Pickup Time is specifically for future, allow it.
-    const isFutureOrder = details?.pickupTime && details.pickupTime.includes('Tomorrow');
+    const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store' } = details;
     
-    // Block if Store Closed AND Not Future Order
-    if (!isStoreOpen && !isFutureOrder && (type === 'online' || type === 'delivery')) {
-        alert(storeSettings.closedMessage || t('storeClosedMsg'));
-        return false;
+    // Save address if new (only for store orders with a logged in customer)
+    if (source === 'store' && customer && type === 'delivery' && delivery?.address) {
+        const currentSaved = customer.savedAddresses || [];
+        if (!currentSaved.includes(delivery.address)) {
+            const newSavedAddresses = [...currentSaved, delivery.address];
+            await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
+        }
     }
-
-    const subTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-    const deliveryFee = details?.delivery?.fee || 0;
-    const totalAmount = subTotal + deliveryFee;
-    const source = details?.source || 'store';
-    const gpRate = GP_RATES[source] || 0;
-    const netAmount = totalAmount * (1 - gpRate);
+    
+    // Calculate Net Revenue (Deduct GP)
+    const gpRate = GP_RATES[source as OrderSource] || 0;
+    const netAmount = cartTotal * (1 - gpRate);
 
     const newOrder: Order = {
-      id: Date.now().toString(),
-      customerName: type === 'dine-in' ? (details?.tableNumber ? `Table ${details.tableNumber}` : 'Walk-in') : (customer?.name || 'Guest'),
-      customerPhone: customer?.phone || '-',
-      type, source,
-      status: (type === 'online' || type === 'delivery') ? 'pending' : 'confirmed',
-      items: [...cart],
-      totalAmount, netAmount,
-      createdAt: new Date().toISOString(),
-      note: details?.note,
-      deliveryAddress: details?.delivery?.address,
-      deliveryZone: details?.delivery?.zoneName,
-      deliveryFee: details?.delivery?.fee,
-      paymentMethod: details?.paymentMethod,
-      pickupTime: details?.pickupTime,
-      tableNumber: details?.tableNumber
+        id: Date.now().toString(),
+        customerName: customer?.name || 'Guest',
+        customerPhone: customer?.phone || 'Guest',
+        type,
+        source: source,
+        status: source === 'store' ? 'pending' : 'confirmed', // 3rd party auto-confirmed
+        items: cart,
+        totalAmount: cartTotal,
+        netAmount: Math.round(netAmount),
+        createdAt: new Date().toISOString(),
+        note: note || '',
+        deliveryAddress: delivery?.address,
+        deliveryZone: delivery?.zoneName,
+        deliveryFee: delivery?.fee,
+        paymentMethod,
+        pickupTime,
+        tableNumber
     };
 
     const { error } = await supabase.from('orders').insert([{
         id: newOrder.id,
         customer_name: newOrder.customerName,
         customer_phone: newOrder.customerPhone,
-        type: newOrder.type, source: newOrder.source, status: newOrder.status,
-        total_amount: newOrder.totalAmount, net_amount: newOrder.netAmount,
-        created_at: newOrder.createdAt, note: newOrder.note,
-        delivery_address: newOrder.deliveryAddress, delivery_zone: newOrder.deliveryZone,
-        delivery_fee: newOrder.deliveryFee, payment_method: newOrder.paymentMethod,
-        pickup_time: newOrder.pickupTime, table_number: newOrder.tableNumber,
+        type: newOrder.type,
+        source: newOrder.source,
+        status: newOrder.status,
+        total_amount: newOrder.totalAmount,
+        net_amount: newOrder.netAmount,
+        note: newOrder.note,
+        delivery_address: newOrder.deliveryAddress,
+        delivery_zone: newOrder.deliveryZone,
+        delivery_fee: newOrder.deliveryFee,
+        payment_method: newOrder.paymentMethod,
+        pickup_time: newOrder.pickupTime,
+        table_number: newOrder.tableNumber,
         items: newOrder.items
     }]);
 
     if (error) {
-        console.error("Order Error:", error);
-        alert(`Order Failed: ${error.message}`);
+        console.error("Supabase Error:", error);
+        alert(`Failed to place order. Error: ${error.message}`);
         return false;
     }
 
     setOrders(prev => [newOrder, ...prev]);
     
-    // Loyalty
+    // Loyalty Points (Only for Store Orders)
     if (customer && source === 'store') {
-        const pizzaCount = cart.filter(i => {
-           const menuItem = menu.find(p => p.id === i.pizzaId);
-           return menuItem?.category === 'pizza' && i.basePrice > 0;
-        }).length;
-        
-        if (pizzaCount > 0) {
-            const updatedProfile = {
-                ...customer,
-                loyaltyPoints: (customer.loyaltyPoints || 0) + pizzaCount,
+        const pizzasCount = cart.filter(i => menu.find(m => m.id === i.pizzaId)?.category === 'pizza').length;
+        if (pizzasCount > 0) {
+            const updated = { 
+                ...customer, 
+                loyaltyPoints: customer.loyaltyPoints + pizzasCount,
                 orderHistory: [newOrder.id, ...(customer.orderHistory || [])]
             };
-            setCustomer(updatedProfile);
+            setCustomer(updated);
         }
     }
 
@@ -527,87 +589,70 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    if(isSupabaseConfigured) {
-        await supabase.from('orders').update({ status }).eq('id', orderId);
-    }
+      if (isSupabaseConfigured) await supabase.from('orders').update({ status }).eq('id', orderId);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
-
-  const reorderItem = (orderId: string) => {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-          order.items.forEach(item => {
-             addToCart({...item, id: Date.now() + Math.random().toString()}); 
-          });
-      }
-  };
-
+  
+  // Expenses
   const addExpense = async (expense: Expense) => {
-    setExpenses(prev => [expense, ...prev]);
-    if(isSupabaseConfigured) {
-        await supabase.from('expenses').insert([{
-            id: expense.id, description: expense.description,
-            amount: expense.amount, category: expense.category,
-            date: expense.date, note: expense.note
-        }]);
-    }
+      if (isSupabaseConfigured) await supabase.from('expenses').insert([expense]);
+      else setExpenses(prev => [...prev, expense]);
   };
-
   const deleteExpense = async (id: string) => {
-    setExpenses(prev => prev.filter(e => e.id !== id));
-    if(isSupabaseConfigured) {
-        await supabase.from('expenses').delete().eq('id', id);
-    }
+      if (isSupabaseConfigured) await supabase.from('expenses').delete().eq('id', id);
+      else setExpenses(prev => prev.filter(e => e.id !== id));
   };
 
-  const generateLuckyPizza = () => {
-    const pizzaBase = menu.find(p => p.name === "Create Your Own Pizza") || menu[0];
-    if (!pizzaBase || toppings.length === 0) return null;
-    const shuffled = [...toppings].sort(() => 0.5 - Math.random());
-    const count = Math.floor(Math.random() * 3) + 3;
-    const selected = shuffled.slice(0, count);
-    return { pizza: pizzaBase, toppings: selected };
-  };
-
-  // --- Store Settings ---
-  const toggleStoreStatus = async (isOpen: boolean, message?: string) => {
-     setStoreSettings(prev => ({ ...prev, isOpen, closedMessage: message ?? prev.closedMessage }));
-     if(isSupabaseConfigured) {
-         await supabase.from('store_settings').update({ 
-             is_open: isOpen, 
-             closed_message: message ?? storeSettings.closedMessage 
-         }).eq('id', 'global');
-     }
-  };
-
-  const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
-      setStoreSettings(prev => ({ ...prev, ...settings }));
+  // Settings
+  const toggleStoreStatus = async (isOpen: boolean, message: string = '') => {
       if (isSupabaseConfigured) {
-           await supabase.from('store_settings').update({
-               promo_banner_url: settings.promoBannerUrl,
-               promo_content_type: settings.promoContentType,
-               holiday_start: settings.holidayStart,
-               holiday_end: settings.holidayEnd
-           }).eq('id', 'global');
+          await supabase.from('store_settings').upsert({ id: 'global', is_open: isOpen, closed_message: message });
+      } else {
+          setStoreSettings({ ...storeSettings, isOpen, closedMessage: message });
       }
   };
+  
+  const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
+      if (isSupabaseConfigured) {
+          // Convert camelCase to snake_case for DB
+          const dbPayload: any = {};
+          if (settings.holidayStart !== undefined) dbPayload.holiday_start = settings.holidayStart;
+          if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
+          if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
+          if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
 
+          await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
+      }
+      setStoreSettings(prev => ({...prev, ...settings}));
+  };
+  
   const generateTimeSlots = (dateOffset: number = 0) => {
-      const slots = [];
-      let time = OPERATING_HOURS.open;
-      const now = new Date();
-      const currentDecimalTime = now.getHours() + (now.getMinutes() / 60);
+      const slots: string[] = [];
+      const startHour = OPERATING_HOURS.open; // 11
+      const endHour = OPERATING_HOURS.close; // 20.5 (8:30 PM)
 
-      while (time < OPERATING_HOURS.close) {
-          if (dateOffset === 0 && time < currentDecimalTime + 0.5) {
-              time += 0.5;
-              continue;
+      const now = new Date();
+      // Current hour in decimal (e.g. 14.5 for 2:30 PM)
+      const currentHour = now.getHours() + now.getMinutes() / 60;
+
+      for (let h = startHour; h <= endHour; h += 0.5) {
+          // If ordering for Today (offset 0)
+          if (dateOffset === 0) {
+              // 1. Morning Pre-order (Before Opening): Add 1 hour buffer from OPEN time
+              // e.g. If now is 9:00, open is 11:00. First slot = 12:00.
+              if (currentHour < startHour) {
+                  if (h < startHour + 1) continue;
+              }
+              // 2. Open Hours: Add 20 min prep buffer from NOW
+              else {
+                  if (h < currentHour + 0.33) continue; 
+              }
           }
-          const hours = Math.floor(time);
-          const minutes = (time % 1) * 60;
-          const timeStr = `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}`;
-          slots.push(timeStr);
-          time += 0.5;
+          
+          const hour = Math.floor(h);
+          const minute = (h % 1) * 60;
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+          slots.push(timeString);
       }
       return slots;
   };
@@ -615,16 +660,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <StoreContext.Provider value={{
       language, toggleLanguage, t, getLocalizedItem,
-      currentView, navigateTo,
-      isAdminLoggedIn, adminLogin, adminLogout,
+      currentView, navigateTo, isAdminLoggedIn, adminLogin, adminLogout,
       shopLogo, updateShopLogo,
-      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza,
+      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller,
       toppings, addTopping, deleteTopping,
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
-      customer, setCustomer, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, reorderItem,
+      customer, setCustomer, customerLogin, addToFavorites, claimReward,
+      orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense,
-      isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots
+      isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
+      generateTimeSlots, canOrderForToday
     }}>
       {children}
     </StoreContext.Provider>
@@ -633,6 +678,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
 export const useStore = () => {
   const context = useContext(StoreContext);
-  if (!context) throw new Error("useStore must be used within StoreProvider");
+  if (!context) throw new Error('useStore must be used within StoreProvider');
   return context;
 };

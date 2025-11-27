@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -32,7 +32,7 @@ export const POSView: React.FC = () => {
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
     const [itemForm, setItemForm] = useState<Partial<Pizza>>({
-        name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza'
+        name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0
     });
     
     // Manage Toppings State
@@ -83,6 +83,7 @@ export const POSView: React.FC = () => {
             updateCartItem({
                 ...editingCartItem,
                 selectedToppings: selectedToppings,
+                // Combo sub-items would be handled differently, simplifying for generic POS edit
             });
         } else {
             const item: CartItem = {
@@ -118,12 +119,12 @@ export const POSView: React.FC = () => {
     };
 
     const handleOpenAddModal = () => {
-        setItemForm({ name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza' });
+        setItemForm({ name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0 });
         setShowItemModal(true);
     };
 
     const handleEditMenuItem = (item: Pizza) => {
-        setItemForm({ ...item });
+        setItemForm({ ...item, comboCount: item.comboCount || 0 });
         setShowItemModal(true);
     };
 
@@ -445,13 +446,13 @@ export const POSView: React.FC = () => {
                              
                              {/* Promo Banner */}
                              <div className="mb-4">
-                                 <label className="text-xs font-bold text-gray-500 mb-1 block">Promotional Banner (Image or Video URL)</label>
+                                 <label className="text-xs font-bold text-gray-500 mb-1 block">Promotional Banner (Image, Video, or YouTube URL)</label>
                                  <div className="flex gap-2">
                                      <div className="relative flex-1">
                                         <Link size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                                         <input 
                                             className="w-full bg-gray-50 border rounded p-2 pl-9 text-sm" 
-                                            placeholder="https://... (Image or MP4 link)" 
+                                            placeholder="https://... (Image, MP4, or YouTube Link)" 
                                             value={storeSettings.promoBannerUrl || ''} 
                                             onChange={e => updateStoreSettings({ promoBannerUrl: e.target.value })}
                                         />
@@ -462,10 +463,10 @@ export const POSView: React.FC = () => {
                                         onChange={e => updateStoreSettings({ promoContentType: e.target.value as 'image'|'video' })}
                                      >
                                          <option value="image">Image</option>
-                                         <option value="video">Video</option>
+                                         <option value="video">Video / YouTube</option>
                                      </select>
                                  </div>
-                                 <p className="text-[10px] text-gray-400 mt-1">Paste a link to a YouTube video or Image to show at the top of the Customer App.</p>
+                                 <p className="text-[10px] text-gray-400 mt-1">Paste a YouTube link or a direct MP4 link to show a video banner at the top of the Customer App.</p>
                              </div>
 
                              {/* Logo */}
@@ -598,6 +599,18 @@ export const POSView: React.FC = () => {
                                     ))}
                                 </select>
                             </div>
+                            {itemForm.category === 'promotion' && (
+                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                    <label className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-1"><Layers size={14}/> Combo Settings</label>
+                                    <p className="text-[10px] text-gray-500 mb-2">How many pizzas can the customer choose in this combo?</p>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setItemForm({...itemForm, comboCount: Math.max(0, (itemForm.comboCount || 0) - 1)})} className="p-1 bg-white border rounded"><Minus size={16}/></button>
+                                        <span className="font-bold text-lg">{itemForm.comboCount || 0}</span>
+                                        <button onClick={() => setItemForm({...itemForm, comboCount: (itemForm.comboCount || 0) + 1})} className="p-1 bg-white border rounded"><Plus size={16}/></button>
+                                        <span className="text-sm ml-2">Pizzas</span>
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">{t('name')}</label>
                                 <input 

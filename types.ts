@@ -18,7 +18,15 @@ export interface Pizza {
   image: string;
   available: boolean;
   category: ProductCategory;
-  isBestSeller?: boolean; // New: Highlight item
+  isBestSeller?: boolean;
+  comboCount?: number; // New: How many pizzas allowed in this combo
+}
+
+export interface SubItem {
+    pizzaId: string;
+    name: string;
+    nameTh?: string;
+    toppings: Topping[];
 }
 
 export interface CartItem {
@@ -30,6 +38,7 @@ export interface CartItem {
   selectedToppings: Topping[];
   quantity: number;
   totalPrice: number;
+  subItems?: SubItem[]; // New: Stores choices for combos
 }
 
 export interface DeliveryZone {
@@ -49,13 +58,16 @@ export interface SavedFavorite {
 export interface CustomerProfile {
   name: string;
   phone: string;
+  password?: string; // New: Password for login
   favoritePizza?: string;
-  address?: string;
+  address?: string; // Current default address
+  savedAddresses?: string[]; // New: History of addresses
   birthday?: string;
   loyaltyPoints: number; // 1 point per pizza ordered
   tier?: 'Bronze' | 'Silver' | 'Gold';
   savedFavorites: SavedFavorite[];
   orderHistory: string[]; // List of Order IDs
+  pdpaAccepted?: boolean; // New: PDPA Consent
 }
 
 export type OrderType = 'dine-in' | 'online' | 'delivery';

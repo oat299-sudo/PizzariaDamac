@@ -77,6 +77,8 @@ export const TRANSLATIONS = {
         later: "Later today",
         deliveryZone: "Delivery Zone",
         deliveryAddress: "Delivery Address",
+        savedAddresses: "Saved Addresses",
+        selectAddress: "Select a saved address...",
         checkDistance: "Check Distance",
         calculating: "Calculating...",
         distanceFromShop: "You are approx {dist} from Pizza Damac",
@@ -95,8 +97,19 @@ export const TRANSLATIONS = {
         whatMood: "What are you in the mood for?",
         thinking: "Thinking...",
         storeClosed: "Store Closed",
-        storeClosedMsg: "We are currently closed. Open 11:00 - 20:30.",
+        storeClosedMsg: "We are currently closed. Open 11:00 - 20:30. See you tomorrow.",
         
+        // Errors & Validation
+        mustRegister: "Please Login or Register to place an order.",
+        addressMissing: "Please enter your full delivery address.",
+        pdpaLabel: "I accept the Terms & Conditions and consent to data collection under PDPA.",
+        pdpaRequired: "You must accept the PDPA terms to register.",
+
+        // Delivery Specific
+        deliveryTBD: "Calculated Later",
+        deliveryNoticeTitle: "Delivery Fee Notice",
+        deliveryNoticeDesc: "We use Lineman/Lalamove. Staff will calculate the exact fee and inform you shortly.",
+
         // POS
         tableService: "Table Service",
         managerMode: "Manager Mode",
@@ -197,6 +210,8 @@ export const TRANSLATIONS = {
         later: "ระบุเวลาภายหลัง",
         deliveryZone: "โซนจัดส่ง",
         deliveryAddress: "ที่อยู่จัดส่ง",
+        savedAddresses: "ที่อยู่ที่บันทึกไว้",
+        selectAddress: "เลือกที่อยู่...",
         checkDistance: "เช็คระยะทาง",
         calculating: "กำลังคำนวณ...",
         distanceFromShop: "คุณอยู่ห่างจากร้านประมาณ {dist}",
@@ -215,7 +230,18 @@ export const TRANSLATIONS = {
         whatMood: "วันนี้อยากทานรสชาติแบบไหน? (เช่น เผ็ด, ชีสเยอะ, มังสวิรัติ)",
         thinking: "กำลังคิด...",
         storeClosed: "ร้านปิด",
-        storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น.",
+        storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น. เจอกันพรุ่งนี้ครับ",
+
+        // Errors & Validation
+        mustRegister: "กรุณาเข้าสู่ระบบ หรือ สมัครสมาชิก ก่อนสั่งซื้อ",
+        addressMissing: "กรุณาระบุที่อยู่จัดส่งให้ครบถ้วน",
+        pdpaLabel: "ข้าพเจ้ายอมรับเงื่อนไขและยินยอมให้เก็บข้อมูลส่วนบุคคลตาม PDPA",
+        pdpaRequired: "กรุณายอมรับเงื่อนไข PDPA เพื่อสมัครสมาชิก",
+
+        // Delivery Specific
+        deliveryTBD: "แจ้งภายหลัง",
+        deliveryNoticeTitle: "แจ้งเรื่องค่าจัดส่ง",
+        deliveryNoticeDesc: "ทางร้านเรียก Lineman/Lalamove ให้ครับ จะแจ้งยอดค่าส่งตามจริงให้ทราบอีกครั้ง",
 
         // POS
         tableService: "บริการที่โต๊ะ",
@@ -504,6 +530,8 @@ export const INITIAL_TOPPINGS: Topping[] = [
   { id: 't10', name: 'Parma Ham', nameTh: 'พาร์มาแฮม', price: 80 },
 ];
 
+// Delivery Zones (Removed from active logic but kept if needed for reference, 
+// though the new requirement handles delivery via Lineman/Lalamove)
 export const DELIVERY_ZONES: DeliveryZone[] = [
   { id: 'z1', name: 'Zone A: Nearby (< 2km)', nameTh: 'โซน A: ใกล้ร้าน (< 2กม.)', fee: 20 },
   { id: 'z2', name: 'Zone B: Nonthaburi Center (2-5km)', nameTh: 'โซน B: กลางเมืองนนท์ (2-5กม.)', fee: 40 },

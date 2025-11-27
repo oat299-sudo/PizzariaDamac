@@ -1,23 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory } from '../types';
-import { INITIAL_TOPPINGS, DELIVERY_ZONES, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle } from 'lucide-react';
-import { getPizzaRecommendation } from '../services/geminiService';
+import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem } from '../types';
+import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock } from 'lucide-react';
 
 export const CustomerView: React.FC = () => {
   const { 
-    menu, addToCart, cart, cartTotal, customer, setCustomer, placeOrder, removeFromCart, navigateTo, 
+    menu, addToCart, cart, cartTotal, customer, setCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
     language, toggleLanguage, t, getLocalizedItem,
-    isStoreOpen, closedMessage, generateTimeSlots, storeSettings
+    isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
+    toppings
   } = useStore();
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showTracker, setShowTracker] = useState(false);
   
@@ -27,34 +27,41 @@ export const CustomerView: React.FC = () => {
   // Registration State
   const [regName, setRegName] = useState(customer?.name || '');
   const [regPhone, setRegPhone] = useState(customer?.phone || '');
-  const [regFav, setRegFav] = useState(customer?.favoritePizza || '');
+  const [regPassword, setRegPassword] = useState('');
   const [regAddress, setRegAddress] = useState(customer?.address || '');
   const [regBirthday, setRegBirthday] = useState(customer?.birthday || '');
+  const [regPdpa, setRegPdpa] = useState(customer?.pdpaAccepted || false);
+
+  // Login State
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Delivery / Checkout State
   const [orderType, setOrderType] = useState<'online' | 'delivery'>('online');
-  const [selectedZoneId, setSelectedZoneId] = useState<string>(DELIVERY_ZONES[0].id);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
   
-  // Logic: If closed, default to Tomorrow. If open, default to Today.
-  const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(!isStoreOpen ? 'tomorrow' : 'today');
+  // Logic: Initialize order date based on store status and time
+  const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(() => {
+      // If store is open OR if it's closed but morning (can order for lunch)
+      if (isStoreOpen || canOrderForToday()) return 'today';
+      return 'tomorrow';
+  });
 
   // Location / Distance
   const [distance, setDistance] = useState<string | null>(null);
   const [checkingLocation, setCheckingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // AI State
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiRecommendation, setAiRecommendation] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [showAiModal, setShowAiModal] = useState(false);
-  
   // Custom Pizza Name State
   const [customName, setCustomName] = useState('');
   
+  // Combo Builder State
+  const [isComboBuilderOpen, setIsComboBuilderOpen] = useState(false);
+  const [comboSelections, setComboSelections] = useState<SubItem[]>([]);
+  const [currentComboSlot, setCurrentComboSlot] = useState<number | null>(null); // Which slot are we filling?
+
   const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
   useEffect(() => {
@@ -67,7 +74,8 @@ export const CustomerView: React.FC = () => {
   useEffect(() => {
       if (isStoreOpen && orderDate === 'tomorrow' && !pickupTime) {
           setOrderDate('today');
-      } else if (!isStoreOpen) {
+      } else if (!isStoreOpen && !canOrderForToday()) {
+          // Only force tomorrow if we strictly can't order for today (night time)
           setOrderDate('tomorrow');
       }
   }, [isStoreOpen]);
@@ -77,6 +85,13 @@ export const CustomerView: React.FC = () => {
     setSelectedPizza(pizza);
     setSelectedToppings([]);
     setCustomName('');
+    
+    // Check if it's a combo
+    if (pizza.category === 'promotion' && (pizza.comboCount || 0) > 0) {
+        setIsComboBuilderOpen(true);
+        // Initialize empty slots
+        setComboSelections(new Array(pizza.comboCount).fill(null));
+    }
   };
 
   const toggleTopping = (topping: Topping) => {
@@ -113,914 +128,608 @@ export const CustomerView: React.FC = () => {
     setSelectedToppings([]);
   };
 
+  // Combo Handlers
+  const handleOpenComboSlot = (index: number) => {
+      setCurrentComboSlot(index);
+  };
+
+  const handleSelectComboPizza = (pizza: Pizza) => {
+      if (currentComboSlot === null) return;
+      
+      const newSelections = [...comboSelections];
+      newSelections[currentComboSlot] = {
+          pizzaId: pizza.id,
+          name: pizza.name,
+          nameTh: pizza.nameTh,
+          toppings: [] // Start with no toppings
+      };
+      setComboSelections(newSelections);
+      setCurrentComboSlot(null); // Go back to builder
+  };
+
+  const handleAddComboToCart = () => {
+      if (!selectedPizza) return;
+      // Calculate total price: Base Combo Price + Sum of all extra toppings on sub-items
+      const extraToppingsPrice = comboSelections.reduce((sum, item) => {
+          return sum + (item?.toppings.reduce((tSum, t) => tSum + t.price, 0) || 0);
+      }, 0);
+      
+      const localized = getLocalizedItem(selectedPizza);
+
+      const item: CartItem = {
+          id: Date.now().toString() + Math.random(),
+          pizzaId: selectedPizza.id,
+          name: localized.name,
+          nameTh: selectedPizza.nameTh,
+          basePrice: selectedPizza.basePrice,
+          selectedToppings: [], // Combo itself has no toppings, the sub-items do
+          subItems: comboSelections, // Store the choices
+          quantity: 1,
+          totalPrice: selectedPizza.basePrice + extraToppingsPrice
+      };
+      addToCart(item);
+      setIsComboBuilderOpen(false);
+      setSelectedPizza(null);
+      setComboSelections([]);
+  };
+
   const handleSaveFavorite = async () => {
       if (!selectedPizza) return;
       
       if (!customer) {
-          alert("Please register or login to save favorites!");
-          setShowRegister(true);
+          alert(t('mustRegister'));
+          setShowAuthModal(true);
           return;
       }
-
-      let name = customName;
-      if (!name) {
-          const localizedPizza = getLocalizedItem(selectedPizza);
-          name = localizedPizza.name;
-      }
       
-      await addToFavorites(name, selectedPizza.id, selectedToppings);
-      alert("Saved to Favorites!");
+      await addToFavorites(
+          selectedPizza.name === "Create Your Own Pizza" && customName ? `${t('nameCreation')}: ${customName}` : selectedPizza.name,
+          selectedPizza.id,
+          selectedToppings
+      );
+      alert(t('saveFavorite') + " Success!");
+  };
+
+  const handlePlaceOrderClick = async () => {
+     if (!customer) {
+        setShowAuthModal(true);
+        return;
+     }
+     if (orderType === 'delivery' && !deliveryAddress) {
+        alert(t('addressMissing'));
+        return;
+     }
+     setIsSubmitting(true);
+     const success = await placeOrder(orderType, {
+        note: '',
+        delivery: orderType === 'delivery' ? {
+            address: deliveryAddress,
+            zoneName: 'TBD',
+            fee: 0 // Will be calculated by staff
+        } : undefined,
+        paymentMethod: paymentMethod,
+        pickupTime: pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP'
+     });
+     setIsSubmitting(false);
+     if (success) {
+        setIsCartOpen(false);
+        // Maybe show tracker
+     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (regName && regPhone) {
-      await setCustomer({ 
-        name: regName, 
-        phone: regPhone, 
-        favoritePizza: regFav,
+    if (!regPdpa) {
+        alert(t('pdpaRequired'));
+        return;
+    }
+    if (!regPassword) {
+        alert("Password is required");
+        return;
+    }
+    await setCustomer({
+        name: regName,
+        phone: regPhone,
+        password: regPassword,
         address: regAddress,
         birthday: regBirthday,
-        tier: 'Bronze', // Default tier
-        loyaltyPoints: customer?.loyaltyPoints || 0,
-        savedFavorites: customer?.savedFavorites || [],
-        orderHistory: customer?.orderHistory || []
-      });
-      setShowRegister(false);
-    }
+        pdpaAccepted: regPdpa,
+        loyaltyPoints: 0,
+        savedFavorites: [],
+        orderHistory: []
+    });
+    setShowAuthModal(false);
   };
 
-  const handlePlaceOrder = async () => {
-    // Determine if blocked
-    if (!isStoreOpen && orderDate === 'today') {
-        alert(closedMessage || t('storeClosedMsg'));
-        return;
-    }
-
-    let finalPickupTime = pickupTime;
-    if (orderDate === 'tomorrow' && !pickupTime) {
-         finalPickupTime = timeSlots[0];
-    }
-    const displayTime = orderDate === 'tomorrow' ? `Tomorrow ${finalPickupTime}` : (finalPickupTime || 'ASAP');
-
-    const commonDetails = {
-       paymentMethod,
-       pickupTime: displayTime
-    };
-
-    setIsSubmitting(true);
-    let success = false;
-    if (orderType === 'delivery') {
-      const zone = DELIVERY_ZONES.find(z => z.id === selectedZoneId);
-      if (!deliveryAddress) {
-        alert("Please enter a delivery address");
-        setIsSubmitting(false);
-        return;
-      }
-      success = await placeOrder('delivery', {
-        ...commonDetails,
-        delivery: {
-            address: deliveryAddress,
-            zoneName: zone ? (language === 'th' && zone.nameTh ? zone.nameTh : zone.name) : 'Standard',
-            fee: zone?.fee || 0
-        }
-      });
-    } else {
-      success = await placeOrder('online', commonDetails);
-    }
-
-    setIsSubmitting(false);
-    if (success) {
-        setIsCartOpen(false);
-        setShowReviewModal(true);
-    }
-  };
-
-  const handleClaimReward = () => {
-      if (claimReward()) {
-          setIsCartOpen(true);
+  const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const success = await customerLogin(loginPhone, loginPassword);
+      if (success) {
+          setShowAuthModal(false);
+      } else {
+          alert("Invalid phone or password");
       }
   };
-  
-  const handleLuckyPizza = () => {
-    const lucky = generateLuckyPizza();
-    if (lucky) {
-        setSelectedPizza(lucky.pizza);
-        setSelectedToppings(lucky.toppings);
-        setCustomName('My Lucky Pizza');
-        setTimeout(() => {
-            alert("🎲 " + t('fateDecide') + "\n" + lucky.toppings.map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ') + "!");
-        }, 500);
-    }
-  };
 
-  const checkDistance = () => {
-      if (!navigator.geolocation) {
-          alert("Geolocation is not supported by your browser");
-          return;
-      }
-      setCheckingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-          (position) => {
-              const lat1 = position.coords.latitude;
-              const lon1 = position.coords.longitude;
-              const lat2 = RESTAURANT_LOCATION.lat;
-              const lon2 = RESTAURANT_LOCATION.lng;
-              
-              const R = 6371; // km
-              const dLat = (lat2 - lat1) * Math.PI / 180;
-              const dLon = (lon2 - lon1) * Math.PI / 180;
-              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-              const d = R * c; // Distance in km
-              
-              setDistance(d.toFixed(1) + ' km');
-              setCheckingLocation(false);
-          },
-          () => {
-              alert("Unable to retrieve your location");
-              setCheckingLocation(false);
+  // Helper for Hero Video
+  const renderHeroMedia = () => {
+      if (!storeSettings.promoBannerUrl) return null;
+      
+      // Check if YouTube
+      if (storeSettings.promoBannerUrl.includes('youtube.com') || storeSettings.promoBannerUrl.includes('youtu.be')) {
+          let videoId = '';
+          if (storeSettings.promoBannerUrl.includes('v=')) {
+              videoId = storeSettings.promoBannerUrl.split('v=')[1]?.split('&')[0];
+          } else if (storeSettings.promoBannerUrl.includes('youtu.be')) {
+              videoId = storeSettings.promoBannerUrl.split('/').pop() || '';
           }
-      );
+          if (videoId) {
+              return (
+                  <iframe 
+                      className="absolute inset-0 w-full h-full object-cover"
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&showinfo=0`}
+                      allow="autoplay; encrypted-media"
+                      frameBorder="0"
+                  />
+              );
+          }
+      }
+      
+      // Video File
+      if (storeSettings.promoContentType === 'video') {
+          return (
+             <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline>
+                 <source src={storeSettings.promoBannerUrl} type="video/mp4" />
+             </video>
+          );
+      }
+      
+      // Image
+      return <img src={storeSettings.promoBannerUrl} className="absolute inset-0 w-full h-full object-cover" />;
   };
-
-  const askAiChef = async () => {
-    if (!aiPrompt.trim()) return;
-    setIsThinking(true);
-    setAiRecommendation('');
-    const result = await getPizzaRecommendation(aiPrompt, menu);
-    setAiRecommendation(result);
-    setIsThinking(false);
-  };
-
-  // Filter Menu
-  const filteredMenu = menu.filter(item => {
-    const cat = item.category || 'pizza';
-    return cat === activeCategory;
-  });
-  
-  const bestSellers = menu.filter(item => item.isBestSeller && item.category === 'pizza');
-
-  const deliveryFee = orderType === 'delivery' ? (DELIVERY_ZONES.find(z => z.id === selectedZoneId)?.fee || 0) : 0;
-  const finalTotal = cartTotal + deliveryFee;
-
-  const activeOrders = orders.filter(o => 
-      customer && o.customerPhone === customer.phone && 
-      o.status !== 'completed' && o.status !== 'cancelled'
-  );
-
-  // Pre-Order Check
-  const isPreOrderMode = !isStoreOpen;
 
   return (
-    <div className="pb-24 max-w-4xl mx-auto bg-gray-50 min-h-screen shadow-2xl flex flex-col relative overflow-hidden">
-      
-      {/* Mobile Header */}
-      <header className={`bg-brand-600 text-white p-4 sticky top-0 z-20 shadow-md flex justify-between items-center h-16`}>
-        <div onClick={() => setShowTracker(true)} className="cursor-pointer flex items-center gap-2">
-            <div>
-               <h1 className="text-xl font-bold font-serif tracking-wide">Pizza Damac</h1>
-            </div>
-        </div>
-        <div className="flex gap-2 items-center">
-            <button onClick={toggleLanguage} className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg text-sm font-bold hover:bg-black/30">
-               <Globe size={16} /> {language === 'en' ? 'EN' : 'TH'}
-            </button>
-            {activeOrders.length > 0 && (
-                <button onClick={() => setShowTracker(true)} className="p-2 bg-green-500 rounded-full animate-pulse shadow-lg text-white">
-                    <Clock size={20} />
-                </button>
-            )}
-             <button onClick={() => setShowAiModal(true)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-sm">
-                <ChefHat size={20} />
-            </button>
-            <button onClick={() => setIsCartOpen(true)} className="relative p-2 bg-white/10 rounded-full hover:bg-white/20 transition backdrop-blur-sm">
-              <ShoppingCart size={20} />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white">
-                  {cart.length}
-                </span>
-              )}
-            </button>
-        </div>
-      </header>
-
-      {/* Hero / Banner Section */}
-      <div className="relative h-48 md:h-64 bg-gray-900 overflow-hidden">
-          {storeSettings.promoBannerUrl ? (
-              storeSettings.promoContentType === 'video' ? (
-                  <video 
-                    src={storeSettings.promoBannerUrl} 
-                    autoPlay muted loop playsInline 
-                    className="w-full h-full object-cover opacity-60"
-                  />
-              ) : (
-                  <img 
-                    src={storeSettings.promoBannerUrl} 
-                    className="w-full h-full object-cover opacity-60" 
-                    alt="Promo"
-                  />
-              )
-          ) : (
-              // Default Fallback
-              <img 
-                src="https://images.unsplash.com/photo-1590947132387-155cc02f3212?auto=format&fit=crop&w=1200&q=80" 
-                className="w-full h-full object-cover opacity-60" 
-                alt="Pizza"
-              />
-          )}
-          
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-10 p-4 text-center">
-              {shopLogo && (
-                  <img 
-                    src={shopLogo} 
-                    className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-white shadow-2xl mb-2 object-cover bg-white" 
-                    alt="Logo"
-                  />
-              )}
-              <h2 className="text-white text-3xl font-bold font-serif shadow-black drop-shadow-lg">Pizza Damac</h2>
-              <p className="text-white/90 text-sm font-medium tracking-wide uppercase drop-shadow-md">Authentic • Fresh • Delicious</p>
-          </div>
-      </div>
-
-      {/* Store Closed / Holiday Banner */}
-      {!isStoreOpen && (
-          <div className="bg-amber-100 border-b border-amber-200 text-amber-900 p-4 text-center">
-              <div className="flex items-center justify-center gap-2 font-bold mb-1">
-                 <Clock size={20} />
-                 {t('storeClosed')}
+    <div className="min-h-screen bg-gray-50 pb-24 md:pb-0 font-sans text-gray-900 flex flex-col">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm">
+           <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                 {shopLogo ? <img src={shopLogo} className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center text-white"><ChefHat/></div>}
+                 <h1 className="font-bold text-xl tracking-tight hidden md:block">Pizza Damac</h1>
               </div>
-              <p className="text-sm opacity-80">{closedMessage || t('storeClosedMsg')}</p>
-              <p className="text-xs font-bold mt-2 text-brand-600 bg-white/50 inline-block px-3 py-1 rounded-full">
-                 But you can PRE-ORDER for tomorrow!
-              </p>
-          </div>
-      )}
 
-      {/* Profile & Loyalty Bar */}
-      <div className="p-4 bg-white border-b border-gray-100 cursor-pointer" onClick={() => customer ? setShowProfile(true) : setShowRegister(true)}>
-        {customer ? (
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-                <div className="bg-brand-100 p-2 rounded-full text-brand-600"><User size={20}/></div>
-                <div>
-                    <span className="text-gray-900 font-bold block leading-tight">{customer.name}</span>
-                    <span className="text-xs text-brand-600 font-medium">
-                        {customer.loyaltyPoints} {t('points')} • {(customer.loyaltyPoints / 10) * 100}% {t('toFreePizza')}
-                    </span>
-                </div>
-            </div>
-            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500" style={{ width: `${Math.min((customer.loyaltyPoints / 10) * 100, 100)}%` }}></div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-brand-50 p-3 rounded-lg border border-brand-100 flex items-center justify-between">
-             <span className="text-brand-800 font-medium text-sm">{t('loginRegister')}</span>
-             <User size={16} className="text-brand-600"/>
-          </div>
-        )}
-      </div>
-
-      {/* Category Navigation */}
-      <div className={`bg-white px-4 pt-2 pb-4 overflow-x-auto scrollbar-hide border-b border-gray-100 sticky top-16 z-10 shadow-sm`}>
-         <div className="flex gap-2">
-            {CATEGORIES.map(cat => (
-                <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
-                        activeCategory === cat.id 
-                        ? 'bg-gray-900 text-white shadow-md' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                    {cat.id === 'promotion' && <Sparkles size={14} className="text-yellow-400" />}
-                    {language === 'th' ? cat.labelTh : cat.label}
-                </button>
-            ))}
-         </div>
-      </div>
-      
-      {/* Promotion Banner */}
-      {activeCategory === 'promotion' && (
-          <div className="p-4 pb-0 animate-fade-in space-y-4">
-              <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-                  <div className="relative z-10">
-                      <h2 className="text-2xl font-bold mb-1">{t('comboMonth')}</h2>
-                      <p className="text-white/90 text-sm mb-4">Get the Family Set and save 20%!</p>
-                      <button onClick={() => {}} className="bg-white text-brand-600 px-4 py-2 rounded-full font-bold text-sm shadow-md">
-                          {t('orderNow')}
-                      </button>
-                  </div>
-                  <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-white/10 -skew-x-12"></div>
-                  <Sparkles className="absolute top-4 right-4 text-yellow-300 animate-pulse" />
+              <div className="flex items-center gap-3">
+                 <button onClick={toggleLanguage} className="w-9 h-9 rounded-full bg-gray-100 font-bold text-xs">{language.toUpperCase()}</button>
+                 {customer ? (
+                     <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 bg-gray-100 rounded-full py-1.5 px-3">
+                         <User size={16}/>
+                         <span className="text-sm font-bold hidden md:inline">{customer.name}</span>
+                         <div className="bg-brand-500 text-white text-[10px] px-1.5 rounded-full">{customer.loyaltyPoints}pts</div>
+                     </button>
+                 ) : (
+                     <button onClick={() => setShowAuthModal(true)} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-bold">{t('login')}</button>
+                 )}
+                 <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700">
+                     <ShoppingBag size={24}/>
+                     {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}
+                 </button>
               </div>
-          </div>
-      )}
-      
-      {/* Best Sellers (Only in Pizza Tab) */}
-      {activeCategory === 'pizza' && bestSellers.length > 0 && (
-          <div className="p-4 pb-0">
-             <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2"><Star className="text-yellow-500" fill="currentColor"/> BEST HITS OF THE MONTH</h3>
-             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                 {bestSellers.map(item => {
-                     const localized = getLocalizedItem(item);
-                     return (
-                         <div 
-                            key={item.id}
-                            onClick={() => item.available && handleCustomize(item)}
-                            className="flex-shrink-0 w-48 bg-white rounded-xl shadow border border-gray-100 overflow-hidden cursor-pointer"
-                         >
-                             <div className="h-32 relative">
-                                 <img src={item.image} className="w-full h-full object-cover" />
-                                 <div className="absolute top-2 right-2 bg-yellow-400 text-white text-[10px] font-bold px-2 py-1 rounded shadow">BEST SELLER</div>
-                             </div>
-                             <div className="p-3">
-                                 <h4 className="font-bold text-sm truncate">{localized.name}</h4>
-                                 <div className="flex justify-between items-center mt-2">
-                                     <span className="text-brand-600 font-bold">฿{item.basePrice}</span>
-                                     <button className="bg-brand-50 p-1 rounded text-brand-600"><Plus size={16}/></button>
-                                 </div>
-                             </div>
-                         </div>
-                     )
-                 })}
-             </div>
-          </div>
-      )}
-
-      {/* Menu Grid */}
-      <main className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1">
-        {filteredMenu.length === 0 ? (
-             <div className="text-center py-12 text-gray-400 col-span-full">
-                 <p>No items in this category yet.</p>
-             </div>
-        ) : (
-            filteredMenu.map(item => {
-                const localized = getLocalizedItem(item);
-                
-                return (
-                <div 
-                    key={item.id} 
-                    onClick={() => item.available && handleCustomize(item)}
-                    className={`bg-white rounded-xl shadow-sm border border-gray-100 flex overflow-hidden h-32 md:h-auto md:flex-col cursor-pointer active:scale-95 transition hover:shadow-md ${!item.available ? 'opacity-60 grayscale' : ''}`}
-                >
-                    <div className="w-32 md:w-full md:h-48 h-full relative flex-shrink-0">
-                        <img src={item.image} alt={localized.name} className="w-full h-full object-cover" />
-                        {!item.available && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <span className="text-white text-xs font-bold bg-red-600 px-2 py-1 rounded">
-                                    {t('soldOut')}
-                                </span>
-                            </div>
-                        )}
-                        {item.isBestSeller && (
-                            <div className="absolute top-2 left-2 bg-yellow-400 text-white p-1 rounded-full shadow-md z-10 md:hidden">
-                                <Star size={12} fill="white" />
-                            </div>
-                        )}
-                    </div>
-                    <div className="p-3 flex-1 flex flex-col justify-between">
-                    <div>
-                        <div className="flex justify-between items-start">
-                            <h3 className="font-bold text-gray-800 leading-tight">{localized.name}</h3>
-                            <span className="text-brand-600 font-bold text-sm">฿{item.basePrice}</span>
-                        </div>
-                        <p className="text-gray-500 text-xs mt-1 line-clamp-2">{localized.description}</p>
-                    </div>
-                    {item.available && <span className="text-xs font-bold text-brand-600 flex items-center gap-1 self-end bg-brand-50 px-2 py-1 rounded-full mt-2"><Plus size={12}/> {t('addToOrder')}</span>}
-                    </div>
-                </div>
-                )
-            })
-        )}
-      </main>
-
-      {/* Staff Access Footer */}
-      <footer className="p-6 text-center text-gray-400 text-xs mt-4 pb-20 border-t border-gray-100 bg-white">
-        <p className="mb-2">© 2024 Pizza Damac Nonthaburi</p>
-        <div className="flex justify-center gap-4 opacity-50 hover:opacity-100 transition duration-200">
-            <button onClick={() => navigateTo('kitchen')} className="hover:text-brand-600 underline flex items-center gap-1">
-                <ChefHat size={12} /> {t('kitchen')}
-            </button>
-            <span className="text-gray-300">|</span>
-            <button onClick={() => navigateTo('pos')} className="hover:text-brand-600 underline flex items-center gap-1">
-                <Banknote size={12} /> {t('pos')}
-            </button>
-        </div>
-      </footer>
-
-      {/* Cart Drawer */}
-      {isCartOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex justify-end backdrop-blur-sm">
-           <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-slide-in">
-              <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                  <h2 className="font-bold text-lg">{t('yourOrder')}</h2>
-                  <button onClick={() => setIsCartOpen(false)}><X /></button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {cart.length === 0 ? (
-                      <div className="text-center text-gray-500 mt-20">{t('cartEmpty')}</div>
-                  ) : (
-                      <>
-                        <div className="space-y-4">
-                            {cart.map(item => {
-                                const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
-                                return (
-                                <div key={item.id} className="flex justify-between border-b border-dashed pb-4">
-                                    <div>
-                                        <h4 className="font-bold text-gray-800">{name}</h4>
-                                        <p className="text-xs text-gray-500">
-                                            {item.basePrice === 0 ? 'Reward' : ''}
-                                            {item.selectedToppings.length > 0 
-                                                ? `+ ${item.selectedToppings.map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ')}` 
-                                                : ''}
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-1">
-                                        <span className="font-medium">฿{item.totalPrice}</span>
-                                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-[10px] font-bold uppercase">{t('delete')}</button>
-                                    </div>
-                                </div>
-                            )})}
-                        </div>
-                      </>
-                  )}
-              </div>
-              
-              {cart.length > 0 && (
-                  <div className="p-5 bg-gray-50 border-t shadow-inner">
-                      {/* Order Type Toggle */}
-                      <div className="flex bg-gray-200 p-1 rounded-lg mb-4">
-                          <button 
-                            onClick={() => setOrderType('online')} 
-                            className={`flex-1 py-2 rounded-md font-bold text-xs uppercase transition ${orderType === 'online' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
-                          >
-                              Self Pickup
-                          </button>
-                          <button 
-                            onClick={() => setOrderType('delivery')}
-                            className={`flex-1 py-2 rounded-md font-bold text-xs uppercase transition ${orderType === 'delivery' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}
-                          >
-                              Delivery
-                          </button>
-                      </div>
-
-                      {/* Pickup Specifics */}
-                      <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                           <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t('pickupTime')}</label>
-                           
-                           {/* Pre-Order Warning */}
-                           {isPreOrderMode && (
-                               <div className="bg-amber-50 border border-amber-200 p-2 rounded mb-2 text-xs text-amber-800">
-                                   Store closed. Ordering available for <strong>Tomorrow</strong>.
-                               </div>
-                           )}
-
-                           {/* Date Toggle */}
-                           <div className="flex gap-2 mb-2">
-                               <button 
-                                   onClick={() => setOrderDate('today')}
-                                   disabled={isPreOrderMode}
-                                   className={`flex-1 py-1.5 rounded text-xs font-bold border transition ${orderDate === 'today' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-500'} ${isPreOrderMode ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
-                               >
-                                   Today {isPreOrderMode && '(Closed)'}
-                               </button>
-                               <button 
-                                   onClick={() => setOrderDate('tomorrow')}
-                                   className={`flex-1 py-1.5 rounded text-xs font-bold border transition ${orderDate === 'tomorrow' ? 'bg-brand-50 border-brand-500 text-brand-700' : 'border-gray-200 text-gray-500'}`}
-                               >
-                                   Tomorrow
-                               </button>
-                           </div>
-
-                           <select 
-                            value={pickupTime}
-                            onChange={(e) => setPickupTime(e.target.value)}
-                            className="w-full p-2 bg-gray-50 border rounded text-sm"
-                           >
-                               {orderDate === 'today' && !isPreOrderMode && <option value="ASAP">{t('asap')}</option>}
-                               {timeSlots.map(time => (
-                                   <option key={time} value={time}>{time}</option>
-                               ))}
-                           </select>
-                      </div>
-
-                      {/* Delivery Specifics */}
-                      {orderType === 'delivery' && (
-                          <div className="mb-4 space-y-3 bg-white p-3 rounded-lg border border-gray-200">
-                              <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryZone')}</label>
-                                <select 
-                                    className="w-full p-2 border rounded text-sm bg-gray-50 mt-1"
-                                    value={selectedZoneId}
-                                    onChange={(e) => setSelectedZoneId(e.target.value)}
-                                >
-                                    {DELIVERY_ZONES.map(z => (
-                                        <option key={z.id} value={z.id}>{language === 'th' ? z.nameTh : z.name} (+฿{z.fee})</option>
-                                    ))}
-                                </select>
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
-                                  <textarea 
-                                    className="w-full p-2 border rounded text-sm bg-gray-50 mt-1"
-                                    placeholder="..."
-                                    rows={2}
-                                    value={deliveryAddress}
-                                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                                  />
-                              </div>
-                              {/* Location Check */}
-                              <div>
-                                  <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('checkDistance')}</label>
-                                    <a href={RESTAURANT_LOCATION.googleMapsUrl} target="_blank" className="text-[10px] text-blue-500 underline flex items-center gap-1"><MapPin size={10} /> Map</a>
-                                  </div>
-                                  <button 
-                                    onClick={checkDistance} 
-                                    className="w-full py-2 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100 flex items-center justify-center gap-1"
-                                  >
-                                    {checkingLocation ? t('calculating') : <><Navigation size={12} /> {t('checkDistance')}</>}
-                                  </button>
-                                  {distance && (
-                                      <p className="text-xs text-center mt-1 text-gray-600">{t('distanceFromShop', { dist: distance })}</p>
-                                  )}
-                              </div>
-                          </div>
-                      )}
-
-                       {/* Payment Method */}
-                       <div className="mb-4 bg-white p-3 rounded-lg border border-gray-200">
-                            <label className="text-xs font-bold text-gray-500 uppercase block mb-2">{t('paymentMethod')}</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button 
-                                    onClick={() => setPaymentMethod('qr_transfer')}
-                                    className={`flex flex-col items-center justify-center p-2 border rounded-lg ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
-                                >
-                                    <QrCode size={20} className="mb-1"/>
-                                    <span className="text-xs font-bold">{t('qrTransfer')}</span>
-                                </button>
-                                <button 
-                                    onClick={() => setPaymentMethod('cash')}
-                                    className={`flex flex-col items-center justify-center p-2 border rounded-lg ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
-                                >
-                                    <Banknote size={20} className="mb-1"/>
-                                    <span className="text-xs font-bold">{t('cash')}</span>
-                                </button>
-                            </div>
-                       </div>
-
-                      {/* Summary */}
-                      <div className="space-y-2 mb-4">
-                         <div className="flex justify-between items-center text-sm text-gray-600">
-                              <span>{t('subtotal')}</span>
-                              <span>฿{cartTotal}</span>
-                         </div>
-                         {orderType === 'delivery' && (
-                             <div className="flex justify-between items-center text-sm text-gray-600">
-                                  <span>{t('deliveryFee')}</span>
-                                  <span>+฿{deliveryFee}</span>
-                             </div>
-                         )}
-                         <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t">
-                              <span>{t('total')}</span>
-                              <span>฿{finalTotal}</span>
-                         </div>
-                      </div>
-
-                      <button 
-                        onClick={handlePlaceOrder}
-                        disabled={isSubmitting || (isPreOrderMode && orderDate === 'today')}
-                        className={`w-full py-3 rounded-xl font-bold text-white transition flex items-center justify-center gap-2 shadow-lg shadow-brand-200 ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700'}`}
-                      >
-                         {isSubmitting ? t('thinking') : (orderType === 'delivery' ? <Truck size={20} /> : <ShoppingBag size={20} />)}
-                         {isPreOrderMode ? 'Pre-Order for Tomorrow' : (orderType === 'delivery' ? t('confirmDelivery') : t('placeOrder'))}
-                      </button>
-                  </div>
-              )}
            </div>
-        </div>
-      )}
+        </header>
 
-      {/* Profile, Registration, AI Modals... (Same as previous version) */}
-      {/* Keeping concise for XML output length, but assuming modals are retained from original file structure */}
-      
-      {showReviewModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl text-center">
-                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Sparkles size={32} />
-                </div>
-                {customer?.loyaltyPoints && customer.loyaltyPoints >= 10 && (
-                    <div className="mb-4 bg-yellow-100 text-yellow-800 p-2 rounded-lg text-xs font-bold animate-pulse">
-                        🎉 You've unlocked a FREE Pizza Reward!
-                    </div>
-                )}
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('orderReceived')} 🍕</h2>
-                <p className="text-gray-600 mb-6 text-sm">
-                    {t('thankYouOrder')}
-                </p>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6">
-                    <p className="font-bold text-brand-600 mb-2 text-sm uppercase">Support Us</p>
-                    <a 
-                        href="https://maps.app.goo.gl/1DsGESUfrPLUKEyc6" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-blue-700 transition"
+        {/* Categories */}
+        <div className="bg-white border-b sticky top-16 z-30">
+            <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
+                {CATEGORIES.map(cat => (
+                    <button 
+                        key={cat.id} 
+                        onClick={() => setActiveCategory(cat.id)}
+                        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all ${activeCategory === cat.id ? 'bg-gray-900 text-white shadow-lg' : 'bg-gray-100 text-gray-500'}`}
                     >
-                        <Star size={16} fill="white" />
-                        {t('reviewGoogle')}
-                        <ExternalLink size={14} />
-                    </a>
-                </div>
-
-                <button 
-                    onClick={() => { setShowReviewModal(false); setShowTracker(true); }}
-                    className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold text-sm"
-                >
-                    {t('trackOrder')}
-                </button>
-           </div>
+                        {language === 'th' ? cat.labelTh : cat.label}
+                    </button>
+                ))}
+            </div>
         </div>
-      )}
 
-      {/* Registration Modal */}
-      {showRegister && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-xs p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-4 text-center">{t('joinDamac')}</h2>
-            <p className="text-xs text-center text-gray-500 mb-4">{t('registerDesc')}</p>
-            <form onSubmit={handleRegister}>
-              <div className="space-y-3">
-                <input 
-                    type="text" 
-                    required
-                    value={regName}
-                    onChange={e => setRegName(e.target.value)}
-                    className="w-full border-gray-200 border rounded-lg p-3 bg-gray-50 text-sm"
-                    placeholder="Name / Nickname"
-                />
-                <input 
-                    type="tel" 
-                    required
-                    value={regPhone}
-                    onChange={e => setRegPhone(e.target.value)}
-                    className="w-full border-gray-200 border rounded-lg p-3 bg-gray-50 text-sm"
-                    placeholder="Mobile Number"
-                />
-                 <textarea 
-                    value={regAddress}
-                    onChange={e => setRegAddress(e.target.value)}
-                    className="w-full border-gray-200 border rounded-lg p-3 bg-gray-50 text-sm"
-                    placeholder="Default Delivery Address (Optional)"
-                    rows={2}
-                />
-                <div className="relative">
-                    <label className="text-xs text-gray-500 absolute -top-2 left-2 bg-white px-1">Birthday (Optional)</label>
-                    <input 
-                        type="date" 
-                        value={regBirthday}
-                        onChange={e => setRegBirthday(e.target.value)}
-                        className="w-full border-gray-200 border rounded-lg p-3 bg-gray-50 text-sm"
-                    />
+        {/* Hero Section */}
+        {activeCategory === 'promotion' && (
+            <div className="relative w-full h-64 md:h-96 overflow-hidden bg-gray-900">
+                {renderHeroMedia()}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col items-center justify-end pb-8">
+                     {shopLogo && <img src={shopLogo} className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl mb-4 object-cover animate-fade-in"/>}
+                     <h2 className="text-white font-bold text-3xl md:text-5xl text-center shadow-black drop-shadow-lg">Pizza Damac</h2>
+                     <p className="text-gray-200 text-sm md:text-lg mt-2 font-medium">Authentic Italian Taste in Nonthaburi</p>
                 </div>
-              </div>
-              <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold mt-4">
-                {t('startEarning')}
-              </button>
-              <button onClick={() => setShowRegister(false)} type="button" className="w-full text-gray-400 py-2 text-sm">{t('cancel')}</button>
-            </form>
-          </div>
-        </div>
-      )}
-      
-      {/* AI Chef Modal */}
-      {showAiModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative">
-             <button onClick={() => setShowAiModal(false)} className="absolute top-3 right-3 text-gray-400"><X size={20}/></button>
-             <div className="text-center mb-4">
-                <div className="bg-brand-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 text-brand-600">
-                    <ChefHat size={24} />
-                </div>
-                <h2 className="font-bold text-lg">{t('chefRec')}</h2>
+            </div>
+        )}
+
+        {/* Best Sellers */}
+        {menu.some(p => p.isBestSeller) && activeCategory !== 'promotion' && (
+             <div className="max-w-7xl mx-auto px-4 py-6">
+                 <h2 className="font-bold text-xl mb-4 flex items-center gap-2"><Star className="text-yellow-500" fill="currentColor"/> Best Sellers</h2>
+                 <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
+                     {menu.filter(p => p.isBestSeller).map(item => (
+                         <div key={'bs-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[200px] bg-white rounded-xl shadow-sm p-3 border border-yellow-100 cursor-pointer hover:shadow-md transition">
+                             <img src={item.image} className="w-full h-24 object-cover rounded-lg mb-2"/>
+                             <h3 className="font-bold text-sm truncate">{getLocalizedItem(item).name}</h3>
+                             <p className="text-brand-600 font-bold text-sm">฿{item.basePrice}</p>
+                         </div>
+                     ))}
+                 </div>
              </div>
-             
-             <textarea 
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder={t('whatMood')}
-                className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-brand-500 outline-none resize-none h-24 bg-gray-50 text-sm mb-4"
-             />
-             
-             <button 
-                onClick={askAiChef}
-                disabled={isThinking || !aiPrompt}
-                className="w-full py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 transition disabled:opacity-50"
-             >
-                {isThinking ? t('thinking') : t('askChef')}
-             </button>
+        )}
 
-             {aiRecommendation && (
-                 <div className="mt-4 p-4 bg-brand-50 rounded-xl border border-brand-100 text-sm text-brand-900 italic">
-                     "{aiRecommendation}"
+        {/* Store Status Banner */}
+        {!isStoreOpen && !canOrderForToday() && (
+             <div className="bg-red-600 text-white p-4 text-center sticky top-28 z-20 shadow-md">
+                 <div className="font-bold text-lg flex items-center justify-center gap-2">
+                     <Clock size={20}/> {t('storeClosed')}
                  </div>
-             )}
-          </div>
-        </div>
-      )}
-      
-      {/* Customization Modal */}
-      {selectedPizza && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="h-48 relative">
-                <img src={selectedPizza.image} className="w-full h-full object-cover rounded-t-2xl sm:rounded-t-2xl" />
-                <button onClick={() => setSelectedPizza(null)} className="absolute top-4 right-4 bg-black/50 text-white p-1 rounded-full"><X size={20}/></button>
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <h3 className="font-bold text-2xl text-white">{getLocalizedItem(selectedPizza).name}</h3>
-                    <p className="text-white/80 text-sm">{getLocalizedItem(selectedPizza).description}</p>
+                 <p className="text-sm opacity-90">{closedMessage}</p>
+                 <p className="text-xs mt-1 font-bold bg-white/20 inline-block px-2 py-1 rounded">Pre-ordering available for Tomorrow</p>
+             </div>
+        )}
+        {!isStoreOpen && canOrderForToday() && (
+             <div className="bg-orange-500 text-white p-4 text-center sticky top-28 z-20 shadow-md">
+                 <div className="font-bold text-lg flex items-center justify-center gap-2">
+                     <Clock size={20}/> Pre-Order for Lunch
+                 </div>
+                 <p className="text-sm opacity-90">First available slot today is {timeSlots[0]}</p>
+             </div>
+        )}
+
+        {/* Menu Grid */}
+        <main className="max-w-7xl mx-auto px-4 py-6 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {menu.filter(p => p.category === activeCategory).map(item => {
+                    const localized = getLocalizedItem(item);
+                    return (
+                        <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition cursor-pointer border border-transparent hover:border-brand-100 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                            <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
+                                <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
+                                {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
+                            </div>
+                            <div className="px-1">
+                                <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
+                                <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                    <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center"><Plus size={18}/></button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </main>
+        
+        {/* Footer with Staff Access */}
+        <footer className="bg-gray-900 text-gray-400 py-8 mt-auto">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="text-sm">© 2025 Pizza Damac Nonthaburi</div>
+                <div className="flex gap-4">
+                    <button onClick={() => navigateTo('kitchen')} className="flex items-center gap-2 hover:text-white transition"><ChefHat size={16}/> {t('kitchen')}</button>
+                    <button onClick={() => navigateTo('pos')} className="flex items-center gap-2 hover:text-white transition"><Lock size={16}/> {t('pos')}</button>
                 </div>
             </div>
-            
-            <div className="p-5">
-               {(selectedPizza.name === "Create Your Own Pizza" || selectedPizza.name.includes("Lucky")) && (
-                   <div className="mb-4">
-                       <label className="text-xs font-bold text-gray-500 uppercase">{t('nameCreation')}</label>
-                       <input 
-                           type="text" 
-                           placeholder="e.g. My Super Cheese" 
-                           className="w-full border-b-2 border-brand-200 py-2 focus:border-brand-600 outline-none font-medium text-lg"
-                           value={customName}
-                           onChange={(e) => setCustomName(e.target.value)}
-                       />
-                   </div>
-               )}
+        </footer>
 
-               {selectedPizza.category === 'pizza' && (
-               <div className="mb-6">
-                 <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">{t('customizeToppings')}</h4>
-                 <div className="grid grid-cols-2 gap-2">
-                   {INITIAL_TOPPINGS.map(topping => {
-                     const isSelected = !!selectedToppings.find(t => t.id === topping.id);
-                     const toppingName = language === 'th' && topping.nameTh ? topping.nameTh : topping.name;
-                     return (
-                        <button 
-                            key={topping.id} 
-                            onClick={() => toggleTopping(topping)}
-                            className={`flex items-center justify-between p-3 border rounded-lg text-sm transition ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-700 font-medium' : 'border-gray-200 text-gray-600'}`}
-                        >
-                            <span>{toppingName}</span>
-                            <span className="text-xs opacity-70">+฿{topping.price}</span>
-                        </button>
-                     );
-                   })}
-                 </div>
-               </div>
-               )}
-               
-               <div className="flex gap-2">
-                   <button onClick={handleSaveFavorite} className="p-3 bg-red-50 text-red-500 rounded-xl border border-red-100 hover:bg-red-100 transition" title="Save to Favorites">
-                       <Heart size={24} fill={customer?.savedFavorites?.find(f => f.pizzaId === selectedPizza.id) ? "currentColor" : "none"} />
-                   </button>
-                   <button 
-                    onClick={handleAddToCart}
-                    className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 transition flex justify-between px-6 items-center shadow-lg shadow-brand-200"
-                   >
-                     <span>{t('addToOrder')}</span>
-                     <span>฿{selectedPizza.basePrice + selectedToppings.reduce((s, t) => s + t.price, 0)}</span>
-                   </button>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-       {/* Profile Slide-over */}
-      {showProfile && customer && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-start">
-              <div className="bg-white w-full max-w-sm h-full shadow-2xl overflow-y-auto animate-slide-in-left p-6">
-                  <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold">{t('myProfile')}</h2>
-                      <button onClick={() => setShowProfile(false)} className="p-2 bg-gray-100 rounded-full"><X size={20}/></button>
-                  </div>
-                  
-                  {/* Loyalty Card */}
-                  <div className="bg-brand-600 text-white p-6 rounded-2xl shadow-lg mb-8 relative overflow-hidden">
-                      <div className="relative z-10">
-                          <div className="flex justify-between items-start">
-                              <p className="text-brand-100 text-sm font-medium mb-1">Pizza Damac Rewards</p>
-                              <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-white/30">{customer.tier || 'Bronze'} Member</span>
-                          </div>
-                          <h3 className="text-3xl font-bold mb-4">{customer.loyaltyPoints} <span className="text-lg font-normal">{t('points')}</span></h3>
-                          <div className="w-full bg-black/20 rounded-full h-2 mb-2">
-                              <div className="bg-yellow-400 h-2 rounded-full transition-all duration-1000" style={{width: `${Math.min((customer.loyaltyPoints / 10) * 100, 100)}%`}}></div>
-                          </div>
-                          <p className="text-xs text-brand-100 flex justify-between">
-                              <span>{customer.loyaltyPoints} / 10 Pizzas</span>
-                              <span>{Math.max(0, 10 - customer.loyaltyPoints)} to go</span>
-                          </p>
-                          
-                          {customer.loyaltyPoints >= 10 && (
+        {/* Customization Modal */}
+        {selectedPizza && (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-4">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+                     {/* Header */}
+                     <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                        <h3 className="font-bold text-xl">{getLocalizedItem(selectedPizza).name}</h3>
+                        <button onClick={() => setSelectedPizza(null)} className="p-2 bg-gray-200 rounded-full"><X size={20}/></button>
+                     </div>
+                     
+                     {/* Content */}
+                     <div className="p-4 overflow-y-auto flex-1">
+                         {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
+                             // Combo Builder Interface
+                             <div>
+                                 <p className="text-sm text-gray-500 mb-4">Select {selectedPizza.comboCount} pizzas for your combo:</p>
+                                 {isComboBuilderOpen ? (
+                                     <div className="space-y-3">
+                                         {new Array(selectedPizza.comboCount).fill(0).map((_, idx) => (
+                                             <div key={idx} onClick={() => handleOpenComboSlot(idx)} className={`p-4 border rounded-xl cursor-pointer flex justify-between items-center ${comboSelections[idx] ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-dashed border-gray-300'}`}>
+                                                 {comboSelections[idx] ? (
+                                                     <div>
+                                                         <div className="font-bold text-green-800">{language==='th' && comboSelections[idx].nameTh ? comboSelections[idx].nameTh : comboSelections[idx].name}</div>
+                                                         <div className="text-xs text-gray-500">
+                                                             {comboSelections[idx].toppings.length > 0 ? `+ ${comboSelections[idx].toppings.length} toppings` : 'No extra toppings'}
+                                                         </div>
+                                                     </div>
+                                                 ) : (
+                                                     <span className="text-gray-400 font-bold">Select Pizza #{idx + 1}</span>
+                                                 )}
+                                                 <ChevronRight size={16} className="text-gray-400"/>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 ) : null}
+                                 
+                                 {/* Pizza Selector for Combo Slot */}
+                                 {currentComboSlot !== null && (
+                                     <div className="absolute inset-0 bg-white z-10 flex flex-col">
+                                         <div className="p-4 border-b flex items-center gap-2 bg-gray-50">
+                                             <button onClick={() => setCurrentComboSlot(null)}><ArrowLeft size={20}/></button>
+                                             <h3 className="font-bold">Select for Slot #{currentComboSlot + 1}</h3>
+                                         </div>
+                                         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 gap-3">
+                                             {menu.filter(p => p.category === 'pizza').map(p => (
+                                                 <div key={p.id} onClick={() => handleSelectComboPizza(p)} className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+                                                     <img src={p.image} className="w-12 h-12 rounded object-cover"/>
+                                                     <div className="font-bold text-sm">{getLocalizedItem(p).name}</div>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                         ) : (
+                             // Standard Customization
+                             <>
+                                 {selectedPizza.name === "Create Your Own Pizza" && (
+                                     <div className="mb-4">
+                                         <label className="block text-sm font-bold mb-1">{t('nameCreation')}</label>
+                                         <input className="w-full border rounded p-2" value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. My Super Pizza"/>
+                                     </div>
+                                 )}
+                                 <h4 className="font-bold text-gray-500 text-xs uppercase mb-3">{t('customizeToppings')}</h4>
+                                 <div className="grid grid-cols-2 gap-2">
+                                     {toppings.map(t => (
+                                         <button 
+                                            key={t.id} 
+                                            onClick={() => toggleTopping(t)}
+                                            className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
+                                        >
+                                             <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                             <span className="text-xs">+฿{t.price}</span>
+                                         </button>
+                                     ))}
+                                 </div>
+                             </>
+                         )}
+                     </div>
+                     
+                     {/* Footer */}
+                     <div className="p-4 border-t bg-gray-50 flex gap-3">
+                         <button onClick={handleSaveFavorite} className="p-3 bg-white border border-gray-300 rounded-xl text-gray-500"><Heart size={20}/></button>
+                         
+                         {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
                              <button 
-                                onClick={handleClaimReward}
-                                className="mt-4 w-full bg-white text-brand-600 font-bold py-2 rounded-lg shadow flex items-center justify-center gap-2 animate-bounce-short"
+                                onClick={handleAddComboToCart}
+                                disabled={comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0)}
+                                className="flex-1 bg-brand-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400"
                              >
-                                <Gift size={16} /> {t('claimReward')}
+                                 {comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0) ? `Select ${selectedPizza.comboCount} items` : t('addToOrder')}
                              </button>
-                          )}
-                      </div>
-                      <Sparkles className="absolute -top-4 -right-4 text-white/10 w-32 h-32" />
-                  </div>
+                         ) : (
+                             <button onClick={handleAddToCart} className="flex-1 bg-brand-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+                                 {t('addToOrder')} - ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}
+                             </button>
+                         )}
+                     </div>
+                </div>
+            </div>
+        )}
 
-                  {/* Favorites */}
-                  <div className="mb-8">
-                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Heart size={18} className="text-red-500" /> {t('savedFavorites')}</h3>
-                      {(!customer.savedFavorites || customer.savedFavorites.length === 0) ? (
-                          <p className="text-gray-400 text-sm">No saved pizzas yet.</p>
-                      ) : (
-                          <div className="space-y-3">
-                              {customer.savedFavorites.map(fav => (
-                                  <div key={fav.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex justify-between items-center">
-                                      <div>
-                                          <p className="font-bold text-sm">{fav.name}</p>
-                                          <p className="text-xs text-gray-500">{fav.toppings.length} toppings</p>
-                                      </div>
-                                      <button 
-                                        onClick={() => {
-                                            const pizza = menu.find(p => p.id === fav.pizzaId);
-                                            if(pizza) {
-                                                const localized = getLocalizedItem(pizza);
-                                                const price = pizza.basePrice + fav.toppings.reduce((s,t) => s + t.price, 0);
-                                                addToCart({
-                                                    id: Date.now().toString(),
-                                                    pizzaId: pizza.id,
-                                                    name: fav.name,
-                                                    nameTh: fav.name, 
-                                                    basePrice: pizza.basePrice,
-                                                    selectedToppings: fav.toppings,
-                                                    quantity: 1,
-                                                    totalPrice: price
-                                                });
-                                                alert("Added to cart!");
-                                                setIsCartOpen(true);
-                                                setShowProfile(false);
-                                            }
-                                        }}
-                                        className="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-full font-bold"
-                                      >
-                                          {t('orderNow')}
-                                      </button>
-                                  </div>
-                              ))}
-                          </div>
-                      )}
-                  </div>
+        {/* Cart Sidebar/Modal */}
+        {isCartOpen && (
+            <div className="fixed inset-0 z-50 bg-black/50 flex justify-end">
+                <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl">
+                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                        <h2 className="font-bold text-xl">{t('yourOrder')}</h2>
+                        <button onClick={() => setIsCartOpen(false)}><X size={24}/></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {cart.length === 0 ? <p className="text-center text-gray-500 mt-10">{t('cartEmpty')}</p> : cart.map(item => (
+                            <div key={item.id} className="flex justify-between items-start border-b pb-4">
+                                <div>
+                                    <div className="font-bold text-lg">{item.name} <span className="text-brand-600 text-sm">x{item.quantity}</span></div>
+                                    <div className="text-sm text-gray-500">{item.selectedToppings.map(t => language==='th'?t.nameTh:t.name).join(', ')}</div>
+                                    {/* Combo breakdown */}
+                                    {item.subItems && (
+                                        <div className="mt-1 pl-2 border-l-2 border-brand-100">
+                                            {item.subItems.map((sub, i) => (
+                                                <div key={i} className="text-xs text-gray-500">
+                                                    • {language==='th' && sub.nameTh ? sub.nameTh : sub.name}
+                                                    {sub.toppings.length > 0 && ` (+${sub.toppings.length} tops)`}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                    <span className="font-bold">฿{item.totalPrice}</span>
+                                    <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-xs">{t('delete')}</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {cart.length > 0 && (
+                        <div className="p-4 border-t bg-gray-50 space-y-4">
+                             {/* Date Selector (Today / Tomorrow) */}
+                             <div className="flex gap-2">
+                                 <button 
+                                    onClick={() => setOrderDate('today')} 
+                                    disabled={!isStoreOpen && !canOrderForToday()} // Fully disabled if night
+                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderDate==='today'?'bg-brand-600 text-white':'bg-white text-gray-500'} ${!isStoreOpen && !canOrderForToday() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                 >
+                                     Today
+                                 </button>
+                                 <button 
+                                    onClick={() => setOrderDate('tomorrow')} 
+                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderDate==='tomorrow'?'bg-brand-600 text-white':'bg-white text-gray-500'}`}
+                                 >
+                                     Tomorrow
+                                 </button>
+                             </div>
 
-                  {/* History */}
-                  <div>
-                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={18} className="text-blue-500" /> {t('recentOrders')}</h3>
-                      {(!customer.orderHistory || customer.orderHistory.length === 0) ? (
-                          <p className="text-gray-400 text-sm">No past orders.</p>
-                      ) : (
-                          <div className="space-y-3">
-                              {customer.orderHistory.slice(0, 5).map(orderId => {
-                                  const order = orders.find(o => o.id === orderId);
-                                  if (!order) return null;
-                                  return (
-                                      <div key={orderId} className="bg-white border border-gray-100 shadow-sm p-3 rounded-lg">
-                                          <div className="flex justify-between items-start mb-2">
-                                              <div>
-                                                  <span className="text-xs text-gray-400 block">{new Date(order.createdAt).toLocaleDateString()}</span>
-                                                  <span className="font-bold text-gray-800 text-sm">฿{order.totalAmount}</span>
-                                              </div>
-                                              <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">{t(order.status as any)}</span>
-                                          </div>
-                                          <button 
-                                            onClick={() => { reorderItem(order.id); setIsCartOpen(true); setShowProfile(false); }}
-                                            className="w-full text-center text-xs text-brand-600 font-bold border border-brand-100 py-1.5 rounded hover:bg-brand-50"
-                                          >
-                                              {t('reorder')}
-                                          </button>
-                                      </div>
-                                  )
-                              })}
-                          </div>
-                      )}
-                  </div>
-                  
-                  <button onClick={() => { setCustomer({ ...customer, name: '', phone: '' } as any); window.location.reload(); }} className="mt-8 text-center w-full text-gray-400 text-xs underline">
-                      {t('logout')}
-                  </button>
-              </div>
-          </div>
-      )}
+                             <div className="flex gap-2">
+                                 <button onClick={() => setOrderType('online')} className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='online'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}>{t('pickupTime')}</button>
+                                 <button onClick={() => setOrderType('delivery')} className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='delivery'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}>{t('deliveryAddress')}</button>
+                             </div>
+                             
+                             {orderType === 'online' && (
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 block">Select Time ({orderDate === 'today' ? 'Today' : 'Tomorrow'})</label>
+                                     <select className="w-full p-2 border rounded" value={pickupTime} onChange={e => setPickupTime(e.target.value)}>
+                                         <option value="">{orderDate === 'today' ? 'ASAP (approx 20 mins)' : 'Select Time'}</option>
+                                         {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                                     </select>
+                                 </div>
+                             )}
 
+                             {orderType === 'delivery' && (
+                                 <div className="space-y-2">
+                                     <textarea className="w-full p-3 border rounded-lg text-sm" placeholder={t('deliveryAddress')} value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)}/>
+                                     {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
+                                         <select className="w-full p-2 text-sm border rounded bg-gray-50" onChange={e => {if(e.target.value) setDeliveryAddress(e.target.value)}}>
+                                             <option value="">{t('selectAddress')}</option>
+                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,30)}...</option>)}
+                                         </select>
+                                     )}
+                                     <div className="bg-blue-50 p-2 rounded text-xs text-blue-800 flex items-start gap-2">
+                                         <Info size={16} className="mt-0.5"/>
+                                         {t('deliveryNoticeDesc')}
+                                     </div>
+                                 </div>
+                             )}
+                             
+                             <button onClick={handlePlaceOrderClick} disabled={isSubmitting} className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg">
+                                 {isSubmitting ? 'Processing...' : (
+                                     !isStoreOpen && orderDate === 'tomorrow' ? `Pre-Order for Tomorrow • ฿${cartTotal}` : `${t('placeOrder')} • ฿${cartTotal}`
+                                 )}
+                             </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* Auth Modal (Login / Register) */}
+        {showAuthModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-sm rounded-2xl p-8 shadow-2xl relative">
+                    <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={24}/></button>
+                    
+                    {/* Tabs */}
+                    <div className="flex border-b mb-6">
+                        <button onClick={() => setAuthMode('login')} className={`flex-1 pb-2 font-bold ${authMode === 'login' ? 'border-b-2 border-brand-600 text-brand-600' : 'text-gray-400'}`}>Login</button>
+                        <button onClick={() => setAuthMode('register')} className={`flex-1 pb-2 font-bold ${authMode === 'register' ? 'border-b-2 border-brand-600 text-brand-600' : 'text-gray-400'}`}>Register</button>
+                    </div>
+
+                    {authMode === 'register' ? (
+                        <form onSubmit={handleRegister} className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Name</label>
+                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regName} onChange={e=>setRegName(e.target.value)} required/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
+                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regPhone} onChange={e=>setRegPhone(e.target.value)} required type="tel"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
+                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regPassword} onChange={e=>setRegPassword(e.target.value)} required type="password"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
+                                <textarea className="w-full bg-gray-50 border rounded-lg p-3" value={regAddress} onChange={e=>setRegAddress(e.target.value)}/>
+                            </div>
+                            <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                                <input type="checkbox" className="mt-1" checked={regPdpa} onChange={e=>setRegPdpa(e.target.checked)}/>
+                                <span className="text-xs">{t('pdpaLabel')}</span>
+                            </label>
+                            <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-black transition">{t('startEarning')}</button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleLogin} className="space-y-4">
+                             <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
+                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={loginPhone} onChange={e=>setLoginPhone(e.target.value)} required type="tel"/>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
+                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required type="password"/>
+                            </div>
+                            <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-brand-700 transition">Login</button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* Profile Modal */}
+        {showProfile && customer && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
+                     <button onClick={() => setShowProfile(false)} className="absolute top-4 right-4"><X size={20}/></button>
+                     <div className="flex flex-col items-center mb-6">
+                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                            <User size={40} className="text-gray-400"/>
+                         </div>
+                         <h3 className="font-bold text-xl">{customer.name}</h3>
+                         <p className="text-gray-500 text-sm">{customer.phone}</p>
+                         <div className="mt-3 flex gap-2">
+                             <div className="bg-yellow-50 text-yellow-800 px-3 py-1 rounded-lg text-sm font-bold border border-yellow-100 flex items-center gap-1">
+                                 <Star size={14}/> {customer.loyaltyPoints} Points
+                             </div>
+                             <div className="bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold border border-blue-100">
+                                 {customer.tier || 'Member'}
+                             </div>
+                         </div>
+                     </div>
+                     
+                     <div className="space-y-4">
+                         <div>
+                             <h4 className="font-bold text-sm text-gray-500 uppercase mb-2">{t('savedFavorites')}</h4>
+                             {customer.savedFavorites && customer.savedFavorites.length > 0 ? (
+                                 <div className="space-y-2">
+                                     {customer.savedFavorites.map(fav => (
+                                         <div key={fav.id} className="bg-gray-50 p-3 rounded-xl flex justify-between items-center">
+                                             <span className="font-bold text-sm">{fav.name}</span>
+                                             <button onClick={() => {
+                                                 // Reorder logic for favorite
+                                                 const pizza = menu.find(p => p.id === fav.pizzaId);
+                                                 if (pizza) {
+                                                     setSelectedPizza(pizza);
+                                                     setSelectedToppings(fav.toppings);
+                                                     setShowProfile(false);
+                                                 }
+                                             }} className="text-brand-600 text-xs font-bold hover:underline">{t('buyAgain')}</button>
+                                         </div>
+                                     ))}
+                                 </div>
+                             ) : <p className="text-sm text-gray-400">No favorites saved yet.</p>}
+                         </div>
+
+                         <div>
+                             <h4 className="font-bold text-sm text-gray-500 uppercase mb-2">{t('recentOrders')}</h4>
+                             {orders.filter(o => o.customerPhone === customer.phone).slice(0,3).map(order => (
+                                 <div key={order.id} className="border-b py-3 last:border-0">
+                                     <div className="flex justify-between">
+                                         <span className="font-bold text-sm">#{order.id.slice(-4)}</span>
+                                         <span className={`text-xs px-2 py-0.5 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span>
+                                     </div>
+                                     <p className="text-xs text-gray-500 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                 </div>
+                             ))}
+                         </div>
+                         
+                         <button onClick={() => {
+                             setCustomer(null as any); 
+                             window.location.reload();
+                         }} className="w-full py-3 text-red-600 font-bold border border-red-100 rounded-xl hover:bg-red-50">{t('logout')}</button>
+                     </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
