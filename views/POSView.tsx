@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
-import { CATEGORIES, INITIAL_TOPPINGS, GP_RATES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Clock, Settings, User, X, ChevronRight, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, PenTool, Menu, Camera, Calculator, PieChart, FileText, Globe, ToggleLeft, ToggleRight, MessageSquare, List, ChevronUp } from 'lucide-react';
+import { CATEGORIES, EXPENSE_CATEGORIES } from '../constants';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -11,7 +11,7 @@ export const POSView: React.FC = () => {
         updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza,
         toppings, addTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
-        expenses, addExpense, deleteExpense,
+        expenses, addExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, closedMessage
     } = useStore();
@@ -26,11 +26,7 @@ export const POSView: React.FC = () => {
     
     // Admin / Edit features
     const [isEditMode, setIsEditMode] = useState(false);
-    const [priceEditId, setPriceEditId] = useState<string | null>(null);
-    const [tempPrice, setTempPrice] = useState<string>('');
     const [tableNumber, setTableNumber] = useState('');
-    
-    // Store Status Msg
     const [tempClosedMsg, setTempClosedMsg] = useState(closedMessage);
     
     // Add/Edit Item State
@@ -54,9 +50,7 @@ export const POSView: React.FC = () => {
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
-        // If simply clicking card in Manage mode, do nothing (edit buttons handle it)
         if (isEditMode && activeTab === 'order') return; 
-        
         setSelectedPizza(pizza);
         setSelectedToppings([]);
         setEditingCartItem(null);
@@ -68,7 +62,6 @@ export const POSView: React.FC = () => {
             setSelectedPizza(pizza);
             setSelectedToppings(item.selectedToppings);
             setEditingCartItem(item);
-            // If on mobile, close the cart drawer to show the modal
             if (window.innerWidth < 768) setShowMobileCart(false);
         }
     };
@@ -84,7 +77,6 @@ export const POSView: React.FC = () => {
     const confirmAddToCart = () => {
         if (!selectedPizza) return;
         const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
-        
         const localized = getLocalizedItem(selectedPizza);
 
         if (editingCartItem) {
@@ -109,15 +101,7 @@ export const POSView: React.FC = () => {
         setSelectedPizza(null);
         setSelectedToppings([]);
         setEditingCartItem(null);
-        // On mobile, re-open cart after edit
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
-    };
-
-    const handlePriceUpdate = () => {
-        if (priceEditId && tempPrice) {
-            updatePizzaPrice(priceEditId, parseFloat(tempPrice));
-            setPriceEditId(null);
-        }
     };
 
     const handlePlaceOrder = async (source: OrderSource) => {
@@ -182,13 +166,6 @@ export const POSView: React.FC = () => {
         }
     };
 
-    const handleDeletePizza = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (confirm("Are you sure you want to delete this item?")) {
-            deletePizza(id);
-        }
-    };
-
     const handleAddTopping = () => {
         if (newToppingName && newToppingPrice) {
             addTopping({
@@ -237,10 +214,10 @@ export const POSView: React.FC = () => {
     const netProfit = totalNetRevenue - totalExpenses;
 
     return (
-        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row">
+        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
             {/* --- MOBILE LAYOUT HEADER --- */}
-            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0">
+            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14">
                 <div className="flex items-center gap-2">
                     {shopLogo ? (
                         <img src={shopLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover" />
@@ -304,12 +281,12 @@ export const POSView: React.FC = () => {
             </aside>
 
             {/* --- MAIN CONTENT --- */}
-            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0 h-full">
+            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-0 md:pb-0 h-full">
                 
                 {/* VIEW: ORDER */}
                 {activeTab === 'order' && (
                     <>
-                        <div className="flex-1 flex flex-col overflow-hidden relative h-full">
+                        <div className="flex-1 flex flex-col overflow-hidden relative h-full pb-16 md:pb-0">
                             {/* Desktop Header */}
                             <div className="hidden md:block p-6 pb-2 shrink-0">
                                 <div className="flex justify-between items-center mb-6">
@@ -341,7 +318,7 @@ export const POSView: React.FC = () => {
                             
                             {/* Categories Bar */}
                             <div className="bg-white/95 backdrop-blur z-10 sticky top-0 shadow-sm md:shadow-none p-2 md:p-6 md:pt-0 shrink-0">
-                                <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
                                     {CATEGORIES.map(cat => (
                                         <button
                                             key={cat.id}
@@ -355,7 +332,7 @@ export const POSView: React.FC = () => {
                             </div>
 
                             {/* Menu Grid */}
-                            <div className="flex-1 overflow-y-auto p-2 md:p-6 pt-2 pb-24 md:pb-20">
+                            <div className="flex-1 overflow-y-auto p-2 md:p-6 pt-0 pb-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
@@ -387,7 +364,7 @@ export const POSView: React.FC = () => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-gray-500 line-clamp-2 mt-1">{localized.description}</p>
+                                                    <p className="text-xs text-gray-500 line-clamp-2 mt-1 hidden md:block">{localized.description}</p>
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
                                                     <span className="font-bold text-brand-600 text-base md:text-xl">฿{item.basePrice}</span>
@@ -400,8 +377,8 @@ export const POSView: React.FC = () => {
                             </div>
                             
                             {/* Mobile Cart Floating Button */}
-                            {cart.length > 0 && (
-                                <div className="md:hidden absolute bottom-4 left-4 right-4 z-20">
+                            {cart.length > 0 && !showMobileCart && (
+                                <div className="md:hidden absolute bottom-20 left-4 right-4 z-20">
                                     <button 
                                         onClick={() => setShowMobileCart(true)}
                                         className="w-full bg-brand-600 text-white p-3 rounded-xl shadow-lg flex justify-between items-center font-bold animate-slide-up"
@@ -417,7 +394,7 @@ export const POSView: React.FC = () => {
                         </div>
 
                         {/* Order Summary / Cart - Responsive Layout */}
-                        <div className={`bg-white border-l shadow-xl flex flex-col z-40 transition-transform duration-300 md:w-96 md:static ${showMobileCart ? 'fixed inset-0 w-full translate-y-0' : 'fixed inset-0 w-full translate-y-full md:hidden'}`}>
+                        <div className={`bg-white border-l shadow-xl flex flex-col z-40 transition-transform duration-300 md:w-96 md:static ${showMobileCart ? 'fixed inset-0 w-full translate-y-0 z-50' : 'fixed inset-0 w-full translate-y-full md:translate-y-0 md:flex'}`}>
                              {/* Mobile Cart Header */}
                              <div className="md:hidden p-4 border-b flex justify-between items-center bg-gray-50 shadow-sm shrink-0">
                                 <h3 className="font-bold text-lg">{t('yourOrder')}</h3>
@@ -627,20 +604,20 @@ export const POSView: React.FC = () => {
             </main>
 
             {/* Mobile Bottom Navigation (Updated) */}
-            <div className="md:hidden bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0">
-                <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); setIsEditMode(false) }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
+            <div className="md:hidden bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 h-16">
+                <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); setIsEditMode(false) }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
                     <ShoppingBag size={22} className={activeTab === 'order' ? 'fill-current' : ''} />
                     <span className="text-[10px] font-bold mt-1">Order</span>
                 </button>
-                <button onClick={() => { setActiveTab('sales'); setShowMobileCart(false); }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'sales' ? 'text-blue-600' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('sales'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'sales' ? 'text-blue-600' : 'text-gray-400'}`}>
                     <PieChart size={22} className={activeTab === 'sales' ? 'fill-current' : ''} />
                     <span className="text-[10px] font-bold mt-1">Report</span>
                 </button>
-                <button onClick={() => { setActiveTab('expenses'); setShowMobileCart(false); }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'expenses' ? 'text-yellow-500' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('expenses'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'expenses' ? 'text-yellow-500' : 'text-gray-400'}`}>
                     <Calculator size={22} className={activeTab === 'expenses' ? 'fill-current' : ''} />
                     <span className="text-[10px] font-bold mt-1">Exp</span>
                 </button>
-                <button onClick={() => { setActiveTab('manage'); setShowMobileCart(false); }} className={`flex-1 py-3 flex flex-col items-center ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
+                <button onClick={() => { setActiveTab('manage'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
                     <Settings size={22} className={activeTab === 'manage' ? 'fill-current' : ''} />
                     <span className="text-[10px] font-bold mt-1">Manage</span>
                 </button>

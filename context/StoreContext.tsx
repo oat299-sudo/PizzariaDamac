@@ -218,7 +218,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       // Orders (Last 100)
-      const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
+      const { data: ordersData, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
       if (ordersData && ordersData.length > 0) {
         const mappedOrders: Order[] = ordersData.map((o: any) => ({
           id: o.id, customerName: o.customer_name, customerPhone: o.customer_phone,
@@ -229,6 +229,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           tableNumber: o.table_number, items: o.items
         }));
         setOrders(mappedOrders);
+      }
+      if (error && error.message.includes('relation "orders" does not exist')) {
+        console.error("Critical: Database tables missing. Please run the SQL script.");
       }
 
       // Expenses
@@ -420,8 +423,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     // Allow order if future date/time is selected, OR if store is currently open
     // If store is closed, and pickupTime is 'ASAP' (default), then block.
-    // We assume 'pickupTime' contains a specific time if selected for later.
-    const isFutureOrder = details?.pickupTime && details.pickupTime !== 'ASAP (approx 20 mins)' && details.pickupTime.includes(':'); // Rudimentary check if it's a specific time string
+    const isFutureOrder = details?.pickupTime && details.pickupTime !== 'ASAP (approx 20 mins)' && details.pickupTime.includes(':');
 
     if (!isStoreOpen && !isFutureOrder && (type === 'online' || type === 'delivery')) {
         alert(closedMessage || t('storeClosedMsg'));
@@ -469,7 +471,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     if (error) {
         console.error("Order Error:", error);
-        alert("Failed to place order. Please check internet connection.");
+        if (error.message.includes('relation "orders" does not exist')) {
+            alert("Database Error: Table 'orders' is missing. Please run the SQL Script in Supabase!");
+        } else {
+            alert(`Order Failed: ${error.message || error.details || "Unknown error"}. Check if RLS is disabled in Supabase.`);
+        }
         return false;
     }
 
