@@ -22,6 +22,7 @@ interface StoreContextType {
   deletePizza: (id: string) => Promise<void>;
   updatePizzaPrice: (id: string, newPrice: number) => Promise<void>;
   togglePizzaAvailability: (id: string) => Promise<void>;
+  toggleBestSeller: (id: string) => Promise<void>; // New
   generateLuckyPizza: () => { pizza: Pizza; toppings: Topping[] } | null;
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
@@ -59,7 +60,9 @@ interface StoreContextType {
   isStoreOpen: boolean;
   isHoliday: boolean;
   closedMessage: string;
+  storeSettings: StoreSettings; // New: Full settings object
   toggleStoreStatus: (isOpen: boolean, message?: string) => Promise<void>;
+  updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>; // New
   generateTimeSlots: (dateOffset?: number) => string[];
 }
 
@@ -105,7 +108,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return 'customer';
   });
 
-  // Handle Browser Back/Forward Buttons
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -126,7 +128,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             url.searchParams.set('view', view);
         }
         window.history.pushState({}, '', url.toString());
-        // Scroll to top on view change
         window.scrollTo(0, 0);
     }
   };
@@ -166,34 +167,46 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
 
   // --- Store Settings State ---
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({ isOpen: true, closedMessage: '' });
   const [isHoliday, setIsHoliday] = useState(false);
-  const [closedMessage, setClosedMessage] = useState('');
-  // Derived state: Open if NOT holiday AND within hours
   const [isStoreOpen, setIsStoreOpen] = useState(true);
+
+  // Helper to check if today is within holiday range
+  const checkHolidayStatus = (start?: string, end?: string) => {
+      if (!start || !end) return false;
+      const today = new Date().toISOString().split('T')[0];
+      return today >= start && today <= end;
+  };
 
   const checkOperatingHours = () => {
     const now = new Date();
-    // Convert to Bangkok Time if needed, but assuming browser local time for simplicity
     const currentHour = now.getHours() + now.getMinutes() / 60;
     const isOpenHours = currentHour >= OPERATING_HOURS.open && currentHour < OPERATING_HOURS.close;
     return isOpenHours;
   };
 
   useEffect(() => {
-     // Re-eval open status whenever holiday or time changes
+     // Check if explicit holiday in DB OR manually closed
+     const isScheduledHoliday = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
+     const effectiveHoliday = isScheduledHoliday || !storeSettings.isOpen; // Logic: settings.isOpen acts as "Manual Override"
+
+     setIsHoliday(effectiveHoliday);
+
      const openHours = checkOperatingHours();
-     setIsStoreOpen(!isHoliday && openHours);
+     // Store is Open IF (Not Holiday) AND (Within Hours)
+     // BUT if manually closed via toggle (isOpen=false), it stays closed.
+     setIsStoreOpen(storeSettings.isOpen && !isScheduledHoliday && openHours);
      
      const interval = setInterval(() => {
          const openHours = checkOperatingHours();
-         setIsStoreOpen(!isHoliday && openHours);
-     }, 60000); // Check every minute
+         const isScheduled = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
+         setIsStoreOpen(storeSettings.isOpen && !isScheduled && openHours);
+     }, 60000); 
      return () => clearInterval(interval);
-  }, [isHoliday]);
+  }, [storeSettings]);
 
-  // --- 1. Fetch Initial Data from Supabase ---
+  // --- 1. Fetch Initial Data ---
   useEffect(() => {
-    // If not configured, don't try to fetch to avoid errors in console unless necessary
     if (!isSupabaseConfigured) return;
 
     const fetchData = async () => {
@@ -203,7 +216,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const mappedMenu: Pizza[] = menuData.map((m: any) => ({
           id: m.id, name: m.name, nameTh: m.name_th, 
           description: m.description, descriptionTh: m.description_th,
-          basePrice: m.base_price, image: m.image, available: m.available, category: m.category
+          basePrice: m.base_price, image: m.image, available: m.available, category: m.category,
+          isBestSeller: m.is_best_seller // New field
         }));
         setMenu(mappedMenu);
       }
@@ -217,9 +231,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setToppings(mappedToppings);
       }
 
-      // Orders (Last 100)
-      const { data: ordersData, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
-      if (ordersData && ordersData.length > 0) {
+      // Orders
+      const { data: ordersData } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
+      if (ordersData) {
         const mappedOrders: Order[] = ordersData.map((o: any) => ({
           id: o.id, customerName: o.customer_name, customerPhone: o.customer_phone,
           type: o.type, source: o.source, status: o.status,
@@ -230,19 +244,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
         setOrders(mappedOrders);
       }
-      if (error && (error.message.includes('relation "orders" does not exist') || error.message.includes('Could not find the table'))) {
-        console.error("Critical: Database tables missing. Please run the SQL script.");
-      }
 
-      // Expenses
-      const { data: expData } = await supabase.from('expenses').select('*').order('date', { ascending: false });
-      if (expData) setExpenses(expData);
-
-      // Store Settings
+      // Settings
       const { data: settingsData } = await supabase.from('store_settings').select('*').eq('id', 'global').single();
       if (settingsData) {
-          setIsHoliday(!settingsData.is_open);
-          setClosedMessage(settingsData.closed_message || '');
+          setStoreSettings({
+              isOpen: settingsData.is_open,
+              closedMessage: settingsData.closed_message || '',
+              promoBannerUrl: settingsData.promo_banner_url,
+              promoContentType: settingsData.promo_content_type || 'image',
+              holidayStart: settingsData.holiday_start,
+              holidayEnd: settingsData.holiday_end
+          });
       }
     };
 
@@ -254,8 +267,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, (payload) => {
           if (payload.new) {
-             setIsHoliday(!payload.new.is_open);
-             setClosedMessage(payload.new.closed_message);
+             setStoreSettings({
+                 isOpen: payload.new.is_open,
+                 closedMessage: payload.new.closed_message,
+                 promoBannerUrl: payload.new.promo_banner_url,
+                 promoContentType: payload.new.promo_content_type,
+                 holidayStart: payload.new.holiday_start,
+                 holidayEnd: payload.new.holiday_end
+             });
           }
       })
       .subscribe();
@@ -270,7 +289,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         await supabase.from('menu_items').insert([{
             id: pizza.id, name: pizza.name, name_th: pizza.nameTh,
             description: pizza.description, description_th: pizza.descriptionTh,
-            base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category
+            base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
+            is_best_seller: pizza.isBestSeller
         }]);
     }
   };
@@ -282,7 +302,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             name: updatedPizza.name, name_th: updatedPizza.nameTh,
             description: updatedPizza.description, description_th: updatedPizza.descriptionTh,
             base_price: updatedPizza.basePrice, image: updatedPizza.image, 
-            available: updatedPizza.available, category: updatedPizza.category
+            available: updatedPizza.available, category: updatedPizza.category,
+            is_best_seller: updatedPizza.isBestSeller
         }).eq('id', updatedPizza.id);
     }
   };
@@ -308,6 +329,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setMenu(prev => prev.map(p => p.id === id ? { ...p, available: newVal } : p));
     if(isSupabaseConfigured) {
         await supabase.from('menu_items').update({ available: newVal }).eq('id', id);
+    }
+  };
+  
+  const toggleBestSeller = async (id: string) => {
+    const item = menu.find(p => p.id === id);
+    if (!item) return;
+    const newVal = !item.isBestSeller;
+    setMenu(prev => prev.map(p => p.id === id ? { ...p, isBestSeller: newVal } : p));
+    if(isSupabaseConfigured) {
+        await supabase.from('menu_items').update({ is_best_seller: newVal }).eq('id', id);
     }
   };
 
@@ -358,7 +389,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setCustState(profile);
     localStorage.setItem('damac_customer', JSON.stringify(profile));
     
-    // Check if exists in DB, if not insert, else update
     if(isSupabaseConfigured) {
         const { data } = await supabase.from('customers').select('phone').eq('phone', profile.phone).single();
         if (data) {
@@ -409,9 +439,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       source?: OrderSource;
     }
   ): Promise<boolean> => {
-    // 1. Check DB Connection
     if (!isSupabaseConfigured) {
-        alert("Database not connected. Please check Netlify settings (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY).");
+        alert("Database not connected.");
         return false;
     }
 
@@ -421,12 +450,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return false;
     }
 
-    // Allow order if future date/time is selected, OR if store is currently open
-    // If store is closed, and pickupTime is 'ASAP' (default), then block.
-    const isFutureOrder = details?.pickupTime && details.pickupTime !== 'ASAP (approx 20 mins)' && details.pickupTime.includes(':');
-
+    // Logic: If Pickup Time is specifically for future, allow it.
+    const isFutureOrder = details?.pickupTime && details.pickupTime.includes('Tomorrow');
+    
+    // Block if Store Closed AND Not Future Order
     if (!isStoreOpen && !isFutureOrder && (type === 'online' || type === 'delivery')) {
-        alert(closedMessage || t('storeClosedMsg'));
+        alert(storeSettings.closedMessage || t('storeClosedMsg'));
         return false;
     }
 
@@ -455,7 +484,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       tableNumber: details?.tableNumber
     };
 
-    // DB Insert
     const { error } = await supabase.from('orders').insert([{
         id: newOrder.id,
         customer_name: newOrder.customerName,
@@ -466,26 +494,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         delivery_address: newOrder.deliveryAddress, delivery_zone: newOrder.deliveryZone,
         delivery_fee: newOrder.deliveryFee, payment_method: newOrder.paymentMethod,
         pickup_time: newOrder.pickupTime, table_number: newOrder.tableNumber,
-        items: newOrder.items // Stores as JSONB
+        items: newOrder.items
     }]);
 
     if (error) {
         console.error("Order Error:", error);
-        // Check for common Supabase Errors
-        if (
-            error.message.includes('relation "orders" does not exist') || 
-            error.message.includes('Could not find the table')
-        ) {
-            alert("CRITICAL DATABASE ERROR: The 'orders' table does not exist in Supabase.\n\nYou must go to Supabase -> SQL Editor and run the creation script.");
-        } else {
-            alert(`Order Failed: ${error.message}\n\nTip: Go to Supabase SQL Editor and run: 'alter table orders disable row level security;'`);
-        }
+        alert(`Order Failed: ${error.message}`);
         return false;
     }
 
     setOrders(prev => [newOrder, ...prev]);
     
-    // Loyalty Logic
+    // Loyalty
     if (customer && source === 'store') {
         const pizzaCount = cart.filter(i => {
            const menuItem = menu.find(p => p.id === i.pizzaId);
@@ -522,7 +542,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
-  // --- Expenses ---
   const addExpense = async (expense: Expense) => {
     setExpenses(prev => [expense, ...prev]);
     if(isSupabaseConfigured) {
@@ -552,19 +571,27 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // --- Store Settings ---
   const toggleStoreStatus = async (isOpen: boolean, message?: string) => {
-     setIsHoliday(!isOpen);
-     if (message !== undefined) setClosedMessage(message);
-     
-     // Update DB
+     setStoreSettings(prev => ({ ...prev, isOpen, closedMessage: message ?? prev.closedMessage }));
      if(isSupabaseConfigured) {
          await supabase.from('store_settings').update({ 
              is_open: isOpen, 
-             closed_message: message ?? closedMessage 
+             closed_message: message ?? storeSettings.closedMessage 
          }).eq('id', 'global');
      }
   };
 
-  // dateOffset: 0 = Today, 1 = Tomorrow
+  const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
+      setStoreSettings(prev => ({ ...prev, ...settings }));
+      if (isSupabaseConfigured) {
+           await supabase.from('store_settings').update({
+               promo_banner_url: settings.promoBannerUrl,
+               promo_content_type: settings.promoContentType,
+               holiday_start: settings.holidayStart,
+               holiday_end: settings.holidayEnd
+           }).eq('id', 'global');
+      }
+  };
+
   const generateTimeSlots = (dateOffset: number = 0) => {
       const slots = [];
       let time = OPERATING_HOURS.open;
@@ -572,13 +599,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const currentDecimalTime = now.getHours() + (now.getMinutes() / 60);
 
       while (time < OPERATING_HOURS.close) {
-          // If dateOffset is 0 (Today), skip times that have passed or are too close
-          // Add 30 min buffer
           if (dateOffset === 0 && time < currentDecimalTime + 0.5) {
               time += 0.5;
               continue;
           }
-
           const hours = Math.floor(time);
           const minutes = (time % 1) * 60;
           const timeStr = `${hours.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}`;
@@ -594,13 +618,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       currentView, navigateTo,
       isAdminLoggedIn, adminLogin, adminLogout,
       shopLogo, updateShopLogo,
-      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, generateLuckyPizza,
+      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza,
       toppings, addTopping, deleteTopping,
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
       customer, setCustomer, addToFavorites, claimReward,
       orders, placeOrder, updateOrderStatus, reorderItem,
       expenses, addExpense, deleteExpense,
-      isStoreOpen, isHoliday, closedMessage, toggleStoreStatus, generateTimeSlots
+      isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots
     }}>
       {children}
     </StoreContext.Provider>

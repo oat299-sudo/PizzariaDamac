@@ -18,6 +18,7 @@ export interface Pizza {
   image: string;
   available: boolean;
   category: ProductCategory;
+  isBestSeller?: boolean; // New: Highlight item
 }
 
 export interface CartItem {
@@ -103,4 +104,9 @@ export interface Expense {
 export interface StoreSettings {
   isOpen: boolean;
   closedMessage: string;
+  // New Fields
+  promoBannerUrl?: string; // URL for image or video
+  promoContentType?: 'image' | 'video';
+  holidayStart?: string; // ISO Date
+  holidayEnd?: string; // ISO Date
 }
