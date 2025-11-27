@@ -230,7 +230,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
         setOrders(mappedOrders);
       }
-      if (error && error.message.includes('relation "orders" does not exist')) {
+      if (error && (error.message.includes('relation "orders" does not exist') || error.message.includes('Could not find the table'))) {
         console.error("Critical: Database tables missing. Please run the SQL script.");
       }
 
@@ -471,10 +471,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     if (error) {
         console.error("Order Error:", error);
-        if (error.message.includes('relation "orders" does not exist')) {
-            alert("Database Error: Table 'orders' is missing. Please run the SQL Script in Supabase!");
+        // Check for common Supabase Errors
+        if (
+            error.message.includes('relation "orders" does not exist') || 
+            error.message.includes('Could not find the table')
+        ) {
+            alert("CRITICAL DATABASE ERROR: The 'orders' table does not exist in Supabase.\n\nYou must go to Supabase -> SQL Editor and run the creation script.");
         } else {
-            alert(`Order Failed: ${error.message || error.details || "Unknown error"}. Check if RLS is disabled in Supabase.`);
+            alert(`Order Failed: ${error.message}\n\nTip: Go to Supabase SQL Editor and run: 'alter table orders disable row level security;'`);
         }
         return false;
     }
