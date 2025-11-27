@@ -4,7 +4,8 @@ import { StoreProvider, useStore } from './context/StoreContext';
 import { CustomerView } from './views/CustomerView';
 import { KitchenView } from './views/KitchenView';
 import { POSView } from './views/POSView';
-import { Lock, ArrowLeft, User, Key } from 'lucide-react';
+import { Lock, ArrowLeft, User, Key, AlertTriangle } from 'lucide-react';
+import { isSupabaseConfigured } from './services/supabaseClient';
 
 const MainLayout = () => {
   const { currentView, navigateTo, isAdminLoggedIn, adminLogin, t } = useStore();
@@ -120,6 +121,12 @@ const App = () => {
   return (
     <StoreProvider>
       <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+        {!isSupabaseConfigured && (
+          <div className="bg-red-600 text-white text-center p-2 text-xs font-bold flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
+            <AlertTriangle size={16} />
+            DATABASE DISCONNECTED: Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to Netlify Settings.
+          </div>
+        )}
         <MainLayout />
       </div>
     </StoreProvider>
