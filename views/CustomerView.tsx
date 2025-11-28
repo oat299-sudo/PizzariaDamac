@@ -7,7 +7,7 @@ import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, B
 
 export const CustomerView: React.FC = () => {
   const { 
-    menu, addToCart, cart, cartTotal, customer, setCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
+    menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
@@ -275,7 +275,9 @@ export const CustomerView: React.FC = () => {
         alert("Password is required");
         return;
     }
-    await setCustomer({
+    
+    // Call new smart register function
+    const result = await registerCustomer({
         name: regName,
         phone: regPhone,
         password: regPassword,
@@ -286,6 +288,13 @@ export const CustomerView: React.FC = () => {
         savedFavorites: [],
         orderHistory: []
     });
+
+    if (result === 'updated') {
+        alert("Account exists! Password has been reset and details updated. Welcome back!");
+    } else {
+        alert("Account created successfully! Welcome to Pizza Damac!");
+    }
+    
     setShowAuthModal(false);
   };
 
@@ -497,6 +506,15 @@ export const CustomerView: React.FC = () => {
                      <h2 className="text-white font-bold text-3xl md:text-5xl text-center shadow-black drop-shadow-lg">Pizza Damac</h2>
                      <p className="text-gray-200 text-sm md:text-lg mt-2 font-medium">Authentic Italian Taste in Nonthaburi</p>
                 </div>
+            </div>
+        )}
+
+        {/* Guest Banner */}
+        {!customer && activeCategory === 'promotion' && (
+            <div className="bg-brand-600 text-white py-3 text-center cursor-pointer hover:bg-brand-700 transition" onClick={() => setShowAuthModal(true)}>
+                <span className="font-bold flex items-center justify-center gap-2">
+                    <User size={18}/> Please Login or Register to start ordering and earning points!
+                </span>
             </div>
         )}
 
@@ -1085,6 +1103,9 @@ export const CustomerView: React.FC = () => {
                                 <span className="text-xs">{t('pdpaLabel')}</span>
                             </label>
                             <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-black transition">{t('startEarning')}</button>
+                            <p className="text-[10px] text-gray-500 text-center mt-2">
+                                If you already have an account with this number, registering again will reset your password but keep your points safe.
+                            </p>
                         </form>
                     ) : (
                         <form onSubmit={handleLogin} className="space-y-4">

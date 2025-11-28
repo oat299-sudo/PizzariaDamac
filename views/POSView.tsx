@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -14,7 +14,7 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem
+        addNewsItem, deleteNewsItem, getAllCustomers
     } = useStore();
     
     // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage'
@@ -277,6 +277,29 @@ export const POSView: React.FC = () => {
         
         setNewsForm({ title: '', summary: '', imageUrl: '', linkUrl: '' });
         alert("News Item Added!");
+    };
+
+    const handleExportCustomers = async () => {
+        const data = await getAllCustomers();
+        if (data.length === 0) {
+            alert("No customer data found to export.");
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','), 
+            ...data.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'pizza_damac_customers.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
     
     // --- MANUAL SAVE HANDLERS ---
@@ -835,12 +858,15 @@ export const POSView: React.FC = () => {
                          {/* 5. Menu Actions */}
                          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
-                             <div className="flex gap-4">
+                             <div className="flex flex-wrap gap-4">
                                  <button onClick={seedDatabase} className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 font-bold text-sm flex items-center gap-2">
                                      <Upload size={16}/> Upload Menu to Database
                                  </button>
                                  <button onClick={() => setShowToppingsModal(true)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-300 font-bold text-sm flex items-center gap-2">
                                      <Layers size={16}/> Manage Toppings
+                                 </button>
+                                 <button onClick={handleExportCustomers} className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-green-700 font-bold text-sm flex items-center gap-2">
+                                     <Download size={16}/> Export Customers (CSV)
                                  </button>
                              </div>
                              <p className="text-[10px] text-gray-400 mt-2">Use "Upload Menu" to sync your local code mock menu with Supabase.</p>

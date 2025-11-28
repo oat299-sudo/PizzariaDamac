@@ -37,6 +37,8 @@ interface StoreContextType {
   cartTotal: number;
   customer: CustomerProfile | null;
   setCustomer: (profile: CustomerProfile) => Promise<void>;
+  registerCustomer: (profile: CustomerProfile) => Promise<'created' | 'updated'>;
+  getAllCustomers: () => Promise<any[]>;
   customerLogin: (phone: string, password: string) => Promise<boolean>;
   addToFavorites: (name: string, pizzaId: string, toppings: Topping[]) => Promise<void>;
   claimReward: () => boolean;
@@ -542,6 +544,65 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
   
+  // Smart Register / Reset Password
+  const registerCustomer = async (newProfile: CustomerProfile): Promise<'created' | 'updated'> => {
+      let existingPoints = 0;
+      let existingHistory: string[] = [];
+      let existingFavorites: SavedFavorite[] = [];
+      let existingTier: 'Bronze' | 'Silver' | 'Gold' | undefined = undefined;
+      let action: 'created' | 'updated' = 'created';
+
+      if (isSupabaseConfigured) {
+          // Check if user exists
+          try {
+              const { data } = await supabase.from('customers').select('*').eq('phone', newProfile.phone).single();
+              if (data) {
+                  // User exists! Preserve their valuable data
+                  action = 'updated';
+                  existingPoints = data.loyalty_points || 0;
+                  existingHistory = data.order_history || [];
+                  existingFavorites = data.saved_favorites || [];
+                  existingTier = data.tier;
+              }
+          } catch (e) { console.warn("Error checking existing customer", e); }
+      }
+
+      // Merge new details with existing history
+      const finalProfile: CustomerProfile = {
+          ...newProfile,
+          loyaltyPoints: existingPoints,
+          orderHistory: existingHistory,
+          savedFavorites: existingFavorites,
+          tier: existingTier
+      };
+      
+      await setCustomer(finalProfile);
+      return action;
+  };
+  
+  const getAllCustomers = async () => {
+      if (!isSupabaseConfigured) return [];
+      try {
+          const { data, error } = await supabase.from('customers').select('name, phone, loyalty_points, tier, created_at, birthday, address, order_history');
+          if (error) throw error;
+          
+          // Format data for CSV
+          return data.map((c: any) => ({
+              Name: c.name,
+              Phone: c.phone,
+              Points: c.loyalty_points,
+              Tier: c.tier,
+              Joined: new Date(c.created_at).toLocaleDateString(),
+              Birthday: c.birthday,
+              Address: c.address ? c.address.replace(/[\n,]/g, ' ') : '', // Escape commas
+              OrdersCount: c.order_history ? c.order_history.length : 0
+          }));
+      } catch (e) {
+          console.error("Export failed", e);
+          return [];
+      }
+  };
+  
   const customerLogin = async (phone: string, password: string): Promise<boolean> => {
       if (!isSupabaseConfigured) {
           // If DB is offline, check local storage or basic bypass for demo purposes
@@ -835,7 +896,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller,
       toppings, addTopping, deleteTopping,
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
-      customer, setCustomer, customerLogin, addToFavorites, claimReward,
+      customer, setCustomer, registerCustomer, getAllCustomers, customerLogin, addToFavorites, claimReward,
       orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
