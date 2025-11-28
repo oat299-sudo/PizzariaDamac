@@ -699,7 +699,7 @@ export const POSView: React.FC = () => {
                                         onChange={e => setItemForm({...itemForm, comboCount: parseInt(e.target.value) || 0})}
                                     />
                                 </div>
-                                <p className="text-[10px] text-gray-500 mt-1">If set > 0, customer will be asked to select this many pizzas.</p>
+                                <p className="text-[10px] text-gray-500 mt-1">If set &gt; 0, customer will be asked to select this many pizzas.</p>
                             </div>
 
                             <div>
