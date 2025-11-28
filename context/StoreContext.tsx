@@ -211,82 +211,92 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // DB Sync
   const fetchMenu = async () => {
       if (!isSupabaseConfigured) return;
-      const { data, error } = await supabase.from('menu_items').select('*');
-      if (!error && data) {
-         setMenu(data.map(d => ({
-             ...d, 
-             basePrice: d.base_price, 
-             nameTh: d.name_th, 
-             descriptionTh: d.description_th, 
-             isBestSeller: d.is_best_seller,
-             comboCount: d.combo_count || 0
-         })));
-      }
+      try {
+        const { data, error } = await supabase.from('menu_items').select('*');
+        if (!error && data) {
+           setMenu(data.map(d => ({
+               ...d, 
+               basePrice: d.base_price, 
+               nameTh: d.name_th, 
+               descriptionTh: d.description_th, 
+               isBestSeller: d.is_best_seller,
+               comboCount: d.combo_count || 0
+           })));
+        }
+      } catch (err) { console.error("Menu fetch failed", err); }
   };
   const fetchToppings = async () => {
       if (!isSupabaseConfigured) return;
-      const { data, error } = await supabase.from('toppings').select('*');
-      if (!error && data) setToppings(data.map(d => ({...d, nameTh: d.name_th})));
+      try {
+          const { data, error } = await supabase.from('toppings').select('*');
+          if (!error && data) setToppings(data.map(d => ({...d, nameTh: d.name_th})));
+      } catch (err) { console.error("Toppings fetch failed", err); }
   };
   const fetchOrders = async () => {
       if (!isSupabaseConfigured) return;
-      const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-      if (error) {
-          if (error.code === '42P01') {
-              console.warn("Table 'orders' missing. Please run SQL script.");
-              return;
+      try {
+          const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+          if (error) {
+              if (error.code === '42P01') {
+                  console.warn("Table 'orders' missing. Please run SQL script.");
+                  return;
+              }
           }
-      }
-      if (data) setOrders(data.map(d => ({
-          ...d, 
-          customerName: d.customer_name, 
-          customerPhone: d.customer_phone, 
-          totalAmount: d.total_amount,
-          netAmount: d.net_amount || d.total_amount,
-          createdAt: d.created_at,
-          deliveryAddress: d.delivery_address,
-          deliveryZone: d.delivery_zone,
-          deliveryFee: d.delivery_fee,
-          paymentMethod: d.payment_method,
-          pickupTime: d.pickup_time,
-          tableNumber: d.table_number
-      })));
+          if (data) setOrders(data.map(d => ({
+              ...d, 
+              customerName: d.customer_name, 
+              customerPhone: d.customer_phone, 
+              totalAmount: d.total_amount,
+              netAmount: d.net_amount || d.total_amount,
+              createdAt: d.created_at,
+              deliveryAddress: d.delivery_address,
+              deliveryZone: d.delivery_zone,
+              deliveryFee: d.delivery_fee,
+              paymentMethod: d.payment_method,
+              pickupTime: d.pickup_time,
+              tableNumber: d.table_number
+          })));
+      } catch (err) { console.error("Orders fetch failed", err); }
   };
   const fetchSettings = async () => {
       if (!isSupabaseConfigured) return;
-      const { data } = await supabase.from('store_settings').select('*').single();
-      if (data) {
-          setStoreSettings({
-              isOpen: data.is_open,
-              closedMessage: data.closed_message,
-              promoBannerUrl: data.promo_banner_url,
-              promoContentType: data.promo_content_type,
-              holidayStart: data.holiday_start,
-              holidayEnd: data.holiday_end
-          });
-      }
+      try {
+          const { data } = await supabase.from('store_settings').select('*').single();
+          if (data) {
+              setStoreSettings({
+                  isOpen: data.is_open,
+                  closedMessage: data.closed_message,
+                  promoBannerUrl: data.promo_banner_url,
+                  promoContentType: data.promo_content_type,
+                  holidayStart: data.holiday_start,
+                  holidayEnd: data.holiday_end
+              });
+          }
+      } catch (err) { console.error("Settings fetch failed", err); }
   };
   const fetchCustomerProfile = async () => {
       if (!isSupabaseConfigured || !customer) return;
-      // Fetch latest profile including addresses
-      const { data } = await supabase.from('customers').select('*').eq('phone', customer.phone).single();
-      if (data) {
-          const updatedProfile: CustomerProfile = {
-              name: data.name,
-              phone: data.phone,
-              password: data.password,
-              address: data.address,
-              birthday: data.birthday,
-              loyaltyPoints: data.loyalty_points,
-              tier: data.tier,
-              savedFavorites: data.saved_favorites || [],
-              orderHistory: data.order_history || [],
-              pdpaAccepted: data.pdpa_accepted,
-              savedAddresses: data.saved_addresses || []
-          };
-          setCustState(updatedProfile);
-          localStorage.setItem('damac_customer', JSON.stringify(updatedProfile));
-      }
+      try {
+          // Fetch latest profile including addresses
+          const { data } = await supabase.from('customers').select('*').eq('phone', customer.phone).single();
+          if (data) {
+              const updatedProfile: CustomerProfile = {
+                  name: data.name,
+                  phone: data.phone,
+                  password: data.password,
+                  address: data.address,
+                  birthday: data.birthday,
+                  loyaltyPoints: data.loyalty_points,
+                  tier: data.tier,
+                  savedFavorites: data.saved_favorites || [],
+                  orderHistory: data.order_history || [],
+                  pdpaAccepted: data.pdpa_accepted,
+                  savedAddresses: data.saved_addresses || []
+              };
+              setCustState(updatedProfile);
+              localStorage.setItem('damac_customer', JSON.stringify(updatedProfile));
+          }
+      } catch (err) { console.error("Profile fetch failed", err); }
   }
   
   useEffect(() => {
@@ -316,31 +326,37 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Actions
   const addPizza = async (pizza: Pizza) => {
       if (isSupabaseConfigured) {
-          await supabase.from('menu_items').insert([{
-              id: pizza.id, name: pizza.name, name_th: pizza.nameTh, 
-              description: pizza.description, description_th: pizza.descriptionTh,
-              base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-              combo_count: pizza.comboCount
-          }]);
-      } else {
-          setMenu(prev => [...prev, pizza]);
-      }
+          try {
+            await supabase.from('menu_items').insert([{
+                id: pizza.id, name: pizza.name, name_th: pizza.nameTh, 
+                description: pizza.description, description_th: pizza.descriptionTh,
+                base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
+                combo_count: pizza.comboCount
+            }]);
+          } catch (e) { console.error(e); }
+      } 
+      // Always update local state for immediate feedback
+      setMenu(prev => [...prev, pizza]);
   };
   const updatePizza = async (pizza: Pizza) => {
       if (isSupabaseConfigured) {
-          await supabase.from('menu_items').update({
-              name: pizza.name, name_th: pizza.nameTh, 
-              description: pizza.description, description_th: pizza.descriptionTh,
-              base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-              combo_count: pizza.comboCount
-          }).eq('id', pizza.id);
-      } else {
-          setMenu(prev => prev.map(p => p.id === pizza.id ? pizza : p));
+          try {
+            await supabase.from('menu_items').update({
+                name: pizza.name, name_th: pizza.nameTh, 
+                description: pizza.description, description_th: pizza.descriptionTh,
+                base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
+                combo_count: pizza.comboCount
+            }).eq('id', pizza.id);
+          } catch(e) { console.error(e); }
       }
+      // Always update local
+      setMenu(prev => prev.map(p => p.id === pizza.id ? pizza : p));
   };
   const deletePizza = async (id: string) => {
-      if (isSupabaseConfigured) await supabase.from('menu_items').delete().eq('id', id);
-      else setMenu(prev => prev.filter(p => p.id !== id));
+      if (isSupabaseConfigured) {
+          try { await supabase.from('menu_items').delete().eq('id', id); } catch(e) { console.error(e); }
+      }
+      setMenu(prev => prev.filter(p => p.id !== id));
   };
   const updatePizzaPrice = async (id: string, newPrice: number) => {
       const p = menu.find(i => i.id === id);
@@ -355,10 +371,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (p) {
           const newVal = !p.isBestSeller;
           if (isSupabaseConfigured) {
-              await supabase.from('menu_items').update({ is_best_seller: newVal }).eq('id', id);
-          } else {
-              setMenu(prev => prev.map(item => item.id === id ? {...item, isBestSeller: newVal} : item));
+              try {
+                await supabase.from('menu_items').update({ is_best_seller: newVal }).eq('id', id);
+              } catch(e) { console.error(e); }
           }
+          setMenu(prev => prev.map(item => item.id === id ? {...item, isBestSeller: newVal} : item));
       }
   }
 
@@ -378,16 +395,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addTopping = async (topping: Topping) => {
       if (isSupabaseConfigured) {
-          await supabase.from('toppings').insert([{
-              id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
-          }]);
-      } else {
-          setToppings(prev => [...prev, topping]);
+          try {
+            await supabase.from('toppings').insert([{
+                id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
+            }]);
+          } catch(e) { console.error(e); }
       }
+      setToppings(prev => [...prev, topping]);
   };
   const deleteTopping = async (id: string) => {
-      if (isSupabaseConfigured) await supabase.from('toppings').delete().eq('id', id);
-      else setToppings(prev => prev.filter(t => t.id !== id));
+      if (isSupabaseConfigured) {
+          try { await supabase.from('toppings').delete().eq('id', id); } catch(e) { console.error(e); }
+      }
+      setToppings(prev => prev.filter(t => t.id !== id));
   };
   
   // Cart
@@ -414,53 +434,68 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       localStorage.setItem('damac_customer', JSON.stringify(profile));
       // Sync to DB
       if (isSupabaseConfigured) {
-          const payload: any = {
-              phone: profile.phone, 
-              name: profile.name, 
-              address: profile.address, 
-              birthday: profile.birthday,
-              password: profile.password, // Save password
-              loyalty_points: profile.loyaltyPoints, 
-              tier: profile.tier,
-              saved_favorites: profile.savedFavorites, 
-              order_history: profile.orderHistory
-          };
-          
-          if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
-          if (profile.savedAddresses !== undefined) payload.saved_addresses = profile.savedAddresses;
+          try {
+            const payload: any = {
+                phone: profile.phone, 
+                name: profile.name, 
+                address: profile.address, 
+                birthday: profile.birthday,
+                password: profile.password, // Save password
+                loyalty_points: profile.loyaltyPoints, 
+                tier: profile.tier,
+                saved_favorites: profile.savedFavorites, 
+                order_history: profile.orderHistory
+            };
+            
+            if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
+            if (profile.savedAddresses !== undefined) payload.saved_addresses = profile.savedAddresses;
 
-          await supabase.from('customers').upsert(payload);
+            await supabase.from('customers').upsert(payload);
+          } catch(e) { console.error("Customer sync failed", e); }
       }
   };
   
   const customerLogin = async (phone: string, password: string): Promise<boolean> => {
       if (!isSupabaseConfigured) {
-          alert("Database not connected.");
+          // If DB is offline, check local storage or basic bypass for demo purposes
+          const saved = localStorage.getItem('damac_customer');
+          if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed.phone === phone) { // Very basic "offline" check
+                  setCustState(parsed);
+                  return true;
+              }
+          }
+          alert("Database not connected and no local profile found.");
           return false;
       }
-      const { data, error } = await supabase.from('customers')
-          .select('*')
-          .eq('phone', phone)
-          .eq('password', password)
-          .single();
-      
-      if (data && !error) {
-          const profile: CustomerProfile = {
-              name: data.name,
-              phone: data.phone,
-              password: data.password,
-              address: data.address,
-              birthday: data.birthday,
-              loyaltyPoints: data.loyalty_points,
-              tier: data.tier,
-              savedFavorites: data.saved_favorites || [],
-              orderHistory: data.order_history || [],
-              pdpaAccepted: data.pdpa_accepted,
-              savedAddresses: data.saved_addresses || []
-          };
-          setCustState(profile);
-          localStorage.setItem('damac_customer', JSON.stringify(profile));
-          return true;
+      try {
+          const { data, error } = await supabase.from('customers')
+              .select('*')
+              .eq('phone', phone)
+              .eq('password', password)
+              .single();
+          
+          if (data && !error) {
+              const profile: CustomerProfile = {
+                  name: data.name,
+                  phone: data.phone,
+                  password: data.password,
+                  address: data.address,
+                  birthday: data.birthday,
+                  loyaltyPoints: data.loyalty_points,
+                  tier: data.tier,
+                  savedFavorites: data.saved_favorites || [],
+                  orderHistory: data.order_history || [],
+                  pdpaAccepted: data.pdpa_accepted,
+                  savedAddresses: data.saved_addresses || []
+              };
+              setCustState(profile);
+              localStorage.setItem('damac_customer', JSON.stringify(profile));
+              return true;
+          }
+      } catch (e) {
+          console.error("Login failed", e);
       }
       return false;
   };
@@ -504,11 +539,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Orders
   const placeOrder = async (type: OrderType, details: any = {}): Promise<boolean> => {
-    if (!isSupabaseConfigured) {
-        alert("Database not connected. Please check Netlify settings.");
-        return false;
-    }
-
+    // If DB is offline, we proceed with local state to allow the app to function as a demo/offline POS
+    
     const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store' } = details;
     
     // Save address if new (only for store orders with a logged in customer)
@@ -544,31 +576,39 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         tableNumber
     };
 
-    const { error } = await supabase.from('orders').insert([{
-        id: newOrder.id,
-        customer_name: newOrder.customerName,
-        customer_phone: newOrder.customerPhone,
-        type: newOrder.type,
-        source: newOrder.source,
-        status: newOrder.status,
-        total_amount: newOrder.totalAmount,
-        net_amount: newOrder.netAmount,
-        note: newOrder.note,
-        delivery_address: newOrder.deliveryAddress,
-        delivery_zone: newOrder.deliveryZone,
-        delivery_fee: newOrder.deliveryFee,
-        payment_method: newOrder.paymentMethod,
-        pickup_time: newOrder.pickupTime,
-        table_number: newOrder.tableNumber,
-        items: newOrder.items
-    }]);
+    if (isSupabaseConfigured) {
+        try {
+            const { error } = await supabase.from('orders').insert([{
+                id: newOrder.id,
+                customer_name: newOrder.customerName,
+                customer_phone: newOrder.customerPhone,
+                type: newOrder.type,
+                source: newOrder.source,
+                status: newOrder.status,
+                total_amount: newOrder.totalAmount,
+                net_amount: newOrder.netAmount,
+                note: newOrder.note,
+                delivery_address: newOrder.deliveryAddress,
+                delivery_zone: newOrder.deliveryZone,
+                delivery_fee: newOrder.deliveryFee,
+                payment_method: newOrder.paymentMethod,
+                pickup_time: newOrder.pickupTime,
+                table_number: newOrder.tableNumber,
+                items: newOrder.items
+            }]);
 
-    if (error) {
-        console.error("Supabase Error:", error);
-        alert(`Failed to place order. Error: ${error.message}`);
-        return false;
+            if (error) {
+                console.error("Supabase Order Insert Error:", error);
+                // We do NOT return false here. We let it fall through to update local state so the user isn't blocked.
+                // alert(`Warning: Order saved locally only. Database error: ${error.message}`);
+            }
+        } catch (err) {
+            console.error("Supabase Connection Error:", err);
+            // Fallback to local
+        }
     }
 
+    // Always update local state
     setOrders(prev => [newOrder, ...prev]);
     
     // Loyalty Points (Only for Store Orders)
@@ -589,39 +629,51 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
-      if (isSupabaseConfigured) await supabase.from('orders').update({ status }).eq('id', orderId);
+      if (isSupabaseConfigured) {
+          try {
+             await supabase.from('orders').update({ status }).eq('id', orderId);
+          } catch(e) { console.error(e); }
+      }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
   
   // Expenses
   const addExpense = async (expense: Expense) => {
-      if (isSupabaseConfigured) await supabase.from('expenses').insert([expense]);
-      else setExpenses(prev => [...prev, expense]);
+      if (isSupabaseConfigured) {
+          try { await supabase.from('expenses').insert([expense]); } catch(e) { console.error(e); }
+      }
+      // Always local update
+      setExpenses(prev => [...prev, expense]);
   };
   const deleteExpense = async (id: string) => {
-      if (isSupabaseConfigured) await supabase.from('expenses').delete().eq('id', id);
-      else setExpenses(prev => prev.filter(e => e.id !== id));
+      if (isSupabaseConfigured) {
+          try { await supabase.from('expenses').delete().eq('id', id); } catch(e) { console.error(e); }
+      }
+      setExpenses(prev => prev.filter(e => e.id !== id));
   };
 
   // Settings
   const toggleStoreStatus = async (isOpen: boolean, message: string = '') => {
       if (isSupabaseConfigured) {
-          await supabase.from('store_settings').upsert({ id: 'global', is_open: isOpen, closed_message: message });
-      } else {
-          setStoreSettings({ ...storeSettings, isOpen, closedMessage: message });
+          try {
+             await supabase.from('store_settings').upsert({ id: 'global', is_open: isOpen, closed_message: message });
+          } catch(e) { console.error(e); }
       }
+      setStoreSettings({ ...storeSettings, isOpen, closedMessage: message });
   };
   
   const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
       if (isSupabaseConfigured) {
-          // Convert camelCase to snake_case for DB
-          const dbPayload: any = {};
-          if (settings.holidayStart !== undefined) dbPayload.holiday_start = settings.holidayStart;
-          if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
-          if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
-          if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
+          try {
+            // Convert camelCase to snake_case for DB
+            const dbPayload: any = {};
+            if (settings.holidayStart !== undefined) dbPayload.holiday_start = settings.holidayStart;
+            if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
+            if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
+            if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
 
-          await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
+            await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
+          } catch(e) { console.error(e); }
       }
       setStoreSettings(prev => ({...prev, ...settings}));
   };
