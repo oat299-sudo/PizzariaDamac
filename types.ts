@@ -4,6 +4,7 @@ export interface Topping {
   name: string;
   nameTh?: string; // Thai Name
   price: number;
+  category?: 'sauce' | 'cheese' | 'meat' | 'vegetable' | 'seasoning' | 'other';
 }
 
 export type ProductCategory = 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'drink' | 'promotion' | 'cake';

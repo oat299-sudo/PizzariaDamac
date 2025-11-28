@@ -24,6 +24,7 @@ interface StoreContextType {
   togglePizzaAvailability: (id: string) => Promise<void>;
   toggleBestSeller: (id: string) => Promise<void>;
   generateLuckyPizza: () => { pizza: Pizza; toppings: Topping[] } | null;
+  seedDatabase: () => Promise<void>;
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
   deleteTopping: (id: string) => Promise<void>;
@@ -393,11 +394,46 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return { pizza: pizzaBase, toppings: randomToppings };
   };
 
+  const seedDatabase = async () => {
+      if (!isSupabaseConfigured) {
+          alert("Database not connected.");
+          return;
+      }
+      const confirmUpload = window.confirm("This will upload the initial menu to Supabase. Continue?");
+      if (!confirmUpload) return;
+
+      try {
+          // Upload Menu
+          for (const p of INITIAL_MENU) {
+              const { error } = await supabase.from('menu_items').upsert({
+                  id: p.id, name: p.name, name_th: p.nameTh, 
+                  base_price: p.basePrice, description: p.description, 
+                  description_th: p.descriptionTh, image: p.image, 
+                  category: p.category, available: p.available, 
+                  is_best_seller: p.isBestSeller, combo_count: p.comboCount
+              });
+              if (error) console.error("Menu Seed Error", error);
+          }
+          // Upload Toppings
+          for (const t of INITIAL_TOPPINGS) {
+              const { error } = await supabase.from('toppings').upsert({
+                  id: t.id, name: t.name, name_th: t.nameTh, price: t.price,
+                  category: t.category // Try to send category if column exists
+              });
+              if (error) console.error("Topping Seed Error", error);
+          }
+          alert("Menu uploaded to database successfully!");
+      } catch (err) {
+          console.error("Seeding failed", err);
+          alert("Seeding failed. Check console.");
+      }
+  };
+
   const addTopping = async (topping: Topping) => {
       if (isSupabaseConfigured) {
           try {
             await supabase.from('toppings').insert([{
-                id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price
+                id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price, category: topping.category
             }]);
           } catch(e) { console.error(e); }
       }
@@ -515,7 +551,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           order.items.forEach(item => {
               addToCart({ ...item, id: Date.now().toString() + Math.random() }); // New ID for new cart item
           });
-          alert(t('cartEmpty') === 'Cart is empty' ? 'Items added to cart!' : 'เพิ่มรายการลงตะกร้าแล้ว');
       }
   };
   const claimReward = () => {
@@ -540,99 +575,109 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Orders
   const placeOrder = async (type: OrderType, details: any = {}): Promise<boolean> => {
     // If DB is offline, we proceed with local state to allow the app to function as a demo/offline POS
-    
-    const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store' } = details;
-    
-    // Save address if new (only for store orders with a logged in customer)
-    if (source === 'store' && customer && type === 'delivery' && delivery?.address) {
-        const currentSaved = customer.savedAddresses || [];
-        if (!currentSaved.includes(delivery.address)) {
-            const newSavedAddresses = [...currentSaved, delivery.address];
-            await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
-        }
-    }
-    
-    // Calculate Net Revenue (Deduct GP)
-    const gpRate = GP_RATES[source as OrderSource] || 0;
-    const netAmount = cartTotal * (1 - gpRate);
-
-    const newOrder: Order = {
-        id: Date.now().toString(),
-        customerName: customer?.name || 'Guest',
-        customerPhone: customer?.phone || 'Guest',
-        type,
-        source: source,
-        status: source === 'store' ? 'pending' : 'confirmed', // 3rd party auto-confirmed
-        items: cart,
-        totalAmount: cartTotal,
-        netAmount: Math.round(netAmount),
-        createdAt: new Date().toISOString(),
-        note: note || '',
-        deliveryAddress: delivery?.address,
-        deliveryZone: delivery?.zoneName,
-        deliveryFee: delivery?.fee,
-        paymentMethod,
-        pickupTime,
-        tableNumber
-    };
-
-    if (isSupabaseConfigured) {
-        try {
-            const { error } = await supabase.from('orders').insert([{
-                id: newOrder.id,
-                customer_name: newOrder.customerName,
-                customer_phone: newOrder.customerPhone,
-                type: newOrder.type,
-                source: newOrder.source,
-                status: newOrder.status,
-                total_amount: newOrder.totalAmount,
-                net_amount: newOrder.netAmount,
-                note: newOrder.note,
-                delivery_address: newOrder.deliveryAddress,
-                delivery_zone: newOrder.deliveryZone,
-                delivery_fee: newOrder.deliveryFee,
-                payment_method: newOrder.paymentMethod,
-                pickup_time: newOrder.pickupTime,
-                table_number: newOrder.tableNumber,
-                items: newOrder.items
-            }]);
-
-            if (error) {
-                console.error("Supabase Order Insert Error:", error);
-                // We do NOT return false here. We let it fall through to update local state so the user isn't blocked.
-                // alert(`Warning: Order saved locally only. Database error: ${error.message}`);
+    try {
+        const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store' } = details;
+        
+        // Save address if new (only for store orders with a logged in customer)
+        if (source === 'store' && customer && type === 'delivery' && delivery?.address) {
+            const currentSaved = customer.savedAddresses || [];
+            if (!currentSaved.includes(delivery.address)) {
+                const newSavedAddresses = [...currentSaved, delivery.address];
+                // Note: setCustomer handles its own errors silently
+                try {
+                    await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
+                } catch (e) { console.warn("Could not save address, continuing", e); }
             }
-        } catch (err) {
-            console.error("Supabase Connection Error:", err);
-            // Fallback to local
         }
-    }
+        
+        // Calculate Net Revenue (Deduct GP)
+        const gpRate = GP_RATES[source as OrderSource] || 0;
+        const netAmount = cartTotal * (1 - gpRate);
 
-    // Always update local state
-    setOrders(prev => [newOrder, ...prev]);
-    
-    // Loyalty Points (Only for Store Orders)
-    if (customer && source === 'store') {
-        const pizzasCount = cart.filter(i => menu.find(m => m.id === i.pizzaId)?.category === 'pizza').length;
-        if (pizzasCount > 0) {
-            const updated = { 
-                ...customer, 
-                loyaltyPoints: customer.loyaltyPoints + pizzasCount,
-                orderHistory: [newOrder.id, ...(customer.orderHistory || [])]
-            };
-            setCustomer(updated);
+        const newOrder: Order = {
+            id: Date.now().toString(),
+            customerName: customer?.name || 'Guest',
+            customerPhone: customer?.phone || 'Guest',
+            type,
+            source: source,
+            status: source === 'store' ? 'pending' : 'confirmed', // 3rd party auto-confirmed
+            items: cart,
+            totalAmount: cartTotal,
+            netAmount: Math.round(netAmount || 0),
+            createdAt: new Date().toISOString(),
+            note: note || '',
+            deliveryAddress: delivery?.address,
+            deliveryZone: delivery?.zoneName,
+            deliveryFee: delivery?.fee,
+            paymentMethod,
+            pickupTime,
+            tableNumber
+        };
+
+        // Always update local state first for responsiveness
+        setOrders(prev => [newOrder, ...prev]);
+        
+        // Loyalty Points (Only for Store Orders)
+        if (customer && source === 'store') {
+            const pizzasCount = cart.filter(i => menu.find(m => m.id === i.pizzaId)?.category === 'pizza').length;
+            if (pizzasCount > 0) {
+                const updated = { 
+                    ...customer, 
+                    loyaltyPoints: customer.loyaltyPoints + pizzasCount,
+                    orderHistory: [newOrder.id, ...(customer.orderHistory || [])]
+                };
+                // setCustomer handles its own errors
+                try {
+                     await setCustomer(updated);
+                } catch(e) { console.warn("Could not update points", e); }
+            }
         }
-    }
 
-    clearCart();
-    return true;
+        // Attempt DB Sync
+        if (isSupabaseConfigured) {
+            try {
+                const { error } = await supabase.from('orders').insert([{
+                    id: newOrder.id,
+                    customer_name: newOrder.customerName,
+                    customer_phone: newOrder.customerPhone,
+                    type: newOrder.type,
+                    source: newOrder.source,
+                    status: newOrder.status,
+                    total_amount: newOrder.totalAmount,
+                    net_amount: newOrder.netAmount,
+                    note: newOrder.note,
+                    delivery_address: newOrder.deliveryAddress,
+                    delivery_zone: newOrder.deliveryZone,
+                    delivery_fee: newOrder.deliveryFee,
+                    payment_method: newOrder.paymentMethod,
+                    pickup_time: newOrder.pickupTime,
+                    table_number: newOrder.tableNumber,
+                    items: newOrder.items
+                }]);
+
+                if (error) {
+                    console.error("Supabase Order Insert Error:", error);
+                }
+            } catch (err) {
+                console.error("Supabase Connection Error (Swallowed):", err);
+                // Swallow "Failed to fetch" errors here so app continues offline
+            }
+        }
+
+        clearCart();
+        return true;
+    } catch (criticalError) {
+        console.error("Critical Error in placeOrder:", criticalError);
+        alert("An unexpected error occurred, but we are attempting to process your request locally.");
+        return true; // Return true to close UI even if critical error logic happens
+    }
   };
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
       if (isSupabaseConfigured) {
           try {
              await supabase.from('orders').update({ status }).eq('id', orderId);
-          } catch(e) { console.error(e); }
+          } catch(e) { console.error("Status update error", e); }
       }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
@@ -640,14 +685,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Expenses
   const addExpense = async (expense: Expense) => {
       if (isSupabaseConfigured) {
-          try { await supabase.from('expenses').insert([expense]); } catch(e) { console.error(e); }
+          try { await supabase.from('expenses').insert([expense]); } catch(e) { console.error("Expense add error", e); }
       }
       // Always local update
       setExpenses(prev => [...prev, expense]);
   };
   const deleteExpense = async (id: string) => {
       if (isSupabaseConfigured) {
-          try { await supabase.from('expenses').delete().eq('id', id); } catch(e) { console.error(e); }
+          try { await supabase.from('expenses').delete().eq('id', id); } catch(e) { console.error("Expense delete error", e); }
       }
       setExpenses(prev => prev.filter(e => e.id !== id));
   };
@@ -657,7 +702,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (isSupabaseConfigured) {
           try {
              await supabase.from('store_settings').upsert({ id: 'global', is_open: isOpen, closed_message: message });
-          } catch(e) { console.error(e); }
+          } catch(e) { console.error("Store status sync error", e); }
       }
       setStoreSettings({ ...storeSettings, isOpen, closedMessage: message });
   };
@@ -673,7 +718,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
 
             await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
-          } catch(e) { console.error(e); }
+          } catch(e) { console.error("Settings sync error", e); }
       }
       setStoreSettings(prev => ({...prev, ...settings}));
   };
@@ -721,7 +766,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
-      generateTimeSlots, canOrderForToday
+      generateTimeSlots, canOrderForToday, seedDatabase
     }}>
       {children}
     </StoreContext.Provider>

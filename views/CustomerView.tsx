@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem } from '../types';
+import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2 } from 'lucide-react';
 
 export const CustomerView: React.FC = () => {
   const { 
@@ -95,6 +95,15 @@ export const CustomerView: React.FC = () => {
   };
 
   const toggleTopping = (topping: Topping) => {
+    // If it's a sauce, ensure single selection for custom pizza
+    if (selectedPizza?.id === 'custom_base' && topping.category === 'sauce') {
+        setSelectedToppings(prev => {
+            const others = prev.filter(t => t.category !== 'sauce');
+            return [...others, topping];
+        });
+        return;
+    }
+
     if (selectedToppings.find(t => t.id === topping.id)) {
       setSelectedToppings(prev => prev.filter(t => t.id !== topping.id));
     } else {
@@ -104,6 +113,16 @@ export const CustomerView: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!selectedPizza) return;
+    
+    // Validation for Custom Pizza: Must have a sauce
+    if (selectedPizza.id === 'custom_base') {
+        const hasSauce = selectedToppings.some(t => t.category === 'sauce');
+        if (!hasSauce) {
+            alert(language === 'th' ? 'กรุณาเลือกซอสอย่างน้อย 1 อย่าง' : 'Please select a base sauce.');
+            return;
+        }
+    }
+
     const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
     
     // Ensure custom pizzas have a name
@@ -250,6 +269,16 @@ export const CustomerView: React.FC = () => {
           alert("Invalid phone or password");
       }
   };
+  
+  const getStatusColor = (status: OrderStatus) => {
+      switch(status) {
+          case 'pending': return 'bg-yellow-100 text-yellow-800';
+          case 'confirmed': return 'bg-blue-100 text-blue-800';
+          case 'completed': return 'bg-green-100 text-green-700';
+          case 'cancelled': return 'bg-red-100 text-red-700';
+          default: return 'bg-gray-100 text-gray-700';
+      }
+  };
 
   // Helper for Hero Video
   const renderHeroMedia = () => {
@@ -286,6 +315,16 @@ export const CustomerView: React.FC = () => {
       
       // Image
       return <img src={storeSettings.promoBannerUrl} className="absolute inset-0 w-full h-full object-cover" />;
+  };
+  
+  // Group toppings by category helper
+  const groupedToppings = {
+      sauce: toppings.filter(t => t.category === 'sauce'),
+      cheese: toppings.filter(t => t.category === 'cheese'),
+      seasoning: toppings.filter(t => t.category === 'seasoning'),
+      meat: toppings.filter(t => t.category === 'meat'),
+      vegetable: toppings.filter(t => t.category === 'vegetable'),
+      other: toppings.filter(t => !t.category || t.category === 'other'),
   };
 
   return (
@@ -471,27 +510,97 @@ export const CustomerView: React.FC = () => {
                                  )}
                              </div>
                          ) : (
-                             // Standard Customization
+                             // Standard Customization OR Make Your Own Pizza
                              <>
-                                 {selectedPizza.name === "Create Your Own Pizza" && (
-                                     <div className="mb-4">
-                                         <label className="block text-sm font-bold mb-1">{t('nameCreation')}</label>
-                                         <input className="w-full border rounded p-2" value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. My Super Pizza"/>
+                                 {selectedPizza.id === 'custom_base' ? (
+                                     // "Create Your Own" Flow
+                                     <div className="space-y-6">
+                                         <div className="mb-4">
+                                             <label className="block text-sm font-bold mb-1">{t('nameCreation')}</label>
+                                             <input className="w-full border rounded p-2" value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. My Super Pizza"/>
+                                         </div>
+
+                                         {/* 1. SAUCES (Required, Select One) */}
+                                         <div>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2">1. Choose Sauce <span className="text-red-500 text-xs">(Required)</span></h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {groupedToppings.sauce.map(t => {
+                                                    const isSelected = selectedToppings.find(sel => sel.id === t.id);
+                                                    return (
+                                                        <button 
+                                                            key={t.id} 
+                                                            onClick={() => toggleTopping(t)}
+                                                            className={`p-3 rounded-lg border text-left flex justify-between items-center ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                {isSelected ? <CheckCircle2 size={16} /> : <div className="w-4 h-4 rounded-full border border-gray-300"></div>}
+                                                                <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                                            </div>
+                                                            {t.price > 0 && <span className="text-xs">+฿{t.price}</span>}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                         </div>
+
+                                         {/* 2. CHEESES */}
+                                         <div>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">2. Select Cheeses</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {groupedToppings.cheese.map(t => (
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                                        <span className="text-xs">+฿{t.price}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                         </div>
+
+                                         {/* 3. SEASONING */}
+                                         <div>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">3. Seasoning</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {groupedToppings.seasoning.map(t => (
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                                        <span className="text-xs">{t.price > 0 ? `+฿${t.price}` : 'Free'}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                         </div>
+
+                                         {/* 4. MEAT & VEGGIES */}
+                                         <div>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">4. Toppings (Meat & Veggies)</h4>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[...groupedToppings.meat, ...groupedToppings.vegetable, ...groupedToppings.other].map(t => (
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                                        <span className="text-xs">+฿{t.price}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                         </div>
                                      </div>
+                                 ) : (
+                                     // Standard Pizza - Just extra toppings list
+                                     <>
+                                         <h4 className="font-bold text-gray-500 text-xs uppercase mb-3">{t('customizeToppings')}</h4>
+                                         <div className="grid grid-cols-2 gap-2">
+                                             {/* Exclude sauces from standard extra toppings unless you want them */}
+                                             {toppings.filter(t => t.category !== 'sauce').map(t => (
+                                                 <button 
+                                                    key={t.id} 
+                                                    onClick={() => toggleTopping(t)}
+                                                    className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
+                                                >
+                                                     <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
+                                                     <span className="text-xs">+฿{t.price}</span>
+                                                 </button>
+                                             ))}
+                                         </div>
+                                     </>
                                  )}
-                                 <h4 className="font-bold text-gray-500 text-xs uppercase mb-3">{t('customizeToppings')}</h4>
-                                 <div className="grid grid-cols-2 gap-2">
-                                     {toppings.map(t => (
-                                         <button 
-                                            key={t.id} 
-                                            onClick={() => toggleTopping(t)}
-                                            className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
-                                        >
-                                             <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                             <span className="text-xs">+฿{t.price}</span>
-                                         </button>
-                                     ))}
-                                 </div>
                              </>
                          )}
                      </div>
@@ -711,15 +820,37 @@ export const CustomerView: React.FC = () => {
 
                          <div>
                              <h4 className="font-bold text-sm text-gray-500 uppercase mb-2">{t('recentOrders')}</h4>
-                             {orders.filter(o => o.customerPhone === customer.phone).slice(0,3).map(order => (
-                                 <div key={order.id} className="border-b py-3 last:border-0">
-                                     <div className="flex justify-between">
-                                         <span className="font-bold text-sm">#{order.id.slice(-4)}</span>
-                                         <span className={`text-xs px-2 py-0.5 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span>
-                                     </div>
-                                     <p className="text-xs text-gray-500 mt-1">{new Date(order.createdAt).toLocaleDateString()}</p>
+                             {orders.filter(o => o.customerPhone === customer.phone).length > 0 ? (
+                                 <div className="space-y-3">
+                                     {orders
+                                         .filter(o => o.customerPhone === customer.phone)
+                                         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                         .map(order => (
+                                         <div key={order.id} className="border-b py-3 last:border-0">
+                                             <div className="flex justify-between items-center mb-1">
+                                                 <div>
+                                                    <span className="font-bold text-sm mr-2">#{order.id.slice(-4)}</span>
+                                                    <span className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</span>
+                                                 </div>
+                                                 <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${getStatusColor(order.status)}`}>{t(order.status as any) || order.status}</span>
+                                             </div>
+                                             <div className="flex justify-between items-center">
+                                                 <span className="font-bold text-brand-600">฿{order.totalAmount}</span>
+                                                 <button 
+                                                    onClick={() => {
+                                                        reorderItem(order.id);
+                                                        setShowProfile(false);
+                                                        setIsCartOpen(true);
+                                                    }}
+                                                    className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 hover:bg-black transition"
+                                                 >
+                                                    <History size={12}/> {t('reorder')}
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     ))}
                                  </div>
-                             ))}
+                             ) : <p className="text-sm text-gray-400">No orders yet.</p>}
                          </div>
                          
                          <button onClick={() => {

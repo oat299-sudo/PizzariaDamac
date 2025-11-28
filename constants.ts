@@ -326,10 +326,10 @@ export const INITIAL_MENU: Pizza[] = [
   {
     id: 'custom_base',
     name: 'Create Your Own Pizza',
-    nameTh: 'พิซซ่าตามใจคุณ',
-    basePrice: 250,
-    description: 'Start with our signature dough and tomato sauce base. Add your favorite toppings!',
-    descriptionTh: 'เริ่มต้นด้วยแป้งสูตรพิเศษและซอสมะเขือเทศ เลือกท็อปปิ้งได้ตามใจ!',
+    nameTh: 'พิซซ่าตามใจคุณ (เลือกหน้าเอง)',
+    basePrice: 200,
+    description: 'Custom pizza: Choose Sauce, Cheese, and Toppings.',
+    descriptionTh: 'พิซซ่าเลือกเอง: เลือกซอส, ชีส และท็อปปิ้งได้ตามใจชอบ',
     image: 'https://images.unsplash.com/photo-1588315029754-2dd089d39a1a?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
@@ -344,13 +344,14 @@ export const INITIAL_MENU: Pizza[] = [
     descriptionTh: 'พิซซ่าซิกเนเจอร์ของร้าน มาพร้อมท็อปปิ้งพรีเมียมและซอสสูตรลับ',
     image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&w=800&q=80',
     available: true,
-    category: 'pizza'
+    category: 'pizza',
+    isBestSeller: true
   },
   {
     id: 'p2',
     name: 'Pizza Truffle',
     nameTh: 'พิซซ่า ทรัฟเฟิล',
-    basePrice: 380,
+    basePrice: 480,
     description: 'Aromatic truffle cream sauce with mushrooms and cheese.',
     descriptionTh: 'ซอสครีมเห็ดทรัฟเฟิลหอมกรุ่น พร้อมเห็ดและชีส',
     image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
@@ -361,7 +362,7 @@ export const INITIAL_MENU: Pizza[] = [
     id: 'p3',
     name: 'Pizza Parmaham',
     nameTh: 'พิซซ่า พาร์มาแฮม',
-    basePrice: 450,
+    basePrice: 520,
     description: 'Classic Italian Parma ham with rocket and parmesan.',
     descriptionTh: 'พาร์มาแฮมอิตาเลียนแท้ เสิร์ฟพร้อมผักร็อกเก็ตและพาร์เมซานชีส',
     image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
@@ -370,6 +371,17 @@ export const INITIAL_MENU: Pizza[] = [
   },
   {
     id: 'p4',
+    name: 'Pizza 4 Cheeses',
+    nameTh: 'พิซซ่า 4 ชีส',
+    basePrice: 380,
+    description: 'Mozzarella, Gorgonzola, Parmesan, and Fontina.',
+    descriptionTh: 'คนรักชีสต้องลอง: มอสซาเรลล่า, กอร์กอนโซล่า, พาร์เมซาน และฟอนติน่า',
+    image: 'https://images.unsplash.com/photo-1573821663912-569905455b1c?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'pizza'
+  },
+  {
+    id: 'p9',
     name: 'Pizza Pepperoni',
     nameTh: 'พิซซ่า เปปเปอโรนี',
     basePrice: 380,
@@ -380,21 +392,10 @@ export const INITIAL_MENU: Pizza[] = [
     category: 'pizza'
   },
   {
-    id: 'p5',
-    name: 'Pizza 4 Cheese',
-    nameTh: 'พิซซ่า 4 ชีส',
-    basePrice: 380,
-    description: 'Mozzarella, Gorgonzola, Parmesan, and Fontina.',
-    descriptionTh: 'คนรักชีสต้องลอง: มอสซาเรลล่า, กอร์กอนโซล่า, พาร์เมซาน และฟอนติน่า',
-    image: 'https://images.unsplash.com/photo-1573821663912-569905455b1c?auto=format&fit=crop&w=800&q=80',
-    available: true,
-    category: 'pizza'
-  },
-  {
     id: 'p6',
-    name: 'Pizza Margarita',
+    name: 'Pizza Margherita',
     nameTh: 'พิซซ่า มาร์เกริต้า',
-    basePrice: 279,
+    basePrice: 300,
     description: 'Classic tomato, mozzarella, and fresh basil.',
     descriptionTh: 'คลาสสิกด้วยซอสมะเขือเทศ มอสซาเรลล่า และใบโหระพา',
     image: 'https://images.unsplash.com/photo-1595854341653-bd3419714781?auto=format&fit=crop&w=800&q=80',
@@ -405,7 +406,7 @@ export const INITIAL_MENU: Pizza[] = [
     id: 'p7',
     name: 'Pizza Marinara',
     nameTh: 'พิซซ่า มารินาร่า',
-    basePrice: 350,
+    basePrice: 300,
     description: 'Tomato sauce, garlic, oregano, and extra virgin olive oil.',
     descriptionTh: 'ซอสมะเขือเทศ กระเทียม ออริกาโน และน้ำมันมะกอก (เจ)',
     image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?auto=format&fit=crop&w=800&q=80',
@@ -518,16 +519,30 @@ export const CATEGORIES: {id: ProductCategory; label: string; labelTh: string}[]
 ];
 
 export const INITIAL_TOPPINGS: Topping[] = [
-  { id: 't1', name: 'Extra Cheese', nameTh: 'เพิ่มชีส', price: 50 },
-  { id: 't2', name: 'Mushrooms', nameTh: 'เห็ด', price: 30 },
-  { id: 't3', name: 'Black Olives', nameTh: 'มะกอกดำ', price: 30 },
-  { id: 't4', name: 'Onions', nameTh: 'หอมใหญ่', price: 20 },
-  { id: 't5', name: 'Bacon', nameTh: 'เบคอน', price: 40 },
-  { id: 't6', name: 'Ham', nameTh: 'แฮม', price: 40 },
-  { id: 't7', name: 'Pineapple', nameTh: 'สับปะรด', price: 30 },
-  { id: 't8', name: 'Bell Peppers', nameTh: 'พริกหวาน', price: 25 },
-  { id: 't9', name: 'Pepperoni', nameTh: 'เปปเปอโรนี', price: 50 },
-  { id: 't10', name: 'Parma Ham', nameTh: 'พาร์มาแฮม', price: 80 },
+  // SAUCES
+  { id: 'sauce_tomato', name: 'Tomato Sauce', nameTh: 'ซอสมะเขือเทศ', price: 0, category: 'sauce' },
+  { id: 'sauce_white', name: 'Béchamel (White Sauce)', nameTh: 'ซอสขาว (เบชาเมล)', price: 0, category: 'sauce' },
+  
+  // CHEESES
+  { id: 'ch_moz', name: 'Mozzarella', nameTh: 'มอสซาเรลล่า', price: 50, category: 'cheese' },
+  { id: 'ch_fresh', name: 'Fresh Mozzarella', nameTh: 'เฟรช มอสซาเรลล่า', price: 80, category: 'cheese' },
+  { id: 'ch_parm', name: 'Parmesan', nameTh: 'พาร์เมซาน', price: 60, category: 'cheese' },
+
+  // SEASONING
+  { id: 'sea_oregano', name: 'Oregano', nameTh: 'ออริกาโน่', price: 0, category: 'seasoning' },
+
+  // VEGETABLES
+  { id: 't2', name: 'Mushrooms', nameTh: 'เห็ด', price: 30, category: 'vegetable' },
+  { id: 't3', name: 'Black Olives', nameTh: 'มะกอกดำ', price: 30, category: 'vegetable' },
+  { id: 't4', name: 'Onions', nameTh: 'หอมใหญ่', price: 20, category: 'vegetable' },
+  { id: 't7', name: 'Pineapple', nameTh: 'สับปะรด', price: 30, category: 'vegetable' },
+  { id: 't8', name: 'Bell Peppers', nameTh: 'พริกหวาน', price: 25, category: 'vegetable' },
+  
+  // MEAT
+  { id: 't5', name: 'Bacon', nameTh: 'เบคอน', price: 40, category: 'meat' },
+  { id: 't6', name: 'Ham', nameTh: 'แฮม', price: 40, category: 'meat' },
+  { id: 't9', name: 'Pepperoni', nameTh: 'เปปเปอโรนี', price: 50, category: 'meat' },
+  { id: 't10', name: 'Parma Ham', nameTh: 'พาร์มาแฮม', price: 80, category: 'meat' },
 ];
 
 // Delivery Zones (Removed from active logic but kept if needed for reference, 

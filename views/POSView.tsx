@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -13,7 +13,7 @@ export const POSView: React.FC = () => {
         adminLogout, shopLogo, updateShopLogo,
         expenses, addExpense,
         t, toggleLanguage, language, getLocalizedItem,
-        isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings
+        isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase
     } = useStore();
     
     // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage'
@@ -480,7 +480,7 @@ export const POSView: React.FC = () => {
                          </div>
 
                          {/* 3. Quick Actions */}
-                         <div className="grid grid-cols-2 gap-4">
+                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                              <button onClick={() => { setShowItemModal(true); setItemForm({category: 'pizza', available: true})}} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md">
                                  <div className="bg-brand-100 text-brand-600 p-3 rounded-full"><Plus size={24}/></div>
                                  <span className="font-bold text-gray-700 text-sm">{t('addItem')}</span>
@@ -488,6 +488,10 @@ export const POSView: React.FC = () => {
                              <button onClick={() => setShowToppingsModal(true)} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md">
                                  <div className="bg-blue-100 text-blue-600 p-3 rounded-full"><List size={24}/></div>
                                  <span className="font-bold text-gray-700 text-sm">Toppings</span>
+                             </button>
+                             <button onClick={seedDatabase} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md border border-yellow-100">
+                                 <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full"><Database size={24}/></div>
+                                 <span className="font-bold text-gray-700 text-sm text-center">Seed Database<br/><span className="text-[10px] font-normal text-gray-400">(Upload Menu)</span></span>
                              </button>
                          </div>
                          
