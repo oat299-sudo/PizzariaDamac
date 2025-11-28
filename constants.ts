@@ -28,6 +28,22 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'COGS', 'Labor', 'Rent', 'Utilities', 'Marketing', 'Maintenance', 'Other'
 ];
 
+// Specific Expense Presets requested by User
+export const PRESET_EXPENSES = [
+    { label: 'ค่าเห็ด (Mushroom)', category: 'COGS' },
+    { label: 'ค่าเช่าที่ มีเมฆ (Rent)', category: 'Rent' },
+    { label: 'ค่าน้ำ (Water)', category: 'Utilities' },
+    { label: 'ค่าไฟ (Electricity)', category: 'Utilities' },
+    { label: 'ค่าไส้กรอก Thaisaugesage', category: 'COGS' },
+    { label: 'ค่าของ Zaino', category: 'COGS' },
+    { label: 'ค่าของ Makro', category: 'COGS' },
+    { label: 'ค่าแรง (Labor)', category: 'Labor' },
+    { label: 'ค่าน้ำแข็ง (Ice)', category: 'COGS' },
+    { label: 'ค่ากล่อง (Boxes)', category: 'COGS' },
+    { label: 'ค่าที่รองพิซซ่า (Pizza Support)', category: 'COGS' },
+    { label: 'ค่าแผ่นรอง Pizza (Paper)', category: 'COGS' },
+];
+
 // TRANSLATIONS DICTIONARY
 export const TRANSLATIONS = {
     en: {
@@ -98,6 +114,8 @@ export const TRANSLATIONS = {
         thinking: "Thinking...",
         storeClosed: "Store Closed",
         storeClosedMsg: "We are currently closed. Open 11:00 - 20:30. See you tomorrow.",
+        vibeReviews: "Vibe & Reviews",
+        newsEvents: "News & Events",
         
         // Errors & Validation
         mustRegister: "Please Login or Register to place an order.",
@@ -140,6 +158,7 @@ export const TRANSLATIONS = {
         note: "Note",
         storeStatus: "Store Status",
         holidayMsg: "Holiday Message",
+        quickExpense: "Quick Expense",
         
         // Kitchen
         pending: "Pending",
@@ -231,6 +250,8 @@ export const TRANSLATIONS = {
         thinking: "กำลังคิด...",
         storeClosed: "ร้านปิด",
         storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น. เจอกันพรุ่งนี้ครับ",
+        vibeReviews: "บรรยากาศ & รีวิว",
+        newsEvents: "ข่าวสาร & กิจกรรม",
 
         // Errors & Validation
         mustRegister: "กรุณาเข้าสู่ระบบ หรือ สมัครสมาชิก ก่อนสั่งซื้อ",
@@ -273,6 +294,7 @@ export const TRANSLATIONS = {
         note: "หมายเหตุ",
         storeStatus: "สถานะร้าน",
         holidayMsg: "ข้อความวันหยุด",
+        quickExpense: "เลือกรายการค่าใช้จ่ายด่วน",
 
         // Kitchen
         pending: "รอรับออเดอร์",
@@ -299,7 +321,33 @@ export const TRANSLATIONS = {
 };
 
 export const INITIAL_MENU: Pizza[] = [
-  // CUSTOM PIZZA (MAKE YOUR OWN)
+  // --- PROMOTIONS & COMBOS ---
+  {
+      id: 'promo_combo_a',
+      name: 'Combo Set A (2 Pizzas + Coke)',
+      nameTh: 'ชุดคอมโบ A (พิซซ่า 2 ถาด + โค้ก)',
+      basePrice: 699,
+      description: 'Choose any 2 Pizzas and get a free large Coke.',
+      descriptionTh: 'เลือกพิซซ่าหน้าใดก็ได้ 2 ถาด แถมฟรีโค้กขวดใหญ่',
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+      available: true,
+      category: 'promotion',
+      comboCount: 2
+  },
+  {
+      id: 'promo_party',
+      name: 'Family Party Set',
+      nameTh: 'ชุดปาร์ตี้ครอบครัว',
+      basePrice: 999,
+      description: '3 Pizzas + Garlic Bread + 2 Cokes.',
+      descriptionTh: 'พิซซ่า 3 ถาด + ขนมปังกระเทียม + โค้ก 2 ขวด',
+      image: 'https://images.unsplash.com/photo-1528137871618-79d2761e3fd5?auto=format&fit=crop&w=800&q=80',
+      available: true,
+      category: 'promotion',
+      comboCount: 3
+  },
+
+  // --- CUSTOM PIZZA ---
   {
     id: 'p_custom',
     name: 'Create Your Own Pizza',
@@ -307,11 +355,11 @@ export const INITIAL_MENU: Pizza[] = [
     basePrice: 200,
     description: 'Start with a base and add your favorite toppings.',
     descriptionTh: 'เลือกซอส ชีส และท็อปปิ้งได้ตามใจชอบ',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
   },
-  // PIZZAS
+  // --- PIZZAS ---
   {
     id: 'p_damac',
     name: 'Pizza Damac',
@@ -391,7 +439,66 @@ export const INITIAL_MENU: Pizza[] = [
     category: 'pizza'
   },
   
-  // APPETIZERS
+  // --- PASTA ---
+  {
+    id: 'pas_carb',
+    name: 'Carbonara',
+    nameTh: 'สปาเก็ตตี้ คาโบนาร่า',
+    basePrice: 220,
+    description: 'Creamy sauce with bacon and parmesan.',
+    descriptionTh: 'ซอสครีมเข้มข้น เบคอน และพาร์เมซานชีส',
+    image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'pasta'
+  },
+  {
+    id: 'pas_bol',
+    name: 'Bolognese',
+    nameTh: 'สปาเก็ตตี้ ซอสเนื้อ',
+    basePrice: 240,
+    description: 'Rich tomato meat sauce.',
+    descriptionTh: 'ซอสมะเขือเทศเนื้อสับรสกลมกล่อม',
+    image: 'https://images.unsplash.com/photo-1622973536968-3ead9e780960?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'pasta'
+  },
+  {
+    id: 'pas_truf',
+    name: 'Truffle Cream Pasta',
+    nameTh: 'พาสต้าครีมทรัฟเฟิล',
+    basePrice: 290,
+    description: 'Fettuccine with aromatic truffle sauce.',
+    descriptionTh: 'เส้นเฟตตูชินีในซอสครีมทรัฟเฟิลหอมกรุ่น',
+    image: 'https://images.unsplash.com/photo-1645112411341-6c4fd023714a?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'pasta'
+  },
+
+  // --- SALADS ---
+  {
+    id: 'sal_caesar',
+    name: 'Caesar Salad',
+    nameTh: 'ซีซาร์สลัด',
+    basePrice: 180,
+    description: 'Romaine lettuce, croutons, parmesan, caesar dressing.',
+    descriptionTh: 'ผักกาดโรเมน เบคอนกรอบ และน้ำสลัดซีซาร์',
+    image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'salad'
+  },
+  {
+    id: 'sal_burrata',
+    name: 'Burrata Salad',
+    nameTh: 'สลัดบูราต้าชีส',
+    basePrice: 350,
+    description: 'Fresh Burrata cheese with tomatoes and balsamic.',
+    descriptionTh: 'ชีสบูราต้าสด มะเขือเทศ และบัลซามิก',
+    image: 'https://images.unsplash.com/photo-1529312266912-b33cf6227e2f?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'salad'
+  },
+
+  // --- APPETIZERS ---
   {
     id: 'app_garlic',
     name: 'Garlic Bread',
@@ -403,8 +510,32 @@ export const INITIAL_MENU: Pizza[] = [
     available: true,
     category: 'appetizer'
   },
-  
-  // DRINKS
+  {
+    id: 'app_fries',
+    name: 'French Fries',
+    nameTh: 'เฟรนช์ฟรายส์',
+    basePrice: 90,
+    description: 'Golden crispy fries.',
+    descriptionTh: 'มันฝรั่งทอดกรอบ',
+    image: 'https://images.unsplash.com/photo-1573080496987-a199f8cd75ec?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'appetizer'
+  },
+
+  // --- CAKES ---
+  {
+    id: 'cake_tira',
+    name: 'Tiramisu',
+    nameTh: 'ทีรามิสุ',
+    basePrice: 160,
+    description: 'Classic Italian coffee dessert.',
+    descriptionTh: 'เค้กกาแฟสไตล์อิตาเลียน',
+    image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'cake'
+  },
+
+  // --- DRINKS ---
   {
     id: 'drk_coke',
     name: 'Cola',
@@ -415,16 +546,27 @@ export const INITIAL_MENU: Pizza[] = [
     image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'drink'
+  },
+  {
+    id: 'drk_water',
+    name: 'Mineral Water',
+    nameTh: 'น้ำแร่',
+    basePrice: 30,
+    description: 'Fresh mineral water.',
+    descriptionTh: 'น้ำแร่ธรรมชาติ',
+    image: 'https://images.unsplash.com/photo-1564414297441-112e3743527d?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'drink'
   }
 ];
 
 export const CATEGORIES: {id: ProductCategory; label: string; labelTh: string}[] = [
   { id: 'promotion', label: 'Pro & Combo', labelTh: 'โปรโมชั่น' },
   { id: 'pizza', label: 'Pizza', labelTh: 'พิซซ่า' },
-  { id: 'cake', label: 'Cakes', labelTh: 'เค้ก' },
   { id: 'pasta', label: 'Pasta', labelTh: 'พาสต้า' },
   { id: 'appetizer', label: 'Snacks', labelTh: 'ทานเล่น' },
   { id: 'salad', label: 'Salads', labelTh: 'สลัด' },
+  { id: 'cake', label: 'Cakes', labelTh: 'เค้ก' },
   { id: 'drink', label: 'Drinks', labelTh: 'เครื่องดื่ม' },
 ];
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity } from 'lucide-react';
 
 export const CustomerView: React.FC = () => {
   const { 
@@ -63,6 +63,9 @@ export const CustomerView: React.FC = () => {
   const [currentComboSlot, setCurrentComboSlot] = useState<number | null>(null); // Which slot are we filling?
 
   const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
+
+  // Active Order Tracking
+  const activeOrder = orders.find(o => o.customerPhone === customer?.phone && o.status !== 'completed' && o.status !== 'cancelled');
 
   useEffect(() => {
     if (customer?.address) {
@@ -274,6 +277,8 @@ export const CustomerView: React.FC = () => {
       switch(status) {
           case 'pending': return 'bg-yellow-100 text-yellow-800';
           case 'confirmed': return 'bg-blue-100 text-blue-800';
+          case 'cooking': return 'bg-orange-100 text-orange-800';
+          case 'ready': return 'bg-green-100 text-green-700';
           case 'completed': return 'bg-green-100 text-green-700';
           case 'cancelled': return 'bg-red-100 text-red-700';
           default: return 'bg-gray-100 text-gray-700';
@@ -328,42 +333,42 @@ export const CustomerView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 md:pb-0 font-sans text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-orange-50 pb-24 md:pb-0 font-sans text-gray-900 flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm">
+        <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-orange-100">
            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                 {shopLogo ? <img src={shopLogo} className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center text-white"><ChefHat/></div>}
-                 <h1 className="font-bold text-xl tracking-tight hidden md:block">Pizza Damac</h1>
+                 {shopLogo ? <img src={shopLogo} className="w-10 h-10 rounded-full object-cover border-2 border-brand-500"/> : <div className="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center text-white"><ChefHat/></div>}
+                 <h1 className="font-bold text-xl tracking-tight hidden md:block text-gray-900">Pizza Damac</h1>
               </div>
 
               <div className="flex items-center gap-3">
-                 <button onClick={toggleLanguage} className="w-9 h-9 rounded-full bg-gray-100 font-bold text-xs">{language.toUpperCase()}</button>
+                 <button onClick={toggleLanguage} className="w-9 h-9 rounded-full bg-orange-100 font-bold text-xs text-brand-700 hover:bg-orange-200 transition">{language.toUpperCase()}</button>
                  {customer ? (
-                     <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 bg-gray-100 rounded-full py-1.5 px-3">
-                         <User size={16}/>
-                         <span className="text-sm font-bold hidden md:inline">{customer.name}</span>
+                     <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 bg-orange-100 rounded-full py-1.5 px-3 hover:bg-orange-200 transition">
+                         <User size={16} className="text-brand-700"/>
+                         <span className="text-sm font-bold hidden md:inline text-brand-900">{customer.name}</span>
                          <div className="bg-brand-500 text-white text-[10px] px-1.5 rounded-full">{customer.loyaltyPoints}pts</div>
                      </button>
                  ) : (
-                     <button onClick={() => setShowAuthModal(true)} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-bold">{t('login')}</button>
+                     <button onClick={() => setShowAuthModal(true)} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:bg-black transition">{t('login')}</button>
                  )}
-                 <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700">
+                 <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:bg-orange-100 rounded-full transition">
                      <ShoppingBag size={24}/>
-                     {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}
+                     {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce-short">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}
                  </button>
               </div>
            </div>
         </header>
 
         {/* Categories */}
-        <div className="bg-white border-b sticky top-16 z-30">
+        <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
                 {CATEGORIES.map(cat => (
                     <button 
                         key={cat.id} 
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all ${activeCategory === cat.id ? 'bg-gray-900 text-white shadow-lg' : 'bg-gray-100 text-gray-500'}`}
+                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all transform ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-lg scale-105' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                     >
                         {language === 'th' ? cat.labelTh : cat.label}
                     </button>
@@ -383,10 +388,65 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
+        {/* VIDEO & REVIEWS SECTION (New) */}
+        {activeCategory === 'promotion' && (
+            <section className="bg-white py-8 border-b">
+                <div className="max-w-7xl mx-auto px-4">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                        <Youtube className="text-red-600" /> {t('vibeReviews')}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Placeholder for Youtube Video 1 */}
+                        <div className="rounded-xl overflow-hidden shadow-lg bg-gray-100 aspect-video relative group cursor-pointer">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition">
+                                <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:opacity-100 transition transform group-hover:scale-110"/>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1543353071-873f17a7a088?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover"/>
+                            <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-sm font-bold">
+                                Customer Reviews: "Best Pizza in Nonthaburi!"
+                            </div>
+                        </div>
+                         {/* Placeholder for Youtube Video 2 */}
+                        <div className="rounded-xl overflow-hidden shadow-lg bg-gray-100 aspect-video relative group cursor-pointer hidden md:block">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition">
+                                <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:opacity-100 transition transform group-hover:scale-110"/>
+                            </div>
+                            <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover"/>
+                             <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-sm font-bold">
+                                Vibe Check: Saturday Night at Pizza Damac
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        )}
+
+        {/* NEWS & EVENTS SECTION (New) */}
+        {activeCategory === 'promotion' && (
+            <section className="bg-orange-100/50 py-6 border-b">
+                 <div className="max-w-7xl mx-auto px-4">
+                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-brand-800">
+                        <Newspaper className="text-brand-600" /> {t('newsEvents')}
+                    </h2>
+                    <div className="bg-white rounded-xl p-4 shadow-sm border border-orange-200 flex flex-col md:flex-row gap-4 items-center">
+                        <div className="w-full md:w-32 h-32 rounded-lg bg-green-100 flex-shrink-0 overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1505935428862-770b6f24f629?auto=format&fit=crop&w=400&q=80" className="w-full h-full object-cover"/>
+                        </div>
+                        <div className="flex-1">
+                            <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">Healthy Living</span>
+                            <h3 className="font-bold text-lg leading-tight mb-1">Pizza Damac Joins "Healthy Food Nonthaburi" Seminar</h3>
+                            <p className="text-gray-600 text-sm line-clamp-2">We are proud to announce our participation in the annual health seminar, showcasing our fresh ingredients and organic toppings.</p>
+                            <button className="text-brand-600 text-xs font-bold mt-2 hover:underline">Read More</button>
+                        </div>
+                    </div>
+                 </div>
+            </section>
+        )}
+
         {/* Best Sellers */}
         {menu.some(p => p.isBestSeller) && activeCategory !== 'promotion' && (
              <div className="max-w-7xl mx-auto px-4 py-6">
-                 <h2 className="font-bold text-xl mb-4 flex items-center gap-2"><Star className="text-yellow-500" fill="currentColor"/> Best Sellers</h2>
+                 <h2 className="font-bold text-xl mb-4 flex items-center gap-2 text-gray-800"><Star className="text-yellow-500" fill="currentColor"/> Best Sellers</h2>
                  <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
                      {menu.filter(p => p.isBestSeller).map(item => (
                          <div key={'bs-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[200px] bg-white rounded-xl shadow-sm p-3 border border-yellow-100 cursor-pointer hover:shadow-md transition">
@@ -424,7 +484,7 @@ export const CustomerView: React.FC = () => {
                 {menu.filter(p => p.category === activeCategory).map(item => {
                     const localized = getLocalizedItem(item);
                     return (
-                        <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition cursor-pointer border border-transparent hover:border-brand-100 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                        <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
                             <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
                                 <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                 {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
@@ -435,7 +495,7 @@ export const CustomerView: React.FC = () => {
                                 <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
                                 <div className="flex justify-between items-center">
                                     <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
-                                    <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center"><Plus size={18}/></button>
+                                    <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
                                 </div>
                             </div>
                         </div>
@@ -454,6 +514,37 @@ export const CustomerView: React.FC = () => {
                 </div>
             </div>
         </footer>
+
+        {/* ACTIVE ORDER LIVE TRACKER (Floating) */}
+        {activeOrder && (
+            <div className="fixed bottom-4 left-4 right-4 z-40 md:left-auto md:right-8 md:bottom-8 md:w-96 animate-fade-in">
+                <div className="bg-gray-900 text-white p-4 rounded-xl shadow-2xl border border-gray-700">
+                    <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                             <div className="relative">
+                                 <Activity size={20} className="text-green-400 animate-pulse"/>
+                             </div>
+                             <span className="font-bold text-sm">Order Status #{activeOrder.id.slice(-4)}</span>
+                        </div>
+                        <button onClick={() => setShowProfile(true)} className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">View</button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                         <span className="text-lg font-bold text-brand-400 uppercase">{t(activeOrder.status as any)}</span>
+                         <span className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</span>
+                    </div>
+                    {/* Simple Progress Bar */}
+                    <div className="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div 
+                            className={`h-full bg-brand-500 transition-all duration-1000 ${
+                                activeOrder.status === 'confirmed' ? 'w-[25%]' : 
+                                activeOrder.status === 'cooking' ? 'w-[60%]' :
+                                activeOrder.status === 'ready' ? 'w-[100%]' : 'w-[5%]'
+                            }`}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Customization Modal */}
         {selectedPizza && (
@@ -512,7 +603,7 @@ export const CustomerView: React.FC = () => {
                          ) : (
                              // Standard Customization OR Make Your Own Pizza
                              <>
-                                 {selectedPizza.id === 'custom_base' ? (
+                                 {selectedPizza.id === 'custom_base' || selectedPizza.name.includes("Create") ? (
                                      // "Create Your Own" Flow
                                      <div className="space-y-6">
                                          <div className="mb-4">
@@ -521,8 +612,8 @@ export const CustomerView: React.FC = () => {
                                          </div>
 
                                          {/* 1. SAUCES (Required, Select One) */}
-                                         <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2">1. Choose Sauce <span className="text-red-500 text-xs">(Required)</span></h4>
+                                         <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                            <h4 className="font-bold text-red-800 text-sm uppercase mb-2 flex items-center gap-2"><Droplets size={16}/> 1. Choose Sauce <span className="text-red-500 text-xs">(Required)</span></h4>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {groupedToppings.sauce.map(t => {
                                                     const isSelected = selectedToppings.find(sel => sel.id === t.id);
@@ -530,13 +621,12 @@ export const CustomerView: React.FC = () => {
                                                         <button 
                                                             key={t.id} 
                                                             onClick={() => toggleTopping(t)}
-                                                            className={`p-3 rounded-lg border text-left flex justify-between items-center ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}
+                                                            className={`p-3 rounded-lg border text-left flex justify-between items-center bg-white ${isSelected ? 'border-brand-500 ring-2 ring-brand-500 text-brand-700' : 'border-gray-200'}`}
                                                         >
                                                             <div className="flex items-center gap-2">
-                                                                {isSelected ? <CheckCircle2 size={16} /> : <div className="w-4 h-4 rounded-full border border-gray-300"></div>}
+                                                                {isSelected ? <CheckCircle2 size={16} className="text-brand-500" /> : <div className="w-4 h-4 rounded-full border border-gray-300"></div>}
                                                                 <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
                                                             </div>
-                                                            {t.price > 0 && <span className="text-xs">+฿{t.price}</span>}
                                                         </button>
                                                     );
                                                 })}
@@ -545,10 +635,10 @@ export const CustomerView: React.FC = () => {
 
                                          {/* 2. CHEESES */}
                                          <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">2. Select Cheeses</h4>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Utensils size={16}/> 2. Select Cheeses</h4>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {groupedToppings.cheese.map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
                                                         <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
                                                         <span className="text-xs">+฿{t.price}</span>
                                                     </button>
@@ -558,10 +648,10 @@ export const CustomerView: React.FC = () => {
 
                                          {/* 3. SEASONING */}
                                          <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">3. Seasoning</h4>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Sparkles size={16}/> 3. Seasoning</h4>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {groupedToppings.seasoning.map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
                                                         <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
                                                         <span className="text-xs">{t.price > 0 ? `+฿${t.price}` : 'Free'}</span>
                                                     </button>
@@ -571,10 +661,10 @@ export const CustomerView: React.FC = () => {
 
                                          {/* 4. MEAT & VEGGIES */}
                                          <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2">4. Toppings (Meat & Veggies)</h4>
+                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Carrot size={16}/> 4. Toppings (Meat & Veggies)</h4>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {[...groupedToppings.meat, ...groupedToppings.vegetable, ...groupedToppings.other].map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}>
+                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
                                                         <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
                                                         <span className="text-xs">+฿{t.price}</span>
                                                     </button>

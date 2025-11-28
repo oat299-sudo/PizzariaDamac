@@ -429,7 +429,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   category: p.category, available: p.available, 
                   is_best_seller: p.isBestSeller, combo_count: p.comboCount
               });
-              if (error) console.error("Menu Seed Error", error);
+              if (error) {
+                  if (error.code === '42703') {
+                      alert("Database Error: Column missing. Please run the SQL script provided in the Supabase SQL Editor to update your table structure.");
+                      return;
+                  }
+                  console.error("Menu Seed Error", error);
+              }
           }
           // Upload Toppings
           for (const t of INITIAL_TOPPINGS) {
@@ -440,7 +446,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                       category: t.category 
                   });
                   if (error) throw error;
-              } catch (e) {
+              } catch (e: any) {
+                  if (e.code === '42703') {
+                      alert("Database Error: Column missing. Please run the SQL script.");
+                      return;
+                  }
                   // Fallback: Try without category if column missing
                    await supabase.from('toppings').upsert({
                       id: t.id, name: t.name, name_th: t.nameTh, price: t.price

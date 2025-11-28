@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
-import { CATEGORIES, EXPENSE_CATEGORIES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database } from 'lucide-react';
+import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -547,15 +547,39 @@ export const POSView: React.FC = () => {
                 {activeTab === 'expenses' && (
                     <div className="flex-1 p-4 overflow-y-auto pb-24">
                         <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('expenses')}</h2>
-                        <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
-                            <form onSubmit={handleAddExpense} className="space-y-3">
-                                <select className="w-full p-3 bg-gray-50 rounded-lg text-sm border-none" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as ExpenseCategory})}>
-                                    {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                                <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" placeholder="Description" value={expenseForm.description} onChange={e=>setExpenseForm({...expenseForm, description:e.target.value})}/>
-                                <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" type="number" placeholder="Amount" value={expenseForm.amount} onChange={e=>setExpenseForm({...expenseForm, amount:e.target.value})}/>
-                                <button type="submit" className="w-full bg-red-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200">Record Expense</button>
-                            </form>
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            {/* Form */}
+                            <div className="bg-white p-5 rounded-xl shadow-sm flex-1">
+                                <form onSubmit={handleAddExpense} className="space-y-4">
+                                    <h3 className="font-bold text-sm text-gray-500 uppercase mb-2">Record New Expense</h3>
+                                    <select className="w-full p-3 bg-gray-50 rounded-lg text-sm border-none" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as ExpenseCategory})}>
+                                        {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                    <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" placeholder="Description" value={expenseForm.description} onChange={e=>setExpenseForm({...expenseForm, description:e.target.value})}/>
+                                    <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" type="number" placeholder="Amount (THB)" value={expenseForm.amount} onChange={e=>setExpenseForm({...expenseForm, amount:e.target.value})}/>
+                                    <button type="submit" className="w-full bg-red-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200">Record Expense</button>
+                                </form>
+                            </div>
+                            
+                            {/* Quick Presets */}
+                            <div className="bg-white p-5 rounded-xl shadow-sm flex-1">
+                                <h3 className="font-bold text-sm text-gray-500 uppercase mb-3 flex items-center gap-2"><MousePointerClick size={16}/> {t('quickExpense')}</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {PRESET_EXPENSES.map((preset, idx) => (
+                                        <button 
+                                            key={idx}
+                                            onClick={() => setExpenseForm({
+                                                ...expenseForm, 
+                                                description: preset.label,
+                                                category: preset.category as ExpenseCategory
+                                            })}
+                                            className="text-left text-xs p-2 rounded border hover:bg-red-50 hover:border-red-200 transition"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
