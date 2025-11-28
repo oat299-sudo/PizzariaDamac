@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings } from '../types';
-import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS } from '../constants';
+import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS, DEFAULT_STORE_SETTINGS } from '../constants';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface StoreContextType {
@@ -170,7 +170,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   });
 
   // --- Store Settings State ---
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>({ isOpen: true, closedMessage: '' });
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
   const [isHoliday, setIsHoliday] = useState(false);
   const [isStoreOpen, setIsStoreOpen] = useState(true);
 
@@ -287,7 +287,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   promoBannerUrl: data.promo_banner_url,
                   promoContentType: data.promo_content_type,
                   holidayStart: data.holiday_start,
-                  holidayEnd: data.holiday_end
+                  holidayEnd: data.holiday_end,
+                  // New fields with fallback to constants
+                  reviewUrl: data.review_url || DEFAULT_STORE_SETTINGS.reviewUrl,
+                  facebookUrl: data.facebook_url || DEFAULT_STORE_SETTINGS.facebookUrl,
+                  lineUrl: data.line_url || DEFAULT_STORE_SETTINGS.lineUrl,
+                  mapUrl: data.map_url || DEFAULT_STORE_SETTINGS.mapUrl,
+                  contactPhone: data.contact_phone || DEFAULT_STORE_SETTINGS.contactPhone
               });
           }
       } catch (err) { console.error("Settings fetch failed", err); }
@@ -753,6 +759,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
             if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
             if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
+            // New fields
+            if (settings.reviewUrl !== undefined) dbPayload.review_url = settings.reviewUrl;
+            if (settings.facebookUrl !== undefined) dbPayload.facebook_url = settings.facebookUrl;
+            if (settings.lineUrl !== undefined) dbPayload.line_url = settings.lineUrl;
+            if (settings.mapUrl !== undefined) dbPayload.map_url = settings.mapUrl;
+            if (settings.contactPhone !== undefined) dbPayload.contact_phone = settings.contactPhone;
 
             await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
           } catch(e) { console.error("Settings sync error", e); }

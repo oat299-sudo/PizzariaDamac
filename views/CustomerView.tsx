@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle } from 'lucide-react';
 
 export const CustomerView: React.FC = () => {
   const { 
@@ -504,8 +504,60 @@ export const CustomerView: React.FC = () => {
             </div>
         </main>
         
+        {/* Contact Us Footer Section */}
+        <section className="bg-gray-800 text-gray-300 py-12">
+            <div className="max-w-7xl mx-auto px-4">
+                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><MapPin className="text-brand-500"/> {t('findUs')}</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                     
+                     {/* Map */}
+                     <a href={storeSettings.mapUrl || "https://maps.google.com"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
+                         <div className="bg-green-100 p-3 rounded-full text-green-600 group-hover:scale-110 transition"><MapPin size={24}/></div>
+                         <div>
+                             <h3 className="text-white font-bold">Google Maps</h3>
+                             <p className="text-xs text-gray-400">Navigate to Pizza Damac</p>
+                         </div>
+                     </a>
+
+                     {/* Facebook */}
+                     <a href={storeSettings.facebookUrl || "#"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
+                         <div className="bg-blue-100 p-3 rounded-full text-blue-600 group-hover:scale-110 transition"><Facebook size={24}/></div>
+                         <div>
+                             <h3 className="text-white font-bold">Facebook</h3>
+                             <p className="text-xs text-gray-400">Follow us for updates</p>
+                         </div>
+                     </a>
+
+                     {/* Line */}
+                     <a href={storeSettings.lineUrl || "#"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
+                         <div className="bg-green-100 p-3 rounded-full text-green-500 group-hover:scale-110 transition"><MessageCircle size={24}/></div>
+                         <div>
+                             <h3 className="text-white font-bold">Line Official</h3>
+                             <p className="text-xs text-gray-400">Chat with us</p>
+                         </div>
+                     </a>
+
+                     {/* Phone */}
+                     <a href={`tel:${storeSettings.contactPhone}`} className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
+                         <div className="bg-orange-100 p-3 rounded-full text-orange-600 group-hover:scale-110 transition"><Phone size={24}/></div>
+                         <div>
+                             <h3 className="text-white font-bold">{storeSettings.contactPhone}</h3>
+                             <p className="text-xs text-gray-400">Call for info</p>
+                         </div>
+                     </a>
+                 </div>
+                 
+                 {/* Google Reviews Link */}
+                 <div className="mt-8 text-center">
+                     <a href={storeSettings.reviewUrl || "#"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-brand-400 hover:text-brand-300 transition">
+                         <Star size={16}/> Rate us on Google Maps
+                     </a>
+                 </div>
+            </div>
+        </section>
+        
         {/* Footer with Staff Access */}
-        <footer className="bg-gray-900 text-gray-400 py-8 mt-auto">
+        <footer className="bg-gray-900 text-gray-500 py-8 border-t border-gray-800">
             <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="text-sm">© 2025 Pizza Damac Nonthaburi</div>
                 <div className="flex gap-4">

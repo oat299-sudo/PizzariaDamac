@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -11,7 +11,7 @@ export const POSView: React.FC = () => {
         updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza, toggleBestSeller,
         toppings, addTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
-        expenses, addExpense,
+        expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase
     } = useStore();
@@ -129,7 +129,7 @@ export const POSView: React.FC = () => {
     };
 
     const handleSaveItem = async () => {
-        if (itemForm.name && itemForm.basePrice) {
+        if (itemForm.name && itemForm.basePrice !== undefined) {
             if (itemForm.id) {
                 await updatePizza(itemForm as Pizza);
             } else {
@@ -209,7 +209,8 @@ export const POSView: React.FC = () => {
     });
 
     const totalGrossSales = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.totalAmount, 0);
-    const netProfit = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const netProfit = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
@@ -293,6 +294,15 @@ export const POSView: React.FC = () => {
                                             {language === 'th' ? cat.labelTh : cat.label}
                                         </button>
                                     ))}
+                                    {/* Add Item Button */}
+                                    {isEditMode && (
+                                        <button 
+                                            onClick={handleOpenAddModal}
+                                            className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap bg-brand-600 text-white shadow-md flex items-center gap-1"
+                                        >
+                                            <Plus size={14}/> Add New
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -409,6 +419,133 @@ export const POSView: React.FC = () => {
                     </>
                 )}
 
+                {/* VIEW: SALES REPORT */}
+                {activeTab === 'sales' && (
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><PieChart className="text-blue-600"/> {t('salesReport')}</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('grossSales')}</h3>
+                                 <p className="text-3xl font-bold text-gray-900 mt-2">฿{totalGrossSales.toLocaleString()}</p>
+                             </div>
+                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('expenses')}</h3>
+                                 <p className="text-3xl font-bold text-red-600 mt-2">฿{totalExpenses.toLocaleString()}</p>
+                             </div>
+                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('netProfit')}</h3>
+                                 <p className={`text-3xl font-bold mt-2 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>฿{netProfit.toLocaleString()}</p>
+                             </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <h3 className="p-6 border-b font-bold text-lg">{t('transactionHistory')}</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                                        <tr>
+                                            <th className="p-4 text-left">Order ID</th>
+                                            <th className="p-4 text-left">Date</th>
+                                            <th className="p-4 text-left">Type</th>
+                                            <th className="p-4 text-left">Status</th>
+                                            <th className="p-4 text-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {orders.slice(0, 20).map(order => (
+                                            <tr key={order.id} className="text-sm hover:bg-gray-50">
+                                                <td className="p-4 font-mono font-bold text-gray-600">#{order.id.slice(-4)}</td>
+                                                <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                                <td className="p-4">
+                                                    <span className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded font-bold text-xs uppercase">{order.source}</span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                        {order.status}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right font-bold">฿{order.totalAmount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* VIEW: EXPENSES */}
+                {activeTab === 'expenses' && (
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                         <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Calculator className="text-yellow-600"/> Expenses & Costs</h2>
+                         
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                             {/* Form */}
+                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                 <h3 className="font-bold text-lg mb-4">{t('recordExpense')}</h3>
+                                 <form onSubmit={handleAddExpense} className="space-y-4">
+                                     <div>
+                                         <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                                         <input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} required placeholder="e.g. Tomatoes"/>
+                                     </div>
+                                     <div className="grid grid-cols-2 gap-4">
+                                         <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Amount (฿)</label>
+                                            <input type="number" className="w-full bg-gray-50 border rounded p-3" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required placeholder="0.00"/>
+                                         </div>
+                                         <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
+                                            <select className="w-full bg-gray-50 border rounded p-3" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as any})}>
+                                                {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                         </div>
+                                     </div>
+                                     <div>
+                                         <label className="text-xs font-bold text-gray-500 uppercase">Note (Optional)</label>
+                                         <input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})}/>
+                                     </div>
+                                     <button type="submit" className="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-yellow-600 transition">Record Expense</button>
+                                 </form>
+                                 
+                                 {/* Quick Expense Buttons (Presets) */}
+                                 <div className="mt-6 pt-6 border-t">
+                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">{t('quickExpense')}</h4>
+                                     <div className="flex flex-wrap gap-2">
+                                         {PRESET_EXPENSES.map((preset, idx) => (
+                                             <button 
+                                                key={idx}
+                                                onClick={() => setExpenseForm({ ...expenseForm, description: preset.label, category: preset.category as any })}
+                                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200"
+                                             >
+                                                 {preset.label}
+                                             </button>
+                                         ))}
+                                     </div>
+                                 </div>
+                             </div>
+
+                             {/* List */}
+                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[500px]">
+                                 <h3 className="p-4 border-b font-bold text-lg bg-gray-50">Recent Expenses</h3>
+                                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                     {expenses.length === 0 ? <p className="text-gray-400 text-center mt-10">No expenses recorded.</p> : expenses.map(exp => (
+                                         <div key={exp.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
+                                             <div>
+                                                 <div className="font-bold text-gray-800">{exp.description}</div>
+                                                 <div className="text-xs text-gray-500">{new Date(exp.date).toLocaleDateString()} • {exp.category}</div>
+                                             </div>
+                                             <div className="flex items-center gap-4">
+                                                 <span className="font-bold text-red-600">-฿{exp.amount}</span>
+                                                 <button onClick={() => deleteExpense(exp.id)} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         </div>
+                    </div>
+                )}
+
                 {/* VIEW: MANAGE (Unified Dashboard) */}
                 {activeTab === 'manage' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
@@ -478,274 +615,150 @@ export const POSView: React.FC = () => {
                                  </label>
                              </div>
                          </div>
+                         
+                         {/* 3. Contact & Links */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.reviewUrl || ''} onChange={e => updateStoreSettings({ reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Map URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.mapUrl || ''} onChange={e => updateStoreSettings({ mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Facebook size={12}/> Facebook URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.facebookUrl || ''} onChange={e => updateStoreSettings({ facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MessageCircle size={12}/> Line URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.lineUrl || ''} onChange={e => updateStoreSettings({ lineUrl: e.target.value })} placeholder="https://line.me/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Phone size={12}/> Contact Phone</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.contactPhone || ''} onChange={e => updateStoreSettings({ contactPhone: e.target.value })} placeholder="099..."/>
+                                 </div>
+                             </div>
+                         </div>
 
-                         {/* 3. Quick Actions */}
-                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                             <button onClick={() => { setShowItemModal(true); setItemForm({category: 'pizza', available: true})}} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md">
-                                 <div className="bg-brand-100 text-brand-600 p-3 rounded-full"><Plus size={24}/></div>
-                                 <span className="font-bold text-gray-700 text-sm">{t('addItem')}</span>
-                             </button>
-                             <button onClick={() => setShowToppingsModal(true)} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md">
-                                 <div className="bg-blue-100 text-blue-600 p-3 rounded-full"><List size={24}/></div>
-                                 <span className="font-bold text-gray-700 text-sm">Toppings</span>
-                             </button>
-                             <button onClick={seedDatabase} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md border border-yellow-100">
-                                 <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full"><Database size={24}/></div>
-                                 <span className="font-bold text-gray-700 text-sm text-center">Upload Menu to DB<br/><span className="text-[10px] font-normal text-gray-400">(Sync Code to Data)</span></span>
-                             </button>
+                         {/* 4. Menu Actions */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
+                             <div className="flex gap-4">
+                                 <button onClick={seedDatabase} className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 font-bold text-sm flex items-center gap-2">
+                                     <Upload size={16}/> Upload Menu to Database
+                                 </button>
+                                 <button onClick={() => setShowToppingsModal(true)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-300 font-bold text-sm flex items-center gap-2">
+                                     <Layers size={16}/> Manage Toppings
+                                 </button>
+                             </div>
+                             <p className="text-[10px] text-gray-400 mt-2">Use "Upload Menu" to sync your local code mock menu with Supabase.</p>
                          </div>
-                         
-                         <button onClick={adminLogout} className="w-full bg-red-50 text-red-600 py-4 rounded-xl font-bold mt-8 flex items-center justify-center gap-2 hover:bg-red-100">
-                             <LogOut size={20}/> Logout
-                         </button>
-                    </div>
-                )}
-                
-                {/* VIEW: SALES REPORT */}
-                {activeTab === 'sales' && (
-                    <div className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8">
-                         <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('accountantReport')}</h2>
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                                <p className="text-gray-400 text-xs uppercase font-bold mb-1">{t('grossSales')}</p>
-                                <p className="text-2xl font-bold text-gray-900">฿{totalGrossSales.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                                <p className="text-gray-400 text-xs uppercase font-bold mb-1">{t('netProfit')}</p>
-                                <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>฿{netProfit.toLocaleString()}</p>
-                            </div>
-                         </div>
-                         
-                         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-50 text-gray-500 font-bold border-b">
-                                    <tr>
-                                        <th className="p-3">Date</th>
-                                        <th className="p-3">Desc</th>
-                                        <th className="p-3 text-right">Amt</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[...orders.filter(o => o.status!=='cancelled').map(o=>({id:o.id, date:o.createdAt, desc:`Order #${o.id.slice(-4)}`, amt:o.netAmount, type:'in'})), ...expenses.map(e=>({id:e.id, date:e.date, desc:e.description, amt:e.amount, type:'out'}))]
-                                      .sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime())
-                                      .map(i => (
-                                          <tr key={i.id} className="border-b last:border-0">
-                                              <td className="p-3 text-gray-500">{new Date(i.date).toLocaleDateString()}</td>
-                                              <td className="p-3 font-medium">{i.desc}</td>
-                                              <td className={`p-3 text-right font-bold ${i.type==='out'?'text-red-500':'text-green-600'}`}>{i.type==='out'?'-':'+'}฿{i.amt.toLocaleString()}</td>
-                                          </tr>
-                                      ))
-                                    }
-                                </tbody>
-                            </table>
-                         </div>
-                    </div>
-                )}
-                
-                {/* VIEW: EXPENSES */}
-                {activeTab === 'expenses' && (
-                    <div className="flex-1 p-4 overflow-y-auto pb-24">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">{t('expenses')}</h2>
-                        <div className="flex flex-col lg:flex-row gap-6">
-                            {/* Form */}
-                            <div className="bg-white p-5 rounded-xl shadow-sm flex-1">
-                                <form onSubmit={handleAddExpense} className="space-y-4">
-                                    <h3 className="font-bold text-sm text-gray-500 uppercase mb-2">Record New Expense</h3>
-                                    <select className="w-full p-3 bg-gray-50 rounded-lg text-sm border-none" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as ExpenseCategory})}>
-                                        {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                    <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" placeholder="Description" value={expenseForm.description} onChange={e=>setExpenseForm({...expenseForm, description:e.target.value})}/>
-                                    <input className="w-full p-3 bg-gray-50 rounded-lg text-sm" type="number" placeholder="Amount (THB)" value={expenseForm.amount} onChange={e=>setExpenseForm({...expenseForm, amount:e.target.value})}/>
-                                    <button type="submit" className="w-full bg-red-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-red-200">Record Expense</button>
-                                </form>
-                            </div>
-                            
-                            {/* Quick Presets */}
-                            <div className="bg-white p-5 rounded-xl shadow-sm flex-1">
-                                <h3 className="font-bold text-sm text-gray-500 uppercase mb-3 flex items-center gap-2"><MousePointerClick size={16}/> {t('quickExpense')}</h3>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {PRESET_EXPENSES.map((preset, idx) => (
-                                        <button 
-                                            key={idx}
-                                            onClick={() => setExpenseForm({
-                                                ...expenseForm, 
-                                                description: preset.label,
-                                                category: preset.category as ExpenseCategory
-                                            })}
-                                            className="text-left text-xs p-2 rounded border hover:bg-red-50 hover:border-red-200 transition"
-                                        >
-                                            {preset.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
             </main>
 
-            {/* Mobile Bottom Navigation */}
-            <div className="md:hidden bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] shrink-0 h-16">
-                <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); setIsEditMode(false) }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
-                    <ShoppingBag size={22} className={activeTab === 'order' ? 'fill-current' : ''} />
-                    <span className="text-[10px] font-bold mt-1">Order</span>
-                </button>
-                <button onClick={() => { setActiveTab('sales'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'sales' ? 'text-blue-600' : 'text-gray-400'}`}>
-                    <PieChart size={22} className={activeTab === 'sales' ? 'fill-current' : ''} />
-                    <span className="text-[10px] font-bold mt-1">Report</span>
-                </button>
-                <button onClick={() => { setActiveTab('expenses'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'expenses' ? 'text-yellow-500' : 'text-gray-400'}`}>
-                    <Calculator size={22} className={activeTab === 'expenses' ? 'fill-current' : ''} />
-                    <span className="text-[10px] font-bold mt-1">Exp</span>
-                </button>
-                <button onClick={() => { setActiveTab('manage'); setShowMobileCart(false); }} className={`flex-1 py-1 flex flex-col items-center ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
-                    <Settings size={22} className={activeTab === 'manage' ? 'fill-current' : ''} />
-                    <span className="text-[10px] font-bold mt-1">Manage</span>
-                </button>
-            </div>
-
-            {/* Add/Edit Item Modal */}
+            {/* Modal: Add/Edit Item */}
             {showItemModal && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        {/* ... Modal Content Same as Before ... */}
-                        <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h3 className="text-xl font-bold">{itemForm.id ? t('updateItem') : t('addItem')}</h3>
-                            <button onClick={() => setShowItemModal(false)}><X size={20}/></button>
-                        </div>
-                        <div className="space-y-4">
-                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('category')}</label>
-                                <select 
-                                    className="w-full border rounded p-2 mt-1 capitalize bg-white"
-                                    value={itemForm.category}
-                                    onChange={e => setItemForm({...itemForm, category: e.target.value as ProductCategory})}
-                                >
-                                    {CATEGORIES.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{language === 'th' ? cat.labelTh : cat.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {itemForm.category === 'promotion' && (
-                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                                    <label className="text-xs font-bold text-yellow-800 uppercase flex items-center gap-1"><Layers size={14}/> Combo Settings</label>
-                                    <p className="text-[10px] text-gray-500 mb-2">How many pizzas can the customer choose in this combo?</p>
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={() => setItemForm({...itemForm, comboCount: Math.max(0, (itemForm.comboCount || 0) - 1)})} className="p-1 bg-white border rounded"><Minus size={16}/></button>
-                                        <span className="font-bold text-lg">{itemForm.comboCount || 0}</span>
-                                        <button onClick={() => setItemForm({...itemForm, comboCount: (itemForm.comboCount || 0) + 1})} className="p-1 bg-white border rounded"><Plus size={16}/></button>
-                                        <span className="text-sm ml-2">Pizzas</span>
-                                    </div>
-                                </div>
-                            )}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl relative">
+                        <h2 className="text-xl font-bold mb-4">{itemForm.id ? 'Edit Item' : 'Add New Item'}</h2>
+                        <button onClick={() => setShowItemModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={20}/></button>
+                        
+                        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">{t('name')}</label>
-                                <input 
-                                    className="w-full border rounded p-2 mt-1" 
-                                    value={itemForm.name} 
-                                    onChange={e => setItemForm({...itemForm, name: e.target.value})}
-                                    placeholder="e.g. Carbonara"
-                                />
+                                <input className="w-full border rounded p-2" value={itemForm.name} onChange={e => setItemForm({...itemForm, name: e.target.value})} />
                             </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('name')} (TH)</label>
-                                <input 
-                                    className="w-full border rounded p-2 mt-1" 
-                                    value={itemForm.nameTh || ''} 
-                                    onChange={e => setItemForm({...itemForm, nameTh: e.target.value})}
-                                    placeholder="ชื่อไทย"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('price')}</label>
+                                    <input type="number" className="w-full border rounded p-2" value={itemForm.basePrice} onChange={e => setItemForm({...itemForm, basePrice: parseFloat(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">{t('category')}</label>
+                                    <select className="w-full border rounded p-2" value={itemForm.category} onChange={e => setItemForm({...itemForm, category: e.target.value as any})}>
+                                        {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('price')} (THB)</label>
-                                <input 
-                                    type="number" 
-                                    className="w-full border rounded p-2 mt-1" 
-                                    value={itemForm.basePrice || ''} 
-                                    onChange={e => setItemForm({...itemForm, basePrice: parseFloat(e.target.value)})}
-                                    placeholder="0"
-                                />
+                            
+                            {/* Combo Settings */}
+                            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                                <label className="text-xs font-bold text-orange-800 uppercase flex items-center gap-1 mb-1">
+                                    <Layers size={12}/> Combo Settings
+                                </label>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm text-gray-600">Pizza Count (0 = Not a combo)</span>
+                                    <input 
+                                        type="number" 
+                                        className="w-20 border rounded p-1 text-center font-bold" 
+                                        value={itemForm.comboCount} 
+                                        onChange={e => setItemForm({...itemForm, comboCount: parseInt(e.target.value) || 0})}
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1">If set > 0, customer will be asked to select this many pizzas.</p>
                             </div>
+
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">{t('description')}</label>
-                                <textarea 
-                                    className="w-full border rounded p-2 mt-1" 
-                                    value={itemForm.description} 
-                                    onChange={e => setItemForm({...itemForm, description: e.target.value})}
-                                    placeholder="Short description"
-                                />
+                                <textarea className="w-full border rounded p-2 h-20" value={itemForm.description} onChange={e => setItemForm({...itemForm, description: e.target.value})} />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
-                                    <ImageIcon size={14}/> {t('imageSource')}
-                                </label>
-                                <div className="flex gap-2 mt-1">
-                                    <label className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 p-3 rounded cursor-pointer flex items-center justify-center gap-2 border border-dashed border-gray-300">
-                                        <Upload size={18} />
-                                        <span className="text-sm font-medium">Upload Image</span>
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('imageSource')}</label>
+                                <div className="flex gap-2 items-center">
+                                    {itemForm.image && <img src={itemForm.image} className="w-16 h-16 rounded object-cover border" />}
+                                    <label className="cursor-pointer bg-gray-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">
+                                        Upload
                                         <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
                                     </label>
+                                    <span className="text-xs text-gray-400">or paste URL</span>
                                 </div>
-                                {itemForm.image && (
-                                    <div className="mt-2 h-32 w-full rounded-lg bg-gray-100 overflow-hidden relative">
-                                        <img src={itemForm.image} alt="Preview" className="w-full h-full object-cover" />
-                                    </div>
-                                )}
                             </div>
-                            <button onClick={handleSaveItem} className="w-full bg-brand-600 text-white py-3 rounded-lg font-bold hover:bg-brand-700">
-                                {itemForm.id ? t('updateItem') : t('saveItem')}
-                            </button>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-2">
+                             {itemForm.id && (
+                                 <button onClick={() => { deletePizza(itemForm.id!); setShowItemModal(false); }} className="px-4 py-2 text-red-600 font-bold hover:bg-red-50 rounded-lg">{t('delete')}</button>
+                             )}
+                             <button onClick={handleSaveItem} className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-black shadow-lg">
+                                 {itemForm.id ? t('updateItem') : t('saveItem')}
+                             </button>
                         </div>
                     </div>
                 </div>
             )}
             
-            {/* Customization Modal */}
-            {selectedPizza && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
-                    <div className="bg-white w-full sm:rounded-xl sm:max-w-lg shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[90vh] rounded-t-2xl">
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
-                            <h3 className="font-bold text-lg line-clamp-1 pr-4">
-                                {editingCartItem ? `${t('edit')}: ${getLocalizedItem(selectedPizza).name}` : getLocalizedItem(selectedPizza).name}
-                            </h3>
-                            <button onClick={() => { setSelectedPizza(null); setEditingCartItem(null); }}><X size={24} className="text-gray-500" /></button>
+            {/* Modal: Manage Toppings */}
+             {showToppingsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
+                        <h2 className="text-xl font-bold mb-4">Manage Toppings</h2>
+                        <button onClick={() => setShowToppingsModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={20}/></button>
+                        
+                        <div className="flex gap-2 mb-4">
+                            <input className="flex-1 border rounded p-2" placeholder="Topping Name" value={newToppingName} onChange={e => setNewToppingName(e.target.value)} />
+                            <input className="w-20 border rounded p-2" type="number" placeholder="Price" value={newToppingPrice} onChange={e => setNewToppingPrice(e.target.value)} />
+                            <button onClick={handleAddTopping} className="bg-brand-600 text-white p-2 rounded"><Plus size={20}/></button>
                         </div>
                         
-                        <div className="p-4 overflow-y-auto flex-1">
-                            {selectedPizza.category === 'pizza' ? (
-                                <div className="grid grid-cols-2 gap-3 mb-6">
-                                    {toppings.map(topping => {
-                                        const isSelected = !!selectedToppings.find(t => t.id === topping.id);
-                                        const toppingName = language === 'th' && topping.nameTh ? topping.nameTh : topping.name;
-                                        return (
-                                            <button 
-                                                key={topping.id}
-                                                onClick={() => toggleTopping(topping)}
-                                                className={`p-3 rounded-lg border text-left flex justify-between items-center transition ${isSelected ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-gray-200 hover:bg-gray-50'}`}
-                                            >
-                                                <span className={`font-medium text-sm ${isSelected ? 'text-brand-700' : 'text-gray-700'}`}>{toppingName}</span>
-                                                <span className="text-xs text-gray-400">+฿{topping.price}</span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 text-gray-400 text-sm">No customization available.</div>
-                            )}
-                        </div>
-
-                        <div className="p-4 border-t bg-gray-50 rounded-b-xl flex items-center justify-between gap-4 pb-safe">
-                             <div className="text-xl font-bold text-brand-600">
-                                ฿{(selectedPizza.basePrice + selectedToppings.reduce((s, t) => s + t.price, 0)) * (editingCartItem ? editingCartItem.quantity : 1)}
-                             </div>
-                             <button onClick={confirmAddToCart} className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-bold">
-                                 {editingCartItem ? t('updateItem') : t('addItem')}
-                             </button>
+                        <div className="flex-1 overflow-y-auto space-y-2 border-t pt-2">
+                             {toppings.map(t => (
+                                 <div key={t.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+                                     <span className="font-medium">{t.name}</span>
+                                     <div className="flex items-center gap-3">
+                                         <span className="text-gray-500 text-sm">฿{t.price}</span>
+                                         <button onClick={() => deleteTopping(t.id)} className="text-red-400 hover:text-red-600"><X size={16}/></button>
+                                     </div>
+                                 </div>
+                             ))}
                         </div>
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

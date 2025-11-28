@@ -1,12 +1,22 @@
 
-import { Pizza, Topping, DeliveryZone, ProductCategory, OrderSource, ExpenseCategory } from './types';
+import { Pizza, Topping, DeliveryZone, ProductCategory, OrderSource, ExpenseCategory, StoreSettings } from './types';
 
 // Restaurant Location (Lat/Lng for Distance Calc)
 export const RESTAURANT_LOCATION = {
   lat: 13.8856, // Approx Nonthaburi coordinates
   lng: 100.5222,
   address: "Pizza Damac, Nonthaburi",
-  googleMapsUrl: "https://maps.app.goo.gl/b6QHKHpAhtFbiUbX6"
+  googleMapsUrl: "https://share.google/AQcDarbUgO7xteLV3"
+};
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+    isOpen: true,
+    closedMessage: '',
+    reviewUrl: "https://maps.app.goo.gl/b6QHKHpAhtFbiUbX6", // Default Google Maps
+    facebookUrl: "https://www.facebook.com/p/PIZZA-DAMAC-100076365540304/",
+    lineUrl: "https://lin.ee/ggi1eDY",
+    mapUrl: "https://share.google/AQcDarbUgO7xteLV3",
+    contactPhone: "0994979199"
 };
 
 // Operating Hours (24h format)
@@ -116,6 +126,8 @@ export const TRANSLATIONS = {
         storeClosedMsg: "We are currently closed. Open 11:00 - 20:30. See you tomorrow.",
         vibeReviews: "Vibe & Reviews",
         newsEvents: "News & Events",
+        contactUs: "Contact Us",
+        findUs: "Find Us",
         
         // Errors & Validation
         mustRegister: "Please Login or Register to place an order.",
@@ -252,6 +264,8 @@ export const TRANSLATIONS = {
         storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น. เจอกันพรุ่งนี้ครับ",
         vibeReviews: "บรรยากาศ & รีวิว",
         newsEvents: "ข่าวสาร & กิจกรรม",
+        contactUs: "ติดต่อเรา",
+        findUs: "แผนที่ & ติดต่อ",
 
         // Errors & Validation
         mustRegister: "กรุณาเข้าสู่ระบบ หรือ สมัครสมาชิก ก่อนสั่งซื้อ",
@@ -321,14 +335,14 @@ export const TRANSLATIONS = {
 };
 
 export const INITIAL_MENU: Pizza[] = [
-  // --- PROMOTIONS & COMBOS ---
+  // --- PROMOTIONS & COMBOS (Updated) ---
   {
       id: 'promo_combo_a',
-      name: 'Combo Set A (2 Pizzas + Coke)',
-      nameTh: 'ชุดคอมโบ A (พิซซ่า 2 ถาด + โค้ก)',
+      name: 'Duo Delight (2 Pizzas)',
+      nameTh: 'ชุดดูโอ้ (พิซซ่า 2 ถาด)',
       basePrice: 699,
-      description: 'Choose any 2 Pizzas and get a free large Coke.',
-      descriptionTh: 'เลือกพิซซ่าหน้าใดก็ได้ 2 ถาด แถมฟรีโค้กขวดใหญ่',
+      description: 'Choose any 2 Pizzas. Great for couples!',
+      descriptionTh: 'เลือกพิซซ่าหน้าใดก็ได้ 2 ถาด เหมาะสำหรับทาน 2 ท่าน',
       image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
       available: true,
       category: 'promotion',
@@ -336,11 +350,11 @@ export const INITIAL_MENU: Pizza[] = [
   },
   {
       id: 'promo_party',
-      name: 'Family Party Set',
-      nameTh: 'ชุดปาร์ตี้ครอบครัว',
+      name: 'Party Feast (3 Pizzas)',
+      nameTh: 'ชุดปาร์ตี้ (พิซซ่า 3 ถาด)',
       basePrice: 999,
-      description: '3 Pizzas + Garlic Bread + 2 Cokes.',
-      descriptionTh: 'พิซซ่า 3 ถาด + ขนมปังกระเทียม + โค้ก 2 ขวด',
+      description: 'Select 3 Pizzas for the ultimate party.',
+      descriptionTh: 'เลือกพิซซ่าหน้าใดก็ได้ 3 ถาด สำหรับปาร์ตี้สุดคุ้ม',
       image: 'https://images.unsplash.com/photo-1528137871618-79d2761e3fd5?auto=format&fit=crop&w=800&q=80',
       available: true,
       category: 'promotion',

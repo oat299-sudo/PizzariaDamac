@@ -117,9 +117,16 @@ export interface Expense {
 export interface StoreSettings {
   isOpen: boolean;
   closedMessage: string;
-  // New Fields
+  // Promo / Marketing
   promoBannerUrl?: string; // URL for image or video
   promoContentType?: 'image' | 'video';
+  // Holiday
   holidayStart?: string; // ISO Date
   holidayEnd?: string; // ISO Date
+  // Contact & Links (Editable)
+  reviewUrl?: string;
+  facebookUrl?: string;
+  lineUrl?: string;
+  mapUrl?: string;
+  contactPhone?: string;
 }
