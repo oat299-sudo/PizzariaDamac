@@ -299,32 +299,9 @@ export const TRANSLATIONS = {
 };
 
 export const INITIAL_MENU: Pizza[] = [
-  // PROMOTIONS
+  // CUSTOM PIZZA (MAKE YOUR OWN)
   {
-    id: 'promo1',
-    name: 'Family Combo Set',
-    nameTh: 'ชุดครอบครัวสุดคุ้ม',
-    basePrice: 899,
-    description: '2 Large Pizzas + 1 Caesar Salad + 1 Garlic Bread + 2 Colas',
-    descriptionTh: 'พิซซ่าถาดใหญ่ 2 ถาด + ซีซาร์สลัด 1 + ขนมปังกระเทียม 1 + โค้ก 2',
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
-    available: true,
-    category: 'promotion'
-  },
-  {
-    id: 'promo2',
-    name: 'Duo Delight',
-    nameTh: 'ชุดดูโอ้ อร่อยคู่',
-    basePrice: 599,
-    description: '1 Pizza Damac + 1 Spaghetti Carbonara + 2 Drinks',
-    descriptionTh: 'พิซซ่าดาแมค 1 ถาด + สปาเก็ตตี้คาโบนาร่า 1 + เครื่องดื่ม 2',
-    image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
-    available: true,
-    category: 'promotion'
-  },
-  // CUSTOM
-  {
-    id: 'custom_base',
+    id: 'p_custom',
     name: 'Create Your Own Pizza',
     nameTh: 'พิซซ่าตามใจคุณ (เลือกหน้าเอง)',
     basePrice: 200,
@@ -340,8 +317,8 @@ export const INITIAL_MENU: Pizza[] = [
     name: 'Pizza Damac',
     nameTh: 'พิซซ่า ดาแมค (แนะนำ)',
     basePrice: 380,
-    description: 'Our signature pizza with premium toppings and secret sauce.',
-    descriptionTh: 'พิซซ่าซิกเนเจอร์ของร้าน มาพร้อมท็อปปิ้งพรีเมียมและซอสสูตรลับ',
+    description: 'Signature pizza with premium toppings.',
+    descriptionTh: 'พิซซ่าซิกเนเจอร์ของร้าน มาพร้อมท็อปปิ้งพรีเมียม',
     image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza',
@@ -352,8 +329,8 @@ export const INITIAL_MENU: Pizza[] = [
     name: 'Pizza Truffle',
     nameTh: 'พิซซ่า ทรัฟเฟิล',
     basePrice: 480,
-    description: 'Aromatic truffle cream sauce with mushrooms and cheese.',
-    descriptionTh: 'ซอสครีมเห็ดทรัฟเฟิลหอมกรุ่น พร้อมเห็ดและชีส',
+    description: 'Aromatic truffle cream sauce with mushrooms.',
+    descriptionTh: 'ซอสครีมเห็ดทรัฟเฟิลหอมกรุ่น พร้อมเห็ด',
     image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
@@ -363,8 +340,8 @@ export const INITIAL_MENU: Pizza[] = [
     name: 'Pizza Parmaham',
     nameTh: 'พิซซ่า พาร์มาแฮม',
     basePrice: 520,
-    description: 'Classic Italian Parma ham with rocket and parmesan.',
-    descriptionTh: 'พาร์มาแฮมอิตาเลียนแท้ เสิร์ฟพร้อมผักร็อกเก็ตและพาร์เมซานชีส',
+    description: 'Classic Italian Parma ham with rocket.',
+    descriptionTh: 'พาร์มาแฮมอิตาเลียนแท้ เสิร์ฟพร้อมผักร็อกเก็ต',
     image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
@@ -375,18 +352,18 @@ export const INITIAL_MENU: Pizza[] = [
     nameTh: 'พิซซ่า 4 ชีส',
     basePrice: 380,
     description: 'Mozzarella, Gorgonzola, Parmesan, and Fontina.',
-    descriptionTh: 'คนรักชีสต้องลอง: มอสซาเรลล่า, กอร์กอนโซล่า, พาร์เมซาน และฟอนติน่า',
+    descriptionTh: 'มอสซาเรลล่า, กอร์กอนโซล่า, พาร์เมซาน และฟอนติน่า',
     image: 'https://images.unsplash.com/photo-1573821663912-569905455b1c?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
   },
   {
-    id: 'p9',
+    id: 'p5',
     name: 'Pizza Pepperoni',
     nameTh: 'พิซซ่า เปปเปอโรนี',
     basePrice: 380,
-    description: 'Loaded with spicy pepperoni slices and mozzarella.',
-    descriptionTh: 'จัดเต็มด้วยเปปเปอโรนีรสเผ็ดและมอสซาเรลล่าชีส',
+    description: 'Loaded with spicy pepperoni slices.',
+    descriptionTh: 'จัดเต็มด้วยเปปเปอโรนีรสเผ็ด',
     image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
@@ -396,8 +373,8 @@ export const INITIAL_MENU: Pizza[] = [
     name: 'Pizza Margherita',
     nameTh: 'พิซซ่า มาร์เกริต้า',
     basePrice: 300,
-    description: 'Classic tomato, mozzarella, and fresh basil.',
-    descriptionTh: 'คลาสสิกด้วยซอสมะเขือเทศ มอสซาเรลล่า และใบโหระพา',
+    description: 'Tomato, mozzarella, and fresh basil.',
+    descriptionTh: 'ซอสมะเขือเทศ มอสซาเรลล่า และใบโหระพา',
     image: 'https://images.unsplash.com/photo-1595854341653-bd3419714781?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
@@ -407,13 +384,27 @@ export const INITIAL_MENU: Pizza[] = [
     name: 'Pizza Marinara',
     nameTh: 'พิซซ่า มารินาร่า',
     basePrice: 300,
-    description: 'Tomato sauce, garlic, oregano, and extra virgin olive oil.',
-    descriptionTh: 'ซอสมะเขือเทศ กระเทียม ออริกาโน และน้ำมันมะกอก (เจ)',
+    description: 'Tomato sauce, garlic, oregano (No Cheese).',
+    descriptionTh: 'ซอสมะเขือเทศ กระเทียม ออริกาโน (เจ)',
     image: 'https://images.unsplash.com/photo-1594007654729-407eedc4be65?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'pizza'
   },
-  // APPETIZERS / SNACKS
+  
+  // PROMOTIONS
+  {
+    id: 'promo1',
+    name: 'Family Combo Set',
+    nameTh: 'ชุดครอบครัวสุดคุ้ม',
+    basePrice: 899,
+    description: '2 Large Pizzas + 1 Caesar Salad + 1 Garlic Bread + 2 Colas',
+    descriptionTh: 'พิซซ่าถาดใหญ่ 2 ถาด + ซีซาร์สลัด 1 + ขนมปังกระเทียม 1 + โค้ก 2',
+    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'promotion'
+  },
+  
+  // APPETIZERS
   {
     id: 's1',
     name: 'Garlic Bread',
@@ -436,6 +427,7 @@ export const INITIAL_MENU: Pizza[] = [
     available: true,
     category: 'appetizer'
   },
+  
   // SALADS
   {
     id: 'sl1',
@@ -448,6 +440,7 @@ export const INITIAL_MENU: Pizza[] = [
     available: true,
     category: 'salad'
   },
+  
   // PASTA
   {
     id: 'pt1',
@@ -460,6 +453,7 @@ export const INITIAL_MENU: Pizza[] = [
     available: true,
     category: 'pasta'
   },
+  
   // CAKES
   {
     id: 'c1',
@@ -472,17 +466,7 @@ export const INITIAL_MENU: Pizza[] = [
     available: true,
     category: 'cake'
   },
-  {
-    id: 'c2',
-    name: 'Dark Chocolate Fudge',
-    nameTh: 'เค้กช็อกโกแลตหน้านิ่ม',
-    basePrice: 160,
-    description: 'Decadent dark chocolate cake made by our expert friend.',
-    descriptionTh: 'เค้กช็อกโกแลตเข้มข้น หวานกำลังดี',
-    image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80',
-    available: true,
-    category: 'cake'
-  },
+  
   // DRINKS
   {
     id: 'd1',
@@ -492,17 +476,6 @@ export const INITIAL_MENU: Pizza[] = [
     description: 'Ice cold refreshing cola.',
     descriptionTh: 'เย็นซ่า ชื่นใจ',
     image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=800&q=80',
-    available: true,
-    category: 'drink'
-  },
-  {
-    id: 'd2',
-    name: 'Italian Soda',
-    nameTh: 'อิตาเลี่ยนโซดา',
-    basePrice: 80,
-    description: 'Sparkling soda with fruit syrup.',
-    descriptionTh: 'น้ำผลไม้โซดา รสชาติเปรี้ยวหวานสดชื่น',
-    image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'drink'
   }
@@ -519,37 +492,31 @@ export const CATEGORIES: {id: ProductCategory; label: string; labelTh: string}[]
 ];
 
 export const INITIAL_TOPPINGS: Topping[] = [
-  // SAUCES
+  // 1. SAUCES (Free Choice)
   { id: 'sauce_tomato', name: 'Tomato Sauce', nameTh: 'ซอสมะเขือเทศ', price: 0, category: 'sauce' },
   { id: 'sauce_white', name: 'Béchamel (White Sauce)', nameTh: 'ซอสขาว (เบชาเมล)', price: 0, category: 'sauce' },
   
-  // CHEESES
+  // 2. CHEESES
   { id: 'ch_moz', name: 'Mozzarella', nameTh: 'มอสซาเรลล่า', price: 50, category: 'cheese' },
   { id: 'ch_fresh', name: 'Fresh Mozzarella', nameTh: 'เฟรช มอสซาเรลล่า', price: 80, category: 'cheese' },
   { id: 'ch_parm', name: 'Parmesan', nameTh: 'พาร์เมซาน', price: 60, category: 'cheese' },
 
-  // SEASONING
+  // 3. SEASONING
   { id: 'sea_oregano', name: 'Oregano', nameTh: 'ออริกาโน่', price: 0, category: 'seasoning' },
 
-  // VEGETABLES
-  { id: 't2', name: 'Mushrooms', nameTh: 'เห็ด', price: 30, category: 'vegetable' },
-  { id: 't3', name: 'Black Olives', nameTh: 'มะกอกดำ', price: 30, category: 'vegetable' },
-  { id: 't4', name: 'Onions', nameTh: 'หอมใหญ่', price: 20, category: 'vegetable' },
-  { id: 't7', name: 'Pineapple', nameTh: 'สับปะรด', price: 30, category: 'vegetable' },
-  { id: 't8', name: 'Bell Peppers', nameTh: 'พริกหวาน', price: 25, category: 'vegetable' },
-  
-  // MEAT
-  { id: 't5', name: 'Bacon', nameTh: 'เบคอน', price: 40, category: 'meat' },
-  { id: 't6', name: 'Ham', nameTh: 'แฮม', price: 40, category: 'meat' },
-  { id: 't9', name: 'Pepperoni', nameTh: 'เปปเปอโรนี', price: 50, category: 'meat' },
-  { id: 't10', name: 'Parma Ham', nameTh: 'พาร์มาแฮม', price: 80, category: 'meat' },
+  // 4. MEAT
+  { id: 't_pep', name: 'Pepperoni', nameTh: 'เปปเปอโรนี', price: 50, category: 'meat' },
+  { id: 't_ham', name: 'Ham', nameTh: 'แฮม', price: 40, category: 'meat' },
+  { id: 't_bacon', name: 'Bacon', nameTh: 'เบคอน', price: 40, category: 'meat' },
+  { id: 't_parma', name: 'Parma Ham', nameTh: 'พาร์มาแฮม', price: 80, category: 'meat' },
+
+  // 5. VEGETABLES
+  { id: 't_mush', name: 'Mushrooms', nameTh: 'เห็ด', price: 30, category: 'vegetable' },
+  { id: 't_olive', name: 'Black Olives', nameTh: 'มะกอกดำ', price: 30, category: 'vegetable' },
+  { id: 't_onion', name: 'Onions', nameTh: 'หอมใหญ่', price: 20, category: 'vegetable' },
+  { id: 't_bell', name: 'Bell Peppers', nameTh: 'พริกหวาน', price: 25, category: 'vegetable' },
+  { id: 't_pine', name: 'Pineapple', nameTh: 'สับปะรด', price: 30, category: 'vegetable' },
 ];
 
-// Delivery Zones (Removed from active logic but kept if needed for reference, 
-// though the new requirement handles delivery via Lineman/Lalamove)
-export const DELIVERY_ZONES: DeliveryZone[] = [
-  { id: 'z1', name: 'Zone A: Nearby (< 2km)', nameTh: 'โซน A: ใกล้ร้าน (< 2กม.)', fee: 20 },
-  { id: 'z2', name: 'Zone B: Nonthaburi Center (2-5km)', nameTh: 'โซน B: กลางเมืองนนท์ (2-5กม.)', fee: 40 },
-  { id: 'z3', name: 'Zone C: Outer Ring (5-10km)', nameTh: 'โซน C: รอบนอก (5-10กม.)', fee: 80 },
-  { id: 'z4', name: 'Zone D: Long Distance (> 10km)', nameTh: 'โซน D: ระยะไกล (> 10กม.)', fee: 150 },
-];
+// Deprecated but kept for type safety if needed
+export const DELIVERY_ZONES: DeliveryZone[] = [];
