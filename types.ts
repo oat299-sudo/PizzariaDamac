@@ -114,6 +114,15 @@ export interface Expense {
   note?: string;
 }
 
+export interface NewsItem {
+    id: string;
+    title: string;
+    summary: string;
+    imageUrl: string;
+    linkUrl?: string;
+    date: string;
+}
+
 export interface StoreSettings {
   isOpen: boolean;
   closedMessage: string;
@@ -124,9 +133,15 @@ export interface StoreSettings {
   holidayStart?: string; // ISO Date
   holidayEnd?: string; // ISO Date
   // Contact & Links (Editable)
-  reviewUrl?: string;
+  reviewUrl?: string; // Main Google Review URL
   facebookUrl?: string;
   lineUrl?: string;
   mapUrl?: string;
   contactPhone?: string;
+  
+  // Media Lists
+  reviewLinks?: string[]; // Up to 5
+  vibeLinks?: string[]; // Up to 5
+  
+  newsItems?: NewsItem[];
 }

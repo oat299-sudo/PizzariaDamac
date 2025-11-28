@@ -16,7 +16,16 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     facebookUrl: "https://www.facebook.com/p/PIZZA-DAMAC-100076365540304/",
     lineUrl: "https://lin.ee/ggi1eDY",
     mapUrl: "https://share.google/AQcDarbUgO7xteLV3",
-    contactPhone: "0994979199"
+    contactPhone: "0994979199",
+    promoContentType: 'image',
+    promoBannerUrl: 'https://images.unsplash.com/photo-1579751626657-72bc17010498?auto=format&fit=crop&w=1200&q=80',
+    reviewLinks: [
+        "https://www.tiktok.com/@yaktautakdakkabbeer/video/7278988315607584006"
+    ],
+    vibeLinks: [
+        "https://www.lemon8-app.com/@midniqhtblues/7241589478358303233?region=th"
+    ],
+    newsItems: []
 };
 
 // Operating Hours (24h format)
@@ -125,6 +134,8 @@ export const TRANSLATIONS = {
         storeClosed: "Store Closed",
         storeClosedMsg: "We are currently closed. Open 11:00 - 20:30. See you tomorrow.",
         vibeReviews: "Vibe & Reviews",
+        customerReviews: "Customer Reviews",
+        vibeCheck: "Vibe Check",
         newsEvents: "News & Events",
         contactUs: "Contact Us",
         findUs: "Find Us",
@@ -171,6 +182,7 @@ export const TRANSLATIONS = {
         storeStatus: "Store Status",
         holidayMsg: "Holiday Message",
         quickExpense: "Quick Expense",
+        mediaManager: "Media Manager",
         
         // Kitchen
         pending: "Pending",
@@ -263,6 +275,8 @@ export const TRANSLATIONS = {
         storeClosed: "ร้านปิด",
         storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น. เจอกันพรุ่งนี้ครับ",
         vibeReviews: "บรรยากาศ & รีวิว",
+        customerReviews: "รีวิวจากลูกค้า",
+        vibeCheck: "บรรยากาศร้าน",
         newsEvents: "ข่าวสาร & กิจกรรม",
         contactUs: "ติดต่อเรา",
         findUs: "แผนที่ & ติดต่อ",
@@ -309,6 +323,7 @@ export const TRANSLATIONS = {
         storeStatus: "สถานะร้าน",
         holidayMsg: "ข้อความวันหยุด",
         quickExpense: "เลือกรายการค่าใช้จ่ายด่วน",
+        mediaManager: "จัดการสื่อ & แบนเนอร์",
 
         // Kitchen
         pending: "รอรับออเดอร์",
@@ -343,10 +358,11 @@ export const INITIAL_MENU: Pizza[] = [
       basePrice: 699,
       description: 'Choose any 2 Pizzas. Great for couples!',
       descriptionTh: 'เลือกพิซซ่าหน้าใดก็ได้ 2 ถาด เหมาะสำหรับทาน 2 ท่าน',
-      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?auto=format&fit=crop&w=800&q=80',
       available: true,
       category: 'promotion',
-      comboCount: 2
+      comboCount: 2,
+      isBestSeller: true
   },
   {
       id: 'promo_party',

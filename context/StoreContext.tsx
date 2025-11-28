@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings } from '../types';
+import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings, NewsItem } from '../types';
 import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS, DEFAULT_STORE_SETTINGS } from '../constants';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -67,6 +67,10 @@ interface StoreContextType {
   updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   generateTimeSlots: (dateOffset?: number) => string[];
   canOrderForToday: () => boolean; // Helper to check if ordering for today is possible
+  
+  // News & Media
+  addNewsItem: (item: NewsItem) => Promise<void>;
+  deleteNewsItem: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -293,7 +297,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   facebookUrl: data.facebook_url || DEFAULT_STORE_SETTINGS.facebookUrl,
                   lineUrl: data.line_url || DEFAULT_STORE_SETTINGS.lineUrl,
                   mapUrl: data.map_url || DEFAULT_STORE_SETTINGS.mapUrl,
-                  contactPhone: data.contact_phone || DEFAULT_STORE_SETTINGS.contactPhone
+                  contactPhone: data.contact_phone || DEFAULT_STORE_SETTINGS.contactPhone,
+                  // JSON or Array columns
+                  reviewLinks: data.review_links || [],
+                  vibeLinks: data.vibe_links || [],
+                  newsItems: data.news_items || []
               });
           }
       } catch (err) { console.error("Settings fetch failed", err); }
@@ -628,7 +636,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 const newSavedAddresses = [...currentSaved, delivery.address];
                 // Note: setCustomer handles its own errors silently
                 try {
-                    await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
+                     await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
                 } catch (e) { console.warn("Could not save address, continuing", e); }
             }
         }
@@ -739,6 +747,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
       setExpenses(prev => prev.filter(e => e.id !== id));
   };
+  
+  // News Actions
+  const addNewsItem = async (item: NewsItem) => {
+      const newItems = [...(storeSettings.newsItems || []), item];
+      updateStoreSettings({ newsItems: newItems });
+  };
+  
+  const deleteNewsItem = async (id: string) => {
+      const newItems = (storeSettings.newsItems || []).filter(i => i.id !== id);
+      updateStoreSettings({ newsItems: newItems });
+  };
 
   // Settings
   const toggleStoreStatus = async (isOpen: boolean, message: string = '') => {
@@ -765,6 +784,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (settings.lineUrl !== undefined) dbPayload.line_url = settings.lineUrl;
             if (settings.mapUrl !== undefined) dbPayload.map_url = settings.mapUrl;
             if (settings.contactPhone !== undefined) dbPayload.contact_phone = settings.contactPhone;
+            
+            // Arrays
+            if (settings.reviewLinks !== undefined) dbPayload.review_links = settings.reviewLinks;
+            if (settings.vibeLinks !== undefined) dbPayload.vibe_links = settings.vibeLinks;
+            if (settings.newsItems !== undefined) dbPayload.news_items = settings.newsItems;
 
             await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
           } catch(e) { console.error("Settings sync error", e); }
@@ -815,7 +839,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
-      generateTimeSlots, canOrderForToday, seedDatabase
+      generateTimeSlots, canOrderForToday, seedDatabase,
+      addNewsItem, deleteNewsItem
     }}>
       {children}
     </StoreContext.Provider>

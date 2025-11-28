@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -13,7 +13,8 @@ export const POSView: React.FC = () => {
         adminLogout, shopLogo, updateShopLogo,
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
-        isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase
+        isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
+        addNewsItem, deleteNewsItem
     } = useStore();
     
     // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage'
@@ -166,6 +167,18 @@ export const POSView: React.FC = () => {
             reader.readAsDataURL(file);
         }
     };
+    
+    const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                updateStoreSettings({ promoBannerUrl: reader.result as string, promoContentType: 'image' });
+                alert("Banner Updated!");
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleAddTopping = () => {
         if (newToppingName && newToppingPrice) {
@@ -200,6 +213,20 @@ export const POSView: React.FC = () => {
             note: ''
         });
         alert("Expense Recorded.");
+    };
+    
+    // Media Helper
+    const updateLinkList = (listType: 'review' | 'vibe', index: number, value: string) => {
+        const currentList = listType === 'review' 
+            ? [...(storeSettings.reviewLinks || [])] 
+            : [...(storeSettings.vibeLinks || [])];
+        
+        currentList[index] = value;
+        // Filter out empty strings if at end, but keep structure for inputs
+        // actually for simplicity, just save full array, clean up on render
+        
+        if (listType === 'review') updateStoreSettings({ reviewLinks: currentList });
+        else updateStoreSettings({ vibeLinks: currentList });
     };
 
     // Filter Menu
@@ -577,46 +604,81 @@ export const POSView: React.FC = () => {
                              </div>
                          </div>
 
-                         {/* 2. Marketing & Branding */}
+                         {/* 2. MEDIA MANAGER (New) */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Globe size={14}/> Marketing</h3>
+                             <h3 className="font-bold text-brand-600 text-sm uppercase mb-4 flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
                              
-                             {/* Promo Banner */}
-                             <div className="mb-4">
-                                 <label className="text-xs font-bold text-gray-500 mb-1 block">Promotional Banner (Image, Video, or YouTube URL)</label>
-                                 <div className="flex gap-2">
-                                     <div className="relative flex-1">
-                                        <Link size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                        <input 
-                                            className="w-full bg-gray-50 border rounded p-2 pl-9 text-sm" 
-                                            placeholder="https://... (Image, MP4, or YouTube Link)" 
-                                            value={storeSettings.promoBannerUrl || ''} 
-                                            onChange={e => updateStoreSettings({ promoBannerUrl: e.target.value })}
-                                        />
+                             {/* Big Banner Upload */}
+                             <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                 <label className="text-sm font-bold text-gray-700 mb-2 block">Main Banner Image</label>
+                                 <div className="flex flex-col md:flex-row gap-4 items-start">
+                                     {storeSettings.promoBannerUrl ? (
+                                         <div className="w-full md:w-64 h-32 rounded-lg overflow-hidden border bg-black">
+                                             <img src={storeSettings.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
+                                         </div>
+                                     ) : (
+                                         <div className="w-full md:w-64 h-32 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">No Banner</div>
+                                     )}
+                                     <div className="flex-1 space-y-3 w-full">
+                                         <label className="flex items-center justify-center gap-2 w-full p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition font-bold text-gray-600 text-sm">
+                                             <Upload size={16}/> Upload New Photo
+                                             <input type="file" hidden accept="image/*" onChange={handleBannerUpload} />
+                                         </label>
+                                         <div className="relative">
+                                             <Link size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                             <input 
+                                                 className="w-full border rounded p-2 pl-9 text-xs" 
+                                                 placeholder="Or paste image URL..." 
+                                                 value={storeSettings.promoBannerUrl || ''} 
+                                                 onChange={e => updateStoreSettings({ promoBannerUrl: e.target.value, promoContentType: 'image' })}
+                                             />
+                                         </div>
                                      </div>
-                                     <select 
-                                        className="bg-gray-50 border rounded text-sm p-2"
-                                        value={storeSettings.promoContentType || 'image'}
-                                        onChange={e => updateStoreSettings({ promoContentType: e.target.value as 'image'|'video' })}
-                                     >
-                                         <option value="image">Image</option>
-                                         <option value="video">Video / YouTube</option>
-                                     </select>
                                  </div>
-                                 <p className="text-[10px] text-gray-400 mt-1">Paste a YouTube link or a direct MP4 link to show a video banner at the top of the Customer App.</p>
                              </div>
 
-                             {/* Logo */}
-                             <div className="flex items-center gap-4 border-t pt-4">
-                                 {shopLogo ? <img src={shopLogo} className="w-12 h-12 rounded-lg object-cover border"/> : <div className="w-12 h-12 bg-gray-200 rounded-lg"></div>}
-                                 <label className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg font-bold text-sm text-center cursor-pointer hover:bg-gray-200">
-                                     Upload Shop Logo
-                                     <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
-                                 </label>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                 {/* Review Links */}
+                                 <div>
+                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><Star size={12}/> Review Videos (Max 5)</h4>
+                                     <p className="text-[10px] text-gray-400 mb-2">Paste YouTube, TikTok, or Facebook Reel links.</p>
+                                     <div className="space-y-2">
+                                         {[0, 1, 2, 3, 4].map(idx => (
+                                             <div key={idx} className="flex gap-2 items-center">
+                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
+                                                 <input 
+                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
+                                                     placeholder="https://..."
+                                                     value={storeSettings.reviewLinks?.[idx] || ''}
+                                                     onChange={e => updateLinkList('review', idx, e.target.value)}
+                                                 />
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+
+                                 {/* Vibe Links */}
+                                 <div>
+                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><PlayCircle size={12}/> Vibe Videos (Max 5)</h4>
+                                     <p className="text-[10px] text-gray-400 mb-2">Show off the atmosphere of your restaurant.</p>
+                                     <div className="space-y-2">
+                                         {[0, 1, 2, 3, 4].map(idx => (
+                                             <div key={idx} className="flex gap-2 items-center">
+                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
+                                                 <input 
+                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
+                                                     placeholder="https://..."
+                                                     value={storeSettings.vibeLinks?.[idx] || ''}
+                                                     onChange={e => updateLinkList('vibe', idx, e.target.value)}
+                                                 />
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
                              </div>
                          </div>
                          
-                         {/* 3. Contact & Links */}
+                         {/* 3. Contact & Links (Legacy/Static) */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

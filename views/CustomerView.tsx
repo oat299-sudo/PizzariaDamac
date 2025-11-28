@@ -285,6 +285,91 @@ export const CustomerView: React.FC = () => {
       }
   };
 
+  // --- EMBED HELPER ---
+  const VideoCard = ({ url }: { url: string }) => {
+      if (!url) return null;
+      
+      let embedSrc = '';
+      let isIframe = false;
+      let label = 'Watch Video';
+      let icon = <PlayCircle size={48} className="mb-2 group-hover:scale-110 transition"/>;
+      let bgColor = 'bg-gray-900';
+      let textColor = 'text-white';
+      
+      // YouTube Detection
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+          let videoId = '';
+          if (url.includes('v=')) {
+              videoId = url.split('v=')[1]?.split('&')[0];
+          } else if (url.includes('youtu.be')) {
+              videoId = url.split('/').pop()?.split('?')[0] || '';
+          } else if (url.includes('/shorts/')) {
+              videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
+          }
+          if (videoId) {
+              embedSrc = `https://www.youtube.com/embed/${videoId}`;
+              isIframe = true;
+          }
+      } 
+      // Facebook Detection
+      else if (url.includes('facebook.com')) {
+          // FB Embed Plugin
+          embedSrc = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560`;
+          isIframe = true;
+          label = "Watch on Facebook";
+      }
+      // TikTok Detection
+      else if (url.includes('tiktok.com')) {
+           // TikTok requires complex oEmbed or specific SDK. Fallback to external link card.
+           label = "Watch on TikTok";
+           bgColor = "bg-black";
+           // Simulate TikTok vibe
+           icon = (
+               <div className="mb-2 group-hover:scale-110 transition flex gap-1">
+                   <div className="w-8 h-8 rounded-full bg-[#00f2ea] mix-blend-screen animate-pulse"></div>
+                   <div className="w-8 h-8 rounded-full bg-[#ff0050] mix-blend-screen -ml-4 animate-pulse"></div>
+               </div>
+           );
+      }
+      // Lemon8 Detection
+      else if (url.includes('lemon8-app.com')) {
+          label = "View on Lemon8";
+          bgColor = "bg-yellow-400";
+          textColor = "text-gray-900";
+          icon = <div className="text-2xl font-bold mb-2 group-hover:scale-110 transition">L8</div>;
+      }
+      else {
+           // Generic Link
+           label = "View Link";
+      }
+
+      if (isIframe) {
+          return (
+              <div className="rounded-xl overflow-hidden shadow-lg bg-black aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start">
+                  <iframe 
+                      src={embedSrc} 
+                      className="w-full h-full" 
+                      title="Video player" 
+                      frameBorder="0" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                      allowFullScreen
+                  ></iframe>
+              </div>
+          );
+      }
+
+      return (
+          <a href={url} target="_blank" rel="noopener noreferrer" className={`rounded-xl overflow-hidden shadow-lg ${bgColor} aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start flex items-center justify-center`}>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 group-hover:opacity-70 transition"></div>
+              <div className={`relative z-10 flex flex-col items-center ${textColor}`}>
+                  {icon}
+                  <span className="font-bold">{label}</span>
+                  <div className="flex items-center gap-1 text-xs mt-1 opacity-80"><ExternalLink size={12}/> Opens in new tab</div>
+              </div>
+          </a>
+      );
+  };
+
   // Helper for Hero Video
   const renderHeroMedia = () => {
       if (!storeSettings.promoBannerUrl) return null;
@@ -376,7 +461,7 @@ export const CustomerView: React.FC = () => {
             </div>
         </div>
 
-        {/* Hero Section */}
+        {/* Hero Section (Banner) */}
         {activeCategory === 'promotion' && (
             <div className="relative w-full h-64 md:h-96 overflow-hidden bg-gray-900">
                 {renderHeroMedia()}
@@ -388,40 +473,39 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* VIDEO & REVIEWS SECTION (New) */}
-        {activeCategory === 'promotion' && (
+        {/* --- REVIEW VIDEO SECTION --- */}
+        {activeCategory === 'promotion' && storeSettings.reviewLinks && storeSettings.reviewLinks.filter(l => l).length > 0 && (
             <section className="bg-white py-8 border-b">
                 <div className="max-w-7xl mx-auto px-4">
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                        <Youtube className="text-red-600" /> {t('vibeReviews')}
+                        <Star className="text-yellow-500" fill="currentColor" /> {t('customerReviews')}
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Placeholder for Youtube Video 1 */}
-                        <div className="rounded-xl overflow-hidden shadow-lg bg-gray-100 aspect-video relative group cursor-pointer">
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition">
-                                <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:opacity-100 transition transform group-hover:scale-110"/>
-                            </div>
-                            <img src="https://images.unsplash.com/photo-1543353071-873f17a7a088?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover"/>
-                            <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-sm font-bold">
-                                Customer Reviews: "Best Pizza in Nonthaburi!"
-                            </div>
-                        </div>
-                         {/* Placeholder for Youtube Video 2 */}
-                        <div className="rounded-xl overflow-hidden shadow-lg bg-gray-100 aspect-video relative group cursor-pointer hidden md:block">
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition">
-                                <PlayCircle className="text-white w-16 h-16 opacity-80 group-hover:opacity-100 transition transform group-hover:scale-110"/>
-                            </div>
-                            <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover"/>
-                             <div className="absolute bottom-0 left-0 w-full p-2 bg-gradient-to-t from-black/80 to-transparent text-white text-sm font-bold">
-                                Vibe Check: Saturday Night at Pizza Damac
-                            </div>
-                        </div>
+                    <div className="flex overflow-x-auto pb-4 gap-4 snap-x no-scrollbar">
+                        {storeSettings.reviewLinks.filter(l => l).map((link, idx) => (
+                            <VideoCard key={`review-${idx}`} url={link} />
+                        ))}
                     </div>
                 </div>
             </section>
         )}
 
-        {/* NEWS & EVENTS SECTION (New) */}
+        {/* --- VIBE VIDEO SECTION --- */}
+        {activeCategory === 'promotion' && storeSettings.vibeLinks && storeSettings.vibeLinks.filter(l => l).length > 0 && (
+            <section className="bg-gray-50 py-8 border-b">
+                <div className="max-w-7xl mx-auto px-4">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                        <Sparkles className="text-purple-600" /> {t('vibeCheck')}
+                    </h2>
+                    <div className="flex overflow-x-auto pb-4 gap-4 snap-x no-scrollbar">
+                        {storeSettings.vibeLinks.filter(l => l).map((link, idx) => (
+                            <VideoCard key={`vibe-${idx}`} url={link} />
+                        ))}
+                    </div>
+                </div>
+            </section>
+        )}
+
+        {/* NEWS & EVENTS SECTION */}
         {activeCategory === 'promotion' && (
             <section className="bg-orange-100/50 py-6 border-b">
                  <div className="max-w-7xl mx-auto px-4">
@@ -822,8 +906,20 @@ export const CustomerView: React.FC = () => {
                              </div>
 
                              <div className="flex gap-2">
-                                 <button onClick={() => setOrderType('online')} className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='online'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}>{t('pickupTime')}</button>
-                                 <button onClick={() => setOrderType('delivery')} className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='delivery'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}>{t('deliveryAddress')}</button>
+                                 <button 
+                                    onClick={() => setOrderType('online')} 
+                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='online'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}
+                                 >
+                                     {t('pickupTime')}
+                                 </button>
+                                 <button 
+                                    disabled
+                                    className="flex-1 py-2 rounded-lg border font-bold bg-gray-100 text-gray-400 cursor-not-allowed flex flex-col items-center justify-center leading-none gap-1"
+                                    title="Delivery currently unavailable"
+                                 >
+                                     <span>{t('deliveryAddress')}</span>
+                                     <span className="text-[10px] uppercase tracking-wider">Temporarily Off</span>
+                                 </button>
                              </div>
                              
                              {orderType === 'online' && (
