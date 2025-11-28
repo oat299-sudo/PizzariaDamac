@@ -333,7 +333,8 @@ export const CustomerView: React.FC = () => {
               videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
           }
           if (videoId) {
-              embedSrc = `https://www.youtube.com/embed/${videoId}`;
+              // Add autoplay=1, mute=1 (required for autoplay), loop=1
+              embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}`;
               isIframe = true;
           }
       } 
