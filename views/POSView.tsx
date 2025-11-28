@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -56,6 +56,40 @@ export const POSView: React.FC = () => {
         imageUrl: '',
         linkUrl: ''
     });
+
+    // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
+    const [mediaForm, setMediaForm] = useState({
+        promoBannerUrl: '',
+        reviewLinks: [] as string[],
+        vibeLinks: [] as string[]
+    });
+
+    const [contactForm, setContactForm] = useState({
+        reviewUrl: '',
+        mapUrl: '',
+        facebookUrl: '',
+        lineUrl: '',
+        contactPhone: ''
+    });
+
+    // Sync local forms when storeSettings loads/updates
+    useEffect(() => {
+        if (storeSettings) {
+            setMediaForm({
+                promoBannerUrl: storeSettings.promoBannerUrl || '',
+                reviewLinks: storeSettings.reviewLinks || [],
+                vibeLinks: storeSettings.vibeLinks || []
+            });
+            setContactForm({
+                reviewUrl: storeSettings.reviewUrl || '',
+                mapUrl: storeSettings.mapUrl || '',
+                facebookUrl: storeSettings.facebookUrl || '',
+                lineUrl: storeSettings.lineUrl || '',
+                contactPhone: storeSettings.contactPhone || ''
+            });
+            setTempClosedMsg(storeSettings.closedMessage);
+        }
+    }, [storeSettings]);
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
@@ -176,13 +210,18 @@ export const POSView: React.FC = () => {
         }
     };
     
+    // Banner Upload saves immediately for convenience, but also updates local form
     const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                updateStoreSettings({ promoBannerUrl: reader.result as string, promoContentType: 'image' });
-                alert("Banner Updated!");
+                const res = reader.result as string;
+                // Update local
+                setMediaForm(prev => ({ ...prev, promoBannerUrl: res }));
+                // Trigger save immediately for file
+                updateStoreSettings({ promoBannerUrl: res, promoContentType: 'image' });
+                alert("Banner Image Uploaded & Saved!");
             };
             reader.readAsDataURL(file);
         }
@@ -240,18 +279,38 @@ export const POSView: React.FC = () => {
         alert("News Item Added!");
     };
     
-    // Media Helper
-    const updateLinkList = (listType: 'review' | 'vibe', index: number, value: string) => {
-        const currentList = listType === 'review' 
-            ? [...(storeSettings.reviewLinks || [])] 
-            : [...(storeSettings.vibeLinks || [])];
-        
-        currentList[index] = value;
-        // Filter out empty strings if at end, but keep structure for inputs
-        // actually for simplicity, just save full array, clean up on render
-        
-        if (listType === 'review') updateStoreSettings({ reviewLinks: currentList });
-        else updateStoreSettings({ vibeLinks: currentList });
+    // --- MANUAL SAVE HANDLERS ---
+    
+    const updateLocalMediaLink = (listType: 'review' | 'vibe', index: number, value: string) => {
+        if (listType === 'review') {
+            const newList = [...mediaForm.reviewLinks];
+            newList[index] = value;
+            setMediaForm(prev => ({ ...prev, reviewLinks: newList }));
+        } else {
+            const newList = [...mediaForm.vibeLinks];
+            newList[index] = value;
+            setMediaForm(prev => ({ ...prev, vibeLinks: newList }));
+        }
+    };
+
+    const handleSaveMediaSettings = () => {
+        updateStoreSettings({
+            promoBannerUrl: mediaForm.promoBannerUrl,
+            reviewLinks: mediaForm.reviewLinks,
+            vibeLinks: mediaForm.vibeLinks
+        });
+        alert("Media Settings Saved Successfully!");
+    };
+
+    const handleSaveContactSettings = () => {
+        updateStoreSettings({
+            reviewUrl: contactForm.reviewUrl,
+            mapUrl: contactForm.mapUrl,
+            facebookUrl: contactForm.facebookUrl,
+            lineUrl: contactForm.lineUrl,
+            contactPhone: contactForm.contactPhone
+        });
+        alert("Contact Settings Saved Successfully!");
     };
 
     // Filter Menu
@@ -631,15 +690,20 @@ export const POSView: React.FC = () => {
 
                          {/* 2. MEDIA MANAGER (New) */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-brand-600 text-sm uppercase mb-4 flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
+                             <div className="flex justify-between items-center mb-4">
+                                 <h3 className="font-bold text-brand-600 text-sm uppercase flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
+                                 <button onClick={handleSaveMediaSettings} className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                                     <Save size={14}/> Save Media Links
+                                 </button>
+                             </div>
                              
                              {/* Big Banner Upload */}
                              <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                                  <label className="text-sm font-bold text-gray-700 mb-2 block">Main Banner Image</label>
                                  <div className="flex flex-col md:flex-row gap-4 items-start">
-                                     {storeSettings.promoBannerUrl ? (
+                                     {mediaForm.promoBannerUrl ? (
                                          <div className="w-full md:w-64 h-32 rounded-lg overflow-hidden border bg-black">
-                                             <img src={storeSettings.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
+                                             <img src={mediaForm.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
                                          </div>
                                      ) : (
                                          <div className="w-full md:w-64 h-32 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">No Banner</div>
@@ -654,8 +718,8 @@ export const POSView: React.FC = () => {
                                              <input 
                                                  className="w-full border rounded p-2 pl-9 text-xs" 
                                                  placeholder="Or paste image URL..." 
-                                                 value={storeSettings.promoBannerUrl || ''} 
-                                                 onChange={e => updateStoreSettings({ promoBannerUrl: e.target.value, promoContentType: 'image' })}
+                                                 value={mediaForm.promoBannerUrl || ''} 
+                                                 onChange={e => setMediaForm({ ...mediaForm, promoBannerUrl: e.target.value })}
                                              />
                                          </div>
                                      </div>
@@ -674,8 +738,8 @@ export const POSView: React.FC = () => {
                                                  <input 
                                                      className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
                                                      placeholder="https://..."
-                                                     value={storeSettings.reviewLinks?.[idx] || ''}
-                                                     onChange={e => updateLinkList('review', idx, e.target.value)}
+                                                     value={mediaForm.reviewLinks?.[idx] || ''}
+                                                     onChange={e => updateLocalMediaLink('review', idx, e.target.value)}
                                                  />
                                              </div>
                                          ))}
@@ -693,8 +757,8 @@ export const POSView: React.FC = () => {
                                                  <input 
                                                      className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
                                                      placeholder="https://..."
-                                                     value={storeSettings.vibeLinks?.[idx] || ''}
-                                                     onChange={e => updateLinkList('vibe', idx, e.target.value)}
+                                                     value={mediaForm.vibeLinks?.[idx] || ''}
+                                                     onChange={e => updateLocalMediaLink('vibe', idx, e.target.value)}
                                                  />
                                              </div>
                                          ))}
@@ -738,27 +802,32 @@ export const POSView: React.FC = () => {
                          
                          {/* 4. Contact & Links */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
+                             <div className="flex justify-between items-center mb-3">
+                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
+                                 <button onClick={handleSaveContactSettings} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                                     <Save size={14}/> Save Settings
+                                 </button>
+                             </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.reviewUrl || ''} onChange={e => updateStoreSettings({ reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.reviewUrl || ''} onChange={e => setContactForm({ ...contactForm, reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
                                  </div>
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Map URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.mapUrl || ''} onChange={e => updateStoreSettings({ mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.mapUrl || ''} onChange={e => setContactForm({ ...contactForm, mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
                                  </div>
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Facebook size={12}/> Facebook URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.facebookUrl || ''} onChange={e => updateStoreSettings({ facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.facebookUrl || ''} onChange={e => setContactForm({ ...contactForm, facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
                                  </div>
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MessageCircle size={12}/> Line URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.lineUrl || ''} onChange={e => updateStoreSettings({ lineUrl: e.target.value })} placeholder="https://line.me/..."/>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.lineUrl || ''} onChange={e => setContactForm({ ...contactForm, lineUrl: e.target.value })} placeholder="https://line.me/..."/>
                                  </div>
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Phone size={12}/> Contact Phone</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={storeSettings.contactPhone || ''} onChange={e => updateStoreSettings({ contactPhone: e.target.value })} placeholder="099..."/>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.contactPhone || ''} onChange={e => setContactForm({ ...contactForm, contactPhone: e.target.value })} placeholder="099..."/>
                                  </div>
                              </div>
                          </div>
