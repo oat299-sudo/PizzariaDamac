@@ -12,7 +12,7 @@ export const RESTAURANT_LOCATION = {
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     isOpen: true,
     closedMessage: '',
-    reviewUrl: "https://maps.app.goo.gl/b6QHKHpAhtFbiUbX6", // Default Google Maps
+    reviewUrl: "https://maps.app.goo.gl/RrpaW1Z5APoz3ucHA", // Updated Link
     facebookUrl: "https://www.facebook.com/p/PIZZA-DAMAC-100076365540304/",
     lineUrl: "https://lin.ee/ggi1eDY",
     mapUrl: "https://share.google/AQcDarbUgO7xteLV3",

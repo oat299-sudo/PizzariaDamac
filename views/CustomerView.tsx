@@ -473,6 +473,37 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
+        {/* REORDER: PROMOTIONS GRID - NOW IMMEDIATELY AFTER BANNER IF CATEGORY IS PROMOTION */}
+        {activeCategory === 'promotion' && (
+            <main className="max-w-7xl mx-auto px-4 py-8 border-b">
+                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-brand-800">
+                    <Star className="text-yellow-500" fill="currentColor"/> Special Offers
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {menu.filter(p => p.category === 'promotion').map(item => {
+                        const localized = getLocalizedItem(item);
+                        return (
+                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
+                                    <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                    {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
+                                    {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
+                                </div>
+                                <div className="px-1">
+                                    <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
+                                    <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                        <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </main>
+        )}
+
         {/* --- REVIEW VIDEO SECTION --- */}
         {activeCategory === 'promotion' && storeSettings.reviewLinks && storeSettings.reviewLinks.filter(l => l).length > 0 && (
             <section className="bg-white py-8 border-b">
@@ -506,28 +537,32 @@ export const CustomerView: React.FC = () => {
         )}
 
         {/* NEWS & EVENTS SECTION */}
-        {activeCategory === 'promotion' && (
+        {activeCategory === 'promotion' && storeSettings.newsItems && storeSettings.newsItems.length > 0 && (
             <section className="bg-orange-100/50 py-6 border-b">
                  <div className="max-w-7xl mx-auto px-4">
                      <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-brand-800">
                         <Newspaper className="text-brand-600" /> {t('newsEvents')}
                     </h2>
-                    <div className="bg-white rounded-xl p-4 shadow-sm border border-orange-200 flex flex-col md:flex-row gap-4 items-center">
-                        <div className="w-full md:w-32 h-32 rounded-lg bg-green-100 flex-shrink-0 overflow-hidden">
-                            <img src="https://images.unsplash.com/photo-1505935428862-770b6f24f629?auto=format&fit=crop&w=400&q=80" className="w-full h-full object-cover"/>
-                        </div>
-                        <div className="flex-1">
-                            <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">Healthy Living</span>
-                            <h3 className="font-bold text-lg leading-tight mb-1">Pizza Damac Joins "Healthy Food Nonthaburi" Seminar</h3>
-                            <p className="text-gray-600 text-sm line-clamp-2">We are proud to announce our participation in the annual health seminar, showcasing our fresh ingredients and organic toppings.</p>
-                            <button className="text-brand-600 text-xs font-bold mt-2 hover:underline">Read More</button>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {storeSettings.newsItems.map(news => (
+                             <div key={news.id} className="bg-white rounded-xl p-4 shadow-sm border border-orange-200 flex flex-col md:flex-row gap-4 items-center">
+                                <div className="w-full md:w-32 h-32 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                    <img src={news.imageUrl} className="w-full h-full object-cover"/>
+                                </div>
+                                <div className="flex-1">
+                                    <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">{new Date(news.date).toLocaleDateString()}</span>
+                                    <h3 className="font-bold text-lg leading-tight mb-1">{news.title}</h3>
+                                    <p className="text-gray-600 text-sm line-clamp-2">{news.summary}</p>
+                                    {news.linkUrl && <a href={news.linkUrl} target="_blank" rel="noreferrer" className="text-brand-600 text-xs font-bold mt-2 hover:underline inline-block">Read More</a>}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                  </div>
             </section>
         )}
 
-        {/* Best Sellers */}
+        {/* Best Sellers (Only show on Promotion page or if not browsing a specific other category) */}
         {menu.some(p => p.isBestSeller) && activeCategory !== 'promotion' && (
              <div className="max-w-7xl mx-auto px-4 py-6">
                  <h2 className="font-bold text-xl mb-4 flex items-center gap-2 text-gray-800"><Star className="text-yellow-500" fill="currentColor"/> Best Sellers</h2>
@@ -562,31 +597,33 @@ export const CustomerView: React.FC = () => {
              </div>
         )}
 
-        {/* Menu Grid */}
-        <main className="max-w-7xl mx-auto px-4 py-6 flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {menu.filter(p => p.category === activeCategory).map(item => {
-                    const localized = getLocalizedItem(item);
-                    return (
-                        <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
-                            <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
-                                <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
-                                {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
-                                {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
-                            </div>
-                            <div className="px-1">
-                                <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
-                                <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
-                                    <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
+        {/* Menu Grid - FOR OTHER CATEGORIES (Not Promotion) */}
+        {activeCategory !== 'promotion' && (
+            <main className="max-w-7xl mx-auto px-4 py-6 flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {menu.filter(p => p.category === activeCategory).map(item => {
+                        const localized = getLocalizedItem(item);
+                        return (
+                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
+                                    <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                    {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
+                                    {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
+                                </div>
+                                <div className="px-1">
+                                    <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
+                                    <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                        <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </main>
+                        );
+                    })}
+                </div>
+            </main>
+        )}
         
         {/* Contact Us Footer Section */}
         <section className="bg-gray-800 text-gray-300 py-12">
@@ -1072,6 +1109,16 @@ export const CustomerView: React.FC = () => {
                                                  </div>
                                                  <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${getStatusColor(order.status)}`}>{t(order.status as any) || order.status}</span>
                                              </div>
+                                             
+                                             {/* LIST ORDER ITEMS */}
+                                             <div className="text-xs text-gray-600 mt-1 mb-2 pl-2 border-l-2 border-gray-100">
+                                                 {order.items.map((item, idx) => (
+                                                     <div key={idx} className="truncate">
+                                                         {item.quantity}x {language==='th' && item.nameTh ? item.nameTh : item.name}
+                                                     </div>
+                                                 ))}
+                                             </div>
+
                                              <div className="flex justify-between items-center">
                                                  <span className="font-bold text-brand-600">฿{order.totalAmount}</span>
                                                  <button 

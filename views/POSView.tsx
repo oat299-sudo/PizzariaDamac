@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -47,6 +47,14 @@ export const POSView: React.FC = () => {
         amount: '',
         category: 'COGS' as ExpenseCategory,
         note: ''
+    });
+
+    // News Form State
+    const [newsForm, setNewsForm] = useState({
+        title: '',
+        summary: '',
+        imageUrl: '',
+        linkUrl: ''
     });
 
     // Cart customization
@@ -213,6 +221,23 @@ export const POSView: React.FC = () => {
             note: ''
         });
         alert("Expense Recorded.");
+    };
+    
+    const handleAddNews = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newsForm.title || !newsForm.summary) return;
+
+        addNewsItem({
+            id: 'news-' + Date.now(),
+            title: newsForm.title,
+            summary: newsForm.summary,
+            imageUrl: newsForm.imageUrl || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
+            linkUrl: newsForm.linkUrl,
+            date: new Date().toISOString()
+        });
+        
+        setNewsForm({ title: '', summary: '', imageUrl: '', linkUrl: '' });
+        alert("News Item Added!");
     };
     
     // Media Helper
@@ -678,7 +703,40 @@ export const POSView: React.FC = () => {
                              </div>
                          </div>
                          
-                         {/* 3. Contact & Links (Legacy/Static) */}
+                         {/* 3. News Manager (New) */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News Manager</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 {/* Form */}
+                                 <div>
+                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Add New News</h4>
+                                     <form onSubmit={handleAddNews} className="space-y-3">
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
+                                         <textarea className="w-full border rounded p-2 text-sm h-20" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Image URL (Optional)" value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}/>
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Link URL (Optional)" value={newsForm.linkUrl} onChange={e => setNewsForm({...newsForm, linkUrl: e.target.value})}/>
+                                         <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Add News</button>
+                                     </form>
+                                 </div>
+                                 {/* List */}
+                                 <div className="border-l pl-6 max-h-60 overflow-y-auto space-y-3">
+                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Existing News</h4>
+                                     {storeSettings.newsItems && storeSettings.newsItems.length > 0 ? (
+                                         storeSettings.newsItems.map(item => (
+                                             <div key={item.id} className="border p-2 rounded flex justify-between items-start bg-gray-50">
+                                                 <div>
+                                                     <div className="font-bold text-sm">{item.title}</div>
+                                                     <div className="text-[10px] text-gray-500 line-clamp-1">{item.summary}</div>
+                                                 </div>
+                                                 <button onClick={() => deleteNewsItem(item.id)} className="text-red-500"><Trash2 size={14}/></button>
+                                             </div>
+                                         ))
+                                     ) : <p className="text-xs text-gray-400">No news items.</p>}
+                                 </div>
+                             </div>
+                         </div>
+                         
+                         {/* 4. Contact & Links */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -705,7 +763,7 @@ export const POSView: React.FC = () => {
                              </div>
                          </div>
 
-                         {/* 4. Menu Actions */}
+                         {/* 5. Menu Actions */}
                          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
                              <div className="flex gap-4">
