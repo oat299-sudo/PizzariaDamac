@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
@@ -66,6 +66,32 @@ export const CustomerView: React.FC = () => {
 
   // Active Order Tracking
   const activeOrder = orders.find(o => o.customerPhone === customer?.phone && o.status !== 'completed' && o.status !== 'cancelled');
+
+  // Quick Access / Buy Again Logic
+  const recentItems = useMemo(() => {
+    if (!customer || !orders) return [];
+    const myOrders = orders.filter(o => o.customerPhone === customer.phone);
+    const uniqueItems = new Map<string, Pizza>();
+    
+    // Sort orders descending
+    myOrders.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    for (const order of myOrders) {
+        for (const item of order.items) {
+            // Use pizzaId as key to avoid duplicates of same item
+            if (!uniqueItems.has(item.pizzaId)) {
+                // Find original menu item to ensure we have current price/image
+                const original = menu.find(m => m.id === item.pizzaId);
+                if (original) {
+                   uniqueItems.set(item.pizzaId, original);
+                }
+            }
+            if (uniqueItems.size >= 5) break;
+        }
+        if (uniqueItems.size >= 5) break;
+    }
+    return Array.from(uniqueItems.values());
+  }, [orders, customer, menu]);
 
   useEffect(() => {
     if (customer?.address) {
@@ -471,6 +497,33 @@ export const CustomerView: React.FC = () => {
                      <p className="text-gray-200 text-sm md:text-lg mt-2 font-medium">Authentic Italian Taste in Nonthaburi</p>
                 </div>
             </div>
+        )}
+
+        {/* --- QUICK ACCESS / BUY AGAIN (Logged In Users) --- */}
+        {customer && recentItems.length > 0 && activeCategory === 'promotion' && (
+            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-orange-50/50">
+                <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-brand-800">
+                     <History size={20} className="text-brand-600"/> {t('buyAgain')}
+                </h2>
+                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                    {recentItems.map(item => {
+                         const localized = getLocalizedItem(item);
+                         return (
+                            <div key={'recent-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[140px] w-[140px] bg-white rounded-xl shadow-sm p-2 border border-orange-100 cursor-pointer hover:shadow-md transition group">
+                                <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
+                                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition"/>
+                                    {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">{t('soldOut')}</div>}
+                                </div>
+                                <h3 className="font-bold text-sm text-gray-800 truncate">{localized.name}</h3>
+                                <div className="flex justify-between items-center mt-1">
+                                    <span className="text-brand-600 font-bold text-xs">฿{item.basePrice}</span>
+                                    <div className="w-5 h-5 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center"><Plus size={12}/></div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
         )}
 
         {/* REORDER: PROMOTIONS GRID - NOW IMMEDIATELY AFTER BANNER IF CATEGORY IS PROMOTION */}
