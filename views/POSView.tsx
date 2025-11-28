@@ -491,7 +491,7 @@ export const POSView: React.FC = () => {
                              </button>
                              <button onClick={seedDatabase} className="bg-white p-5 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition hover:shadow-md border border-yellow-100">
                                  <div className="bg-yellow-100 text-yellow-600 p-3 rounded-full"><Database size={24}/></div>
-                                 <span className="font-bold text-gray-700 text-sm text-center">Seed Database<br/><span className="text-[10px] font-normal text-gray-400">(Upload Menu)</span></span>
+                                 <span className="font-bold text-gray-700 text-sm text-center">Upload Menu to DB<br/><span className="text-[10px] font-normal text-gray-400">(Sync Code to Data)</span></span>
                              </button>
                          </div>
                          

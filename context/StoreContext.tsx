@@ -215,14 +215,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
         const { data, error } = await supabase.from('menu_items').select('*');
         if (!error && data) {
-           setMenu(data.map(d => ({
-               ...d, 
-               basePrice: d.base_price, 
-               nameTh: d.name_th, 
-               descriptionTh: d.description_th, 
-               isBestSeller: d.is_best_seller,
-               comboCount: d.combo_count || 0
-           })));
+           // Merge with local to ensure category/combo logic exists even if DB column missing
+           const mergedMenu = data.map(d => {
+               const local = INITIAL_MENU.find(m => m.id === d.id);
+               return {
+                   ...d, 
+                   basePrice: d.base_price, 
+                   nameTh: d.name_th, 
+                   descriptionTh: d.description_th, 
+                   isBestSeller: d.is_best_seller,
+                   comboCount: d.combo_count !== undefined ? d.combo_count : (local?.comboCount || 0),
+                   category: d.category || local?.category || 'pizza'
+               };
+           });
+           setMenu(mergedMenu);
         }
       } catch (err) { console.error("Menu fetch failed", err); }
   };
@@ -230,7 +236,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (!isSupabaseConfigured) return;
       try {
           const { data, error } = await supabase.from('toppings').select('*');
-          if (!error && data) setToppings(data.map(d => ({...d, nameTh: d.name_th})));
+          if (!error && data) {
+              // Vital Fix: If DB lacks 'category' column, fallback to INITIAL_TOPPINGS
+              const mergedToppings = data.map(d => {
+                  const local = INITIAL_TOPPINGS.find(t => t.id === d.id);
+                  return {
+                      ...d, 
+                      nameTh: d.name_th,
+                      category: d.category || local?.category || 'other'
+                  };
+              });
+              setToppings(mergedToppings);
+          }
       } catch (err) { console.error("Toppings fetch failed", err); }
   };
   const fetchOrders = async () => {
@@ -396,10 +413,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const seedDatabase = async () => {
       if (!isSupabaseConfigured) {
-          alert("Database not connected.");
+          alert("Database not connected. Cannot upload.");
           return;
       }
-      const confirmUpload = window.confirm("This will upload the initial menu to Supabase. Continue?");
+      const confirmUpload = window.confirm("This will upload all the latest Menu Items and Toppings from the code to the Database. It will overwrite existing items with the same ID. Continue?");
       if (!confirmUpload) return;
 
       try {
@@ -416,16 +433,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }
           // Upload Toppings
           for (const t of INITIAL_TOPPINGS) {
-              const { error } = await supabase.from('toppings').upsert({
-                  id: t.id, name: t.name, name_th: t.nameTh, price: t.price,
-                  category: t.category // Try to send category if column exists
-              });
-              if (error) console.error("Topping Seed Error", error);
+              // Try catch for category column specifically (in case user schema is old)
+              try {
+                  const { error } = await supabase.from('toppings').upsert({
+                      id: t.id, name: t.name, name_th: t.nameTh, price: t.price,
+                      category: t.category 
+                  });
+                  if (error) throw error;
+              } catch (e) {
+                  // Fallback: Try without category if column missing
+                   await supabase.from('toppings').upsert({
+                      id: t.id, name: t.name, name_th: t.nameTh, price: t.price
+                  });
+              }
           }
-          alert("Menu uploaded to database successfully!");
+          alert("Menu uploaded to database successfully! Your app is now in sync.");
+          fetchMenu(); // Refresh
+          fetchToppings(); // Refresh
       } catch (err) {
           console.error("Seeding failed", err);
-          alert("Seeding failed. Check console.");
+          alert("Seeding failed. Check console for details.");
       }
   };
 
