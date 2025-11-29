@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw } from 'lucide-react';
 
 // --- EMBED HELPER ---
-const VideoCard = ({ url }: { url: string }) => {
+const VideoCard: React.FC<{ url: string }> = ({ url }) => {
     if (!url) return null;
     
     let embedSrc = '';
@@ -96,7 +96,7 @@ export const CustomerView: React.FC = () => {
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
-    toppings
+    toppings, fetchOrders
   } = useStore();
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
@@ -105,6 +105,7 @@ export const CustomerView: React.FC = () => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showTracker, setShowTracker] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Category State
   const [activeCategory, setActiveCategory] = useState<ProductCategory>('promotion');
@@ -393,6 +394,12 @@ export const CustomerView: React.FC = () => {
       }
   };
   
+  const handleManualRefresh = async () => {
+      setIsRefreshing(true);
+      await fetchOrders();
+      setTimeout(() => setIsRefreshing(false), 500);
+  };
+  
   const getStatusColor = (status: OrderStatus) => {
       switch(status) {
           case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -583,7 +590,7 @@ export const CustomerView: React.FC = () => {
                         <PlayCircle className="text-red-500" fill="currentColor" /> {t('customerReviews')}
                     </h2>
                     <div className="flex overflow-x-auto pb-4 gap-4 snap-x no-scrollbar">
-                        {storeSettings.reviewLinks.filter(l => l).map((link, idx) => (
+                        {storeSettings.reviewLinks.filter((l): l is string => !!l).map((link, idx) => (
                             <VideoCard key={`review-${idx}`} url={link} />
                         ))}
                     </div>
@@ -735,7 +742,12 @@ export const CustomerView: React.FC = () => {
                              </div>
                              <span className="font-bold text-sm">Order Status #{activeOrder.id.slice(-4)}</span>
                         </div>
-                        <button onClick={() => setShowProfile(true)} className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">View</button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={handleManualRefresh} className={`text-xs bg-gray-700 p-1.5 rounded hover:bg-gray-600 transition ${isRefreshing ? 'animate-spin' : ''}`}>
+                                <RotateCw size={14}/>
+                            </button>
+                            <button onClick={() => setShowProfile(true)} className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">View</button>
+                        </div>
                     </div>
                     <div className="flex items-center justify-between">
                          <span className="text-lg font-bold text-brand-400 uppercase">{t(activeOrder.status as any)}</span>

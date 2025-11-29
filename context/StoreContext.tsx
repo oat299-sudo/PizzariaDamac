@@ -59,6 +59,7 @@ interface StoreContextType {
   expenses: Expense[];
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  fetchOrders: () => Promise<void>; // Exposed for manual refresh
   
   // Store Settings
   isStoreOpen: boolean;
@@ -341,12 +342,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         fetchSettings();
         
         const subscription = supabase.channel('realtime_updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+            fetchOrders(); // Reload orders when change happens
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, fetchSettings)
         .subscribe();
         
-        return () => { subscription.unsubscribe(); }
+        // Polling fallback every 5 seconds to ensure status updates even if realtime is flaky
+        const interval = setInterval(() => {
+             fetchOrders();
+        }, 5000);
+        
+        return () => { 
+            subscription.unsubscribe(); 
+            clearInterval(interval);
+        }
     }
   }, []);
 
@@ -898,7 +909,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, getAllCustomers, customerLogin, addToFavorites, claimReward,
       orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
-      expenses, addExpense, deleteExpense,
+      expenses, addExpense, deleteExpense, fetchOrders,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
       generateTimeSlots, canOrderForToday, seedDatabase,
       addNewsItem, deleteNewsItem
