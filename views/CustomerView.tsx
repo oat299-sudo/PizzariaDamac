@@ -1,9 +1,94 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
 import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle } from 'lucide-react';
+
+// --- EMBED HELPER ---
+const VideoCard = ({ url }: { url: string }) => {
+    if (!url) return null;
+    
+    let embedSrc = '';
+    let isIframe = false;
+    let label = 'Watch Video';
+    let icon = <PlayCircle size={48} className="mb-2 group-hover:scale-110 transition"/>;
+    let bgColor = 'bg-gray-900';
+    let textColor = 'text-white';
+    
+    // YouTube Detection
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let videoId = '';
+        if (url.includes('v=')) {
+            videoId = url.split('v=')[1]?.split('&')[0];
+        } else if (url.includes('youtu.be')) {
+            videoId = url.split('/').pop()?.split('?')[0] || '';
+        } else if (url.includes('/shorts/')) {
+            videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
+        }
+        if (videoId) {
+            // Add autoplay=1, mute=1 (required for autoplay), loop=1
+            embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}`;
+            isIframe = true;
+        }
+    } 
+    // Facebook Detection
+    else if (url.includes('facebook.com')) {
+        // FB Embed Plugin
+        embedSrc = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560`;
+        isIframe = true;
+        label = "Watch on Facebook";
+    }
+    // TikTok Detection
+    else if (url.includes('tiktok.com')) {
+            // TikTok requires complex oEmbed or specific SDK. Fallback to external link card.
+            label = "Watch on TikTok";
+            bgColor = "bg-black";
+            // Simulate TikTok vibe
+            icon = (
+                <div className="mb-2 group-hover:scale-110 transition flex gap-1">
+                    <div className="w-8 h-8 rounded-full bg-[#00f2ea] mix-blend-screen animate-pulse"></div>
+                    <div className="w-8 h-8 rounded-full bg-[#ff0050] mix-blend-screen -ml-4 animate-pulse"></div>
+                </div>
+            );
+    }
+    // Lemon8 Detection
+    else if (url.includes('lemon8-app.com')) {
+        label = "View on Lemon8";
+        bgColor = "bg-yellow-400";
+        textColor = "text-gray-900";
+        icon = <div className="text-2xl font-bold mb-2 group-hover:scale-110 transition">L8</div>;
+    }
+    else {
+            // Generic Link
+            label = "View Link";
+    }
+
+    if (isIframe) {
+        return (
+            <div className="rounded-xl overflow-hidden shadow-lg bg-black aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start">
+                <iframe 
+                    src={embedSrc} 
+                    className="w-full h-full" 
+                    title="Video player" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                    allowFullScreen
+                ></iframe>
+            </div>
+        );
+    }
+
+    return (
+        <a href={url} target="_blank" rel="noopener noreferrer" className={`rounded-xl overflow-hidden shadow-lg ${bgColor} aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start flex items-center justify-center`}>
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 group-hover:opacity-70 transition"></div>
+            <div className={`relative z-10 flex flex-col items-center ${textColor}`}>
+                {icon}
+                <span className="font-bold">{label}</span>
+                <div className="flex items-center gap-1 text-xs mt-1 opacity-80"><ExternalLink size={12}/> Opens in new tab</div>
+            </div>
+        </a>
+    );
+};
 
 export const CustomerView: React.FC = () => {
   const { 
@@ -320,92 +405,6 @@ export const CustomerView: React.FC = () => {
       }
   };
 
-  // --- EMBED HELPER ---
-  const VideoCard = ({ url }: { url: string }) => {
-      if (!url) return null;
-      
-      let embedSrc = '';
-      let isIframe = false;
-      let label = 'Watch Video';
-      let icon = <PlayCircle size={48} className="mb-2 group-hover:scale-110 transition"/>;
-      let bgColor = 'bg-gray-900';
-      let textColor = 'text-white';
-      
-      // YouTube Detection
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-          let videoId = '';
-          if (url.includes('v=')) {
-              videoId = url.split('v=')[1]?.split('&')[0];
-          } else if (url.includes('youtu.be')) {
-              videoId = url.split('/').pop()?.split('?')[0] || '';
-          } else if (url.includes('/shorts/')) {
-              videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
-          }
-          if (videoId) {
-              // Add autoplay=1, mute=1 (required for autoplay), loop=1
-              embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}`;
-              isIframe = true;
-          }
-      } 
-      // Facebook Detection
-      else if (url.includes('facebook.com')) {
-          // FB Embed Plugin
-          embedSrc = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&width=560`;
-          isIframe = true;
-          label = "Watch on Facebook";
-      }
-      // TikTok Detection
-      else if (url.includes('tiktok.com')) {
-           // TikTok requires complex oEmbed or specific SDK. Fallback to external link card.
-           label = "Watch on TikTok";
-           bgColor = "bg-black";
-           // Simulate TikTok vibe
-           icon = (
-               <div className="mb-2 group-hover:scale-110 transition flex gap-1">
-                   <div className="w-8 h-8 rounded-full bg-[#00f2ea] mix-blend-screen animate-pulse"></div>
-                   <div className="w-8 h-8 rounded-full bg-[#ff0050] mix-blend-screen -ml-4 animate-pulse"></div>
-               </div>
-           );
-      }
-      // Lemon8 Detection
-      else if (url.includes('lemon8-app.com')) {
-          label = "View on Lemon8";
-          bgColor = "bg-yellow-400";
-          textColor = "text-gray-900";
-          icon = <div className="text-2xl font-bold mb-2 group-hover:scale-110 transition">L8</div>;
-      }
-      else {
-           // Generic Link
-           label = "View Link";
-      }
-
-      if (isIframe) {
-          return (
-              <div className="rounded-xl overflow-hidden shadow-lg bg-black aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start">
-                  <iframe 
-                      src={embedSrc} 
-                      className="w-full h-full" 
-                      title="Video player" 
-                      frameBorder="0" 
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                      allowFullScreen
-                  ></iframe>
-              </div>
-          );
-      }
-
-      return (
-          <a href={url} target="_blank" rel="noopener noreferrer" className={`rounded-xl overflow-hidden shadow-lg ${bgColor} aspect-video relative group w-72 md:w-96 flex-shrink-0 snap-start flex items-center justify-center`}>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 group-hover:opacity-70 transition"></div>
-              <div className={`relative z-10 flex flex-col items-center ${textColor}`}>
-                  {icon}
-                  <span className="font-bold">{label}</span>
-                  <div className="flex items-center gap-1 text-xs mt-1 opacity-80"><ExternalLink size={12}/> Opens in new tab</div>
-              </div>
-          </a>
-      );
-  };
-
   // Helper for Hero Video
   const renderHeroMedia = () => {
       if (!storeSettings.promoBannerUrl) return null;
@@ -581,27 +580,11 @@ export const CustomerView: React.FC = () => {
             <section className="bg-white py-8 border-b">
                 <div className="max-w-7xl mx-auto px-4">
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                        <Star className="text-yellow-500" fill="currentColor" /> {t('customerReviews')}
+                        <PlayCircle className="text-red-500" fill="currentColor" /> {t('customerReviews')}
                     </h2>
                     <div className="flex overflow-x-auto pb-4 gap-4 snap-x no-scrollbar">
                         {storeSettings.reviewLinks.filter(l => l).map((link, idx) => (
                             <VideoCard key={`review-${idx}`} url={link} />
-                        ))}
-                    </div>
-                </div>
-            </section>
-        )}
-
-        {/* --- VIBE VIDEO SECTION --- */}
-        {activeCategory === 'promotion' && storeSettings.vibeLinks && storeSettings.vibeLinks.filter(l => l).length > 0 && (
-            <section className="bg-gray-50 py-8 border-b">
-                <div className="max-w-7xl mx-auto px-4">
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                        <Sparkles className="text-purple-600" /> {t('vibeCheck')}
-                    </h2>
-                    <div className="flex overflow-x-auto pb-4 gap-4 snap-x no-scrollbar">
-                        {storeSettings.vibeLinks.filter(l => l).map((link, idx) => (
-                            <VideoCard key={`vibe-${idx}`} url={link} />
                         ))}
                     </div>
                 </div>
@@ -698,52 +681,33 @@ export const CustomerView: React.FC = () => {
         )}
         
         {/* Contact Us Footer Section */}
-        <section className="bg-gray-800 text-gray-300 py-12">
+        <section className="bg-gray-800 text-gray-300 py-8">
             <div className="max-w-7xl mx-auto px-4">
-                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><MapPin className="text-brand-500"/> {t('findUs')}</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                 <h2 className="text-xl font-bold text-white mb-6 flex items-center justify-center gap-2"><MapPin className="text-brand-500"/> {t('findUs')}</h2>
+                 <div className="flex flex-wrap justify-center gap-6 md:gap-12">
                      
                      {/* Map */}
-                     <a href={storeSettings.mapUrl || "https://maps.google.com"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
-                         <div className="bg-green-100 p-3 rounded-full text-green-600 group-hover:scale-110 transition"><MapPin size={24}/></div>
-                         <div>
-                             <h3 className="text-white font-bold">Google Maps</h3>
-                             <p className="text-xs text-gray-400">Navigate to Pizza Damac</p>
-                         </div>
+                     <a href={storeSettings.mapUrl || "https://maps.google.com"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
+                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-green-600 group-hover:text-white transition text-green-500"><MapPin size={24}/></div>
+                         <span className="text-xs font-bold">Maps</span>
                      </a>
 
                      {/* Facebook */}
-                     <a href={storeSettings.facebookUrl || "#"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
-                         <div className="bg-blue-100 p-3 rounded-full text-blue-600 group-hover:scale-110 transition"><Facebook size={24}/></div>
-                         <div>
-                             <h3 className="text-white font-bold">Facebook</h3>
-                             <p className="text-xs text-gray-400">Follow us for updates</p>
-                         </div>
+                     <a href={storeSettings.facebookUrl || "#"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
+                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-blue-600 group-hover:text-white transition text-blue-500"><Facebook size={24}/></div>
+                         <span className="text-xs font-bold">Facebook</span>
                      </a>
 
                      {/* Line */}
-                     <a href={storeSettings.lineUrl || "#"} target="_blank" rel="noopener noreferrer" className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
-                         <div className="bg-green-100 p-3 rounded-full text-green-500 group-hover:scale-110 transition"><MessageCircle size={24}/></div>
-                         <div>
-                             <h3 className="text-white font-bold">Line Official</h3>
-                             <p className="text-xs text-gray-400">Chat with us</p>
-                         </div>
+                     <a href={storeSettings.lineUrl || "#"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
+                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-green-500 group-hover:text-white transition text-green-400"><MessageCircle size={24}/></div>
+                         <span className="text-xs font-bold">Line</span>
                      </a>
 
                      {/* Phone */}
-                     <a href={`tel:${storeSettings.contactPhone}`} className="bg-gray-700 p-4 rounded-xl hover:bg-gray-600 transition flex items-center gap-4 group">
-                         <div className="bg-orange-100 p-3 rounded-full text-orange-600 group-hover:scale-110 transition"><Phone size={24}/></div>
-                         <div>
-                             <h3 className="text-white font-bold">{storeSettings.contactPhone}</h3>
-                             <p className="text-xs text-gray-400">Call for info</p>
-                         </div>
-                     </a>
-                 </div>
-                 
-                 {/* Google Reviews Link */}
-                 <div className="mt-8 text-center">
-                     <a href={storeSettings.reviewUrl || "#"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-brand-400 hover:text-brand-300 transition">
-                         <Star size={16}/> Rate us on Google Maps
+                     <a href={`tel:${storeSettings.contactPhone}`} className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
+                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-orange-500 group-hover:text-white transition text-orange-400"><Phone size={24}/></div>
+                         <span className="text-xs font-bold">Call</span>
                      </a>
                  </div>
             </div>
@@ -786,6 +750,13 @@ export const CustomerView: React.FC = () => {
                                 activeOrder.status === 'ready' ? 'w-[100%]' : 'w-[5%]'
                             }`}
                         ></div>
+                    </div>
+                    
+                    {/* Rate Us Button (Moved Here) */}
+                    <div className="mt-4 pt-3 border-t border-gray-700 text-center">
+                        <a href={storeSettings.reviewUrl || "#"} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center justify-center gap-1">
+                            <Star size={12} fill="currentColor"/> Review us on Google Maps
+                        </a>
                     </div>
                 </div>
             </div>

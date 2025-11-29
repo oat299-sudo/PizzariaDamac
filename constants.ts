@@ -14,7 +14,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     closedMessage: '',
     reviewUrl: "https://maps.app.goo.gl/RrpaW1Z5APoz3ucHA", // Updated Link
     facebookUrl: "https://www.facebook.com/p/PIZZA-DAMAC-100076365540304/",
-    lineUrl: "https://lin.ee/ggi1eDY",
+    lineUrl: "https://lin.ee/KlsHunE",
     mapUrl: "https://share.google/AQcDarbUgO7xteLV3",
     contactPhone: "0994979199",
     promoContentType: 'image',
@@ -133,8 +133,8 @@ export const TRANSLATIONS = {
         thinking: "Thinking...",
         storeClosed: "Store Closed",
         storeClosedMsg: "We are currently closed. Open 11:00 - 20:30. See you tomorrow.",
-        vibeReviews: "Vibe & Reviews",
-        customerReviews: "Customer Reviews",
+        vibeReviews: "Highlights & Reviews", // Renamed
+        customerReviews: "Highlights & Reviews", // Renamed
         vibeCheck: "Vibe Check",
         newsEvents: "News & Events",
         contactUs: "Contact Us",
@@ -274,8 +274,8 @@ export const TRANSLATIONS = {
         thinking: "กำลังคิด...",
         storeClosed: "ร้านปิด",
         storeClosedMsg: "ขณะนี้ร้านปิดให้บริการ เปิด 11:00 - 20:30 น. เจอกันพรุ่งนี้ครับ",
-        vibeReviews: "บรรยากาศ & รีวิว",
-        customerReviews: "รีวิวจากลูกค้า",
+        vibeReviews: "ไฮไลท์ & รีวิว", // Renamed
+        customerReviews: "ไฮไลท์ & รีวิว", // Renamed
         vibeCheck: "บรรยากาศร้าน",
         newsEvents: "ข่าวสาร & กิจกรรม",
         contactUs: "ติดต่อเรา",
