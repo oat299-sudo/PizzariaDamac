@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
@@ -358,7 +359,8 @@ export const CustomerView: React.FC = () => {
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
-        // Maybe show tracker
+        // Automatically open tracker on success
+        setShowTracker(true);
      }
   };
 
@@ -415,6 +417,7 @@ export const CustomerView: React.FC = () => {
       switch(status) {
           case 'pending': return 'bg-yellow-100 text-yellow-800';
           case 'confirmed': return 'bg-blue-100 text-blue-800';
+          case 'acknowledged': return 'bg-indigo-100 text-indigo-800';
           case 'cooking': return 'bg-orange-100 text-orange-800';
           case 'ready': return 'bg-green-100 text-green-700';
           case 'completed': return 'bg-green-100 text-green-700';
@@ -741,10 +744,11 @@ export const CustomerView: React.FC = () => {
                      </div>
                      <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-3">
                          <div className={`h-full transition-all duration-1000 ${
-                             activeOrder.status === 'pending' ? 'w-1/5 bg-yellow-400' :
-                             activeOrder.status === 'confirmed' ? 'w-2/5 bg-blue-500' :
-                             activeOrder.status === 'cooking' ? 'w-3/5 bg-orange-500 animate-pulse' :
-                             activeOrder.status === 'ready' ? 'w-4/5 bg-green-500' :
+                             activeOrder.status === 'pending' ? 'w-1/6 bg-yellow-400' :
+                             activeOrder.status === 'confirmed' ? 'w-2/6 bg-blue-500' :
+                             activeOrder.status === 'acknowledged' ? 'w-3/6 bg-indigo-500' :
+                             activeOrder.status === 'cooking' ? 'w-4/6 bg-orange-500 animate-pulse' :
+                             activeOrder.status === 'ready' ? 'w-5/6 bg-green-500' :
                              'w-full bg-green-600'
                          }`}></div>
                      </div>
@@ -1178,6 +1182,39 @@ export const CustomerView: React.FC = () => {
                                  <p className="text-xs text-center text-gray-500">{10 - customer.loyaltyPoints} more points {t('toFreePizza')}</p>
                              )}
                          </div>
+
+                         {/* ACTIVE ORDER CARD */}
+                         {activeOrder && (
+                             <div className="bg-white p-4 rounded-xl shadow-md border-l-4 border-brand-500 mb-6 relative overflow-hidden group cursor-pointer" onClick={() => { setShowProfile(false); setShowTracker(true); }}>
+                                 <div className="flex justify-between items-start mb-3 relative z-10">
+                                     <div>
+                                         <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                             <Activity size={18} className="text-brand-600 animate-pulse"/> 
+                                             Active Order
+                                         </h3>
+                                         <span className="text-xs text-gray-500">#{activeOrder.id.slice(-4)} • {activeOrder.items.length} items</span>
+                                     </div>
+                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(activeOrder.status)}`}>
+                                         {t(activeOrder.status as any)}
+                                     </span>
+                                 </div>
+                                 
+                                 <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden mb-3 relative z-10">
+                                     <div className={`h-full transition-all duration-1000 ${
+                                         activeOrder.status === 'pending' ? 'w-1/6 bg-yellow-400' :
+                                         activeOrder.status === 'confirmed' ? 'w-2/6 bg-blue-500' :
+                                         activeOrder.status === 'acknowledged' ? 'w-3/6 bg-indigo-500' :
+                                         activeOrder.status === 'cooking' ? 'w-4/6 bg-orange-500' :
+                                         activeOrder.status === 'ready' ? 'w-5/6 bg-green-500' :
+                                         'w-full bg-green-600'
+                                     }`}></div>
+                                 </div>
+                                 
+                                 <div className="text-center text-xs font-bold text-brand-600 flex items-center justify-center gap-1">
+                                     Tap to Track <ArrowRight size={12}/>
+                                 </div>
+                             </div>
+                         )}
                          
                          {/* Favorites */}
                          <div className="mb-6">
