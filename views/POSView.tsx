@@ -59,7 +59,7 @@ export const POSView: React.FC = () => {
     
     // Table QR State
     const [qrTableNum, setQrTableNum] = useState('1');
-    const [qrBaseUrl, setQrBaseUrl] = useState(() => window.location.origin);
+    const [qrBaseUrl, setQrBaseUrl] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
 
     // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
     const [mediaForm, setMediaForm] = useState({
@@ -339,6 +339,12 @@ export const POSView: React.FC = () => {
         });
         alert("Contact Settings Saved Successfully!");
     };
+    
+    // Helper to clean URL for QR
+    const getCleanQrUrl = () => {
+        // Remove trailing slash if present to avoid //?table=
+        return qrBaseUrl.replace(/\/$/, "");
+    };
 
     // Filter Menu
     const filteredMenu = menu.filter(item => {
@@ -412,8 +418,9 @@ export const POSView: React.FC = () => {
                         <button onClick={() => setActiveTab('expenses')} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'expenses' ? 'bg-gray-800 text-yellow-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <Calculator size={24} />
                         </button>
-                         <button onClick={() => setActiveTab('manage')} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'manage' ? 'bg-gray-800 text-red-500 shadow-inner' : 'hover:bg-gray-800'}`}>
+                         <button onClick={() => setActiveTab('manage')} className={`relative group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'manage' ? 'bg-gray-800 text-red-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <Settings size={24} />
+                            {activeTab !== 'manage' && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
                         </button>
                         <div className="h-px bg-gray-800 w-full my-2"></div>
                         <button 
@@ -878,8 +885,10 @@ export const POSView: React.FC = () => {
                          </div>
                          
                          {/* 5. Table QR Code Generator (New) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><QrCode size={14}/> Table QR Generator</h3>
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200 ring-2 ring-brand-100">
+                             <h3 className="font-bold text-gray-700 text-xs uppercase mb-3 flex items-center gap-2">
+                                 <QrCode size={14}/> Table QR Generator <span className="bg-red-500 text-white text-[10px] px-1 rounded animate-pulse">NEW</span>
+                             </h3>
                              <div className="flex flex-col md:flex-row gap-6 items-start">
                                  <div className="space-y-4 max-w-sm">
                                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
@@ -919,14 +928,14 @@ export const POSView: React.FC = () => {
                                  {qrTableNum && (
                                      <div className="flex gap-6 items-center p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                                          <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${qrBaseUrl}/?table=${qrTableNum}`)}`} 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${getCleanQrUrl()}/?table=${qrTableNum}`)}`} 
                                             alt={`Table ${qrTableNum} QR`} 
                                             className="w-32 h-32"
                                          />
                                          <div className="space-y-2">
                                              <div className="font-bold text-lg">Table {qrTableNum}</div>
                                              <a 
-                                                 href={`${qrBaseUrl}/?table=${qrTableNum}`} 
+                                                 href={`${getCleanQrUrl()}/?table=${qrTableNum}`} 
                                                  target="_blank"
                                                  className="text-xs text-blue-600 hover:underline block mb-2"
                                              >
@@ -940,7 +949,7 @@ export const POSView: React.FC = () => {
                                                              <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
                                                                  <h1 style="font-size:48px;margin-bottom:10px;">Table ${qrTableNum}</h1>
                                                                  <p style="margin-bottom:30px;font-size:24px;">Scan to Order</p>
-                                                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${qrBaseUrl}/?table=${qrTableNum}`)}" style="width:400px;height:400px;" />
+                                                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${getCleanQrUrl()}/?table=${qrTableNum}`)}" style="width:400px;height:400px;" />
                                                                  <p style="margin-top:30px;color:#666;">Pizza Damac</p>
                                                                  <script>window.print();</script>
                                                              </body>
@@ -992,8 +1001,9 @@ export const POSView: React.FC = () => {
                     <Calculator size={20}/>
                     <span className="text-[10px] font-bold">Expenses</span>
                 </button>
-                <button onClick={() => setActiveTab('manage')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
+                <button onClick={() => setActiveTab('manage')} className={`relative flex flex-col items-center gap-1 p-2 ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
                     <Settings size={20}/>
+                    {activeTab !== 'manage' && <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
                     <span className="text-[10px] font-bold">Manage</span>
                 </button>
             </div>
