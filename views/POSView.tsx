@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
-        menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, 
+        menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder,
         updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza, toggleBestSeller,
         toppings, addTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
@@ -26,6 +27,7 @@ export const POSView: React.FC = () => {
     
     // Admin / Edit features
     const [isEditMode, setIsEditMode] = useState(false);
+    const [isSalesEditMode, setIsSalesEditMode] = useState(false); // New: For deleting sales records
     const [tableNumber, setTableNumber] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     
@@ -154,13 +156,20 @@ export const POSView: React.FC = () => {
     const handlePlaceOrder = async (source: OrderSource) => {
         const success = await placeOrder('dine-in', { 
             tableNumber: source === 'store' ? tableNumber : `${source.toUpperCase()} Order`,
-            source: source
+            source: source,
+            paymentMethod: 'cash' // Default to cash for POS, but can be changed in checkout modal if we added selector
         });
         if (success) {
             if (source !== 'store') alert(`Recorded ${source} order!`);
             else alert("Order sent to Kitchen!");
             setTableNumber('');
             setShowMobileCart(false);
+        }
+    };
+
+    const handleDeleteOrder = async (orderId: string) => {
+        if (window.confirm("Are you sure you want to PERMANENTLY delete this order record? This will affect your sales report.")) {
+            await deleteOrder(orderId);
         }
     };
 
@@ -351,9 +360,16 @@ export const POSView: React.FC = () => {
         return cat === activeCategory;
     });
 
-    const totalGrossSales = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.totalAmount, 0);
+    // --- SALES CALCULATIONS ---
+    const activeOrders = orders.filter(o => o.status !== 'cancelled');
+    const totalGrossSales = activeOrders.reduce((sum, o) => sum + o.totalAmount, 0);
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
+    const netProfit = activeOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
+    
+    // Robust Cash vs Online breakdown
+    const cashSales = activeOrders.filter(o => o.paymentMethod === 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
+    const onlineSales = activeOrders.filter(o => o.paymentMethod !== 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
+
 
     // Helper to group toppings
     const groupedToppings = {
@@ -585,11 +601,32 @@ export const POSView: React.FC = () => {
                 {/* VIEW: SALES REPORT */}
                 {activeTab === 'sales' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><PieChart className="text-blue-600"/> {t('salesReport')}</h2>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><PieChart className="text-blue-600"/> {t('salesReport')}</h2>
+                            <button 
+                                onClick={() => setIsSalesEditMode(!isSalesEditMode)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs border ${isSalesEditMode ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                                {isSalesEditMode ? <Unlock size={14}/> : <Lock size={14}/>}
+                                {isSalesEditMode ? 'Edit Mode ON' : 'Manage Data'}
+                            </button>
+                        </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('grossSales')}</h3>
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2">
+                                     {t('grossSales')}
+                                 </h3>
                                  <p className="text-3xl font-bold text-gray-900 mt-2">฿{totalGrossSales.toLocaleString()}</p>
+                                 {/* CASH BREAKDOWN */}
+                                 <div className="mt-4 pt-4 border-t flex justify-between text-xs">
+                                     <div className="flex items-center gap-1 text-green-700 font-bold">
+                                         <Banknote size={14}/> Cash: ฿{cashSales.toLocaleString()}
+                                     </div>
+                                     <div className="flex items-center gap-1 text-blue-700 font-bold">
+                                         <CreditCard size={14}/> Online: ฿{onlineSales.toLocaleString()}
+                                     </div>
+                                 </div>
                              </div>
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                  <h3 className="text-sm font-bold text-gray-500 uppercase">{t('expenses')}</h3>
@@ -610,17 +647,25 @@ export const POSView: React.FC = () => {
                                             <th className="p-4 text-left">Order ID</th>
                                             <th className="p-4 text-left">Date</th>
                                             <th className="p-4 text-left">Type</th>
+                                            <th className="p-4 text-left">Payment</th>
                                             <th className="p-4 text-left">Status</th>
                                             <th className="p-4 text-right">Amount</th>
+                                            {isSalesEditMode && <th className="p-4 text-center">Action</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {orders.slice(0, 20).map(order => (
-                                            <tr key={order.id} className="text-sm hover:bg-gray-50">
+                                        {orders.slice(0, 50).map(order => (
+                                            <tr key={order.id} className="text-sm hover:bg-gray-50 transition">
                                                 <td className="p-4 font-mono font-bold text-gray-600">#{order.id.slice(-4)}</td>
-                                                <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                                <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                                                 <td className="p-4">
                                                     <span className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded font-bold text-xs uppercase">{order.source}</span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.paymentMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                        {order.paymentMethod === 'cash' ? <Banknote size={12}/> : <CreditCard size={12}/>}
+                                                        {order.paymentMethod === 'cash' ? 'CASH' : 'ONLINE'}
+                                                    </span>
                                                 </td>
                                                 <td className="p-4">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -628,6 +673,17 @@ export const POSView: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-right font-bold">฿{order.totalAmount}</td>
+                                                {isSalesEditMode && (
+                                                    <td className="p-4 text-center">
+                                                        <button 
+                                                            onClick={() => handleDeleteOrder(order.id)}
+                                                            className="text-red-500 hover:bg-red-50 p-2 rounded-full transition"
+                                                            title="Delete Record"
+                                                        >
+                                                            <Trash2 size={16}/>
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>
