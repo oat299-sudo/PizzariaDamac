@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings, NewsItem } from '../types';
 import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS, DEFAULT_STORE_SETTINGS } from '../constants';
@@ -183,8 +184,22 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     localStorage.setItem('damac_logo', base64);
   };
 
-  // --- Data States (From DB) ---
-  const [menu, setMenu] = useState<Pizza[]>(INITIAL_MENU);
+  // --- Data States (From DB + Local Storage Backup) ---
+  const [menu, setMenu] = useState<Pizza[]>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_menu');
+          if (saved) {
+              try { return JSON.parse(saved); } catch(e) {}
+          }
+      }
+      return INITIAL_MENU;
+  });
+  
+  // Persist Menu to LocalStorage
+  useEffect(() => {
+      localStorage.setItem('damac_menu', JSON.stringify(menu));
+  }, [menu]);
+
   const [toppings, setToppings] = useState<Topping[]>(INITIAL_TOPPINGS);
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -194,8 +209,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return saved ? JSON.parse(saved) : null;
   });
 
-  // --- Store Settings State ---
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
+  // --- Store Settings State (From DB + Local Storage Backup) ---
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_store_settings');
+          if (saved) {
+              try { return { ...DEFAULT_STORE_SETTINGS, ...JSON.parse(saved) }; } 
+              catch(e) { console.error("Settings parse error", e); }
+          }
+      }
+      return DEFAULT_STORE_SETTINGS;
+  });
+
+  // Persist Settings to LocalStorage
+  useEffect(() => {
+      localStorage.setItem('damac_store_settings', JSON.stringify(storeSettings));
+  }, [storeSettings]);
+
   const [isHoliday, setIsHoliday] = useState(false);
   const [isStoreOpen, setIsStoreOpen] = useState(true);
 
@@ -875,7 +905,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (isSupabaseConfigured) {
           try {
             // Convert camelCase to snake_case for DB
-            const dbPayload: any = {};
+            const dbPayload: any = { id: 'global' }; // Ensure ID is present for upsert
+            
             if (settings.holidayStart !== undefined) dbPayload.holiday_start = settings.holidayStart;
             if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
             if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
@@ -892,7 +923,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (settings.vibeLinks !== undefined) dbPayload.vibe_links = settings.vibeLinks;
             if (settings.newsItems !== undefined) dbPayload.news_items = settings.newsItems;
 
-            await supabase.from('store_settings').update(dbPayload).eq('id', 'global');
+            await supabase.from('store_settings').upsert(dbPayload); // Changed to UPSERT for reliability
           } catch(e) { console.error("Settings sync error", e); }
       }
       setStoreSettings(prev => ({...prev, ...settings}));

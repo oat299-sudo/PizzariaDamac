@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -62,6 +62,12 @@ export const POSView: React.FC = () => {
     const [qrTableNum, setQrTableNum] = useState('1');
     const [qrBaseUrl, setQrBaseUrl] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
 
+    // --- PAYMENT MODAL STATE ---
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+    const [cashReceived, setCashReceived] = useState<string>('');
+    const [change, setChange] = useState<number>(0);
+
     // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
     const [mediaForm, setMediaForm] = useState({
         promoBannerUrl: '',
@@ -95,6 +101,16 @@ export const POSView: React.FC = () => {
             setTempClosedMsg(storeSettings.closedMessage);
         }
     }, [storeSettings]);
+
+    // Calculate Change
+    useEffect(() => {
+        if (paymentMethod === 'cash' && cashReceived) {
+            const received = parseFloat(cashReceived);
+            setChange(received - cartTotal);
+        } else {
+            setChange(0);
+        }
+    }, [cashReceived, cartTotal, paymentMethod]);
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
@@ -153,18 +169,47 @@ export const POSView: React.FC = () => {
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
 
-    const handlePlaceOrder = async (source: OrderSource) => {
-        const success = await placeOrder('dine-in', { 
-            tableNumber: source === 'store' ? tableNumber : `${source.toUpperCase()} Order`,
-            source: source,
-            paymentMethod: 'cash' // Default to cash for POS, but can be changed in checkout modal if we added selector
+    const handleCheckBill = () => {
+        if (cart.length === 0) return;
+        setCashReceived(''); // Reset
+        setPaymentMethod('cash');
+        setShowPaymentModal(true);
+    };
+
+    const handleFinalizePayment = async () => {
+        // Validation for Cash
+        if (paymentMethod === 'cash') {
+            if (parseFloat(cashReceived || '0') < cartTotal) {
+                alert("Insufficient cash received!");
+                return;
+            }
+        }
+    
+        const note = paymentMethod === 'cash' 
+            ? `Cash: ${cashReceived}, Change: ${change}` 
+            : 'Paid via QR';
+    
+        const success = await placeOrder('dine-in', {
+            tableNumber: tableNumber || 'Walk-in',
+            source: 'store',
+            paymentMethod: paymentMethod,
+            note: note
         });
+    
         if (success) {
-            if (source !== 'store') alert(`Recorded ${source} order!`);
-            else alert("Order sent to Kitchen!");
+            alert(paymentMethod === 'cash' ? `Order Paid! Change: ฿${change}` : "Order Paid via QR!");
+            setShowPaymentModal(false);
             setTableNumber('');
             setShowMobileCart(false);
         }
+    };
+
+    const handlePrintBill = () => {
+        alert("Printing Bill... (Simulation)\n\n" + 
+              `Table: ${tableNumber || 'Walk-in'}\n` +
+              `Total: ฿${cartTotal}\n` +
+              cart.map(i => `- ${i.name} x${i.quantity} (฿${i.totalPrice})`).join('\n')
+        );
     };
 
     const handleDeleteOrder = async (orderId: string) => {
@@ -318,22 +363,34 @@ export const POSView: React.FC = () => {
     
     const updateLocalMediaLink = (listType: 'review' | 'vibe', index: number, value: string) => {
         if (listType === 'review') {
-            const newList = [...mediaForm.reviewLinks];
+            const newList = [...(mediaForm.reviewLinks || [])];
             newList[index] = value;
             setMediaForm(prev => ({ ...prev, reviewLinks: newList }));
         } else {
-            const newList = [...mediaForm.vibeLinks];
+            const newList = [...(mediaForm.vibeLinks || [])];
             newList[index] = value;
             setMediaForm(prev => ({ ...prev, vibeLinks: newList }));
         }
     };
 
     const handleSaveMediaSettings = () => {
+        // Filter empty links to keep DB clean
+        const cleanReviews = (mediaForm.reviewLinks || []).filter(l => l && l.trim() !== '');
+        const cleanVibes = (mediaForm.vibeLinks || []).filter(l => l && l.trim() !== '');
+
         updateStoreSettings({
             promoBannerUrl: mediaForm.promoBannerUrl,
-            reviewLinks: mediaForm.reviewLinks,
-            vibeLinks: mediaForm.vibeLinks
+            reviewLinks: cleanReviews,
+            vibeLinks: cleanVibes
         });
+        
+        // Update local state to reflect cleaned arrays (removes empty slots from UI)
+        setMediaForm(prev => ({
+            ...prev,
+            reviewLinks: cleanReviews,
+            vibeLinks: cleanVibes
+        }));
+
         alert("Media Settings Saved Successfully!");
     };
 
@@ -589,8 +646,8 @@ export const POSView: React.FC = () => {
                                  </div>
                                  <div className="grid grid-cols-2 gap-3 mb-4">
                                      <button onClick={clearCart} className="px-4 py-3 rounded-xl border border-gray-300 text-gray-600 font-bold">Clear</button>
-                                     <button onClick={() => handlePlaceOrder('store')} disabled={cart.length === 0} className="px-4 py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                                         <Store size={18} /> Order
+                                     <button onClick={handleCheckBill} disabled={cart.length === 0} className="px-4 py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                                         <Store size={18} /> Check Bill
                                      </button>
                                  </div>
                              </div>
@@ -1176,6 +1233,103 @@ export const POSView: React.FC = () => {
                             <div className="font-bold text-xl">Total: ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}</div>
                             <button onClick={confirmAddToCart} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-brand-700">
                                 <Plus size={20}/> Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: PAYMENT / CHECK BILL */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h2 className="font-bold text-xl text-gray-800">Payment / Check Bill</h2>
+                            <button onClick={() => setShowPaymentModal(false)}><X className="text-gray-500"/></button>
+                        </div>
+                        
+                        <div className="p-6 space-y-6 overflow-y-auto">
+                            {/* Total Display */}
+                            <div className="text-center">
+                                <div className="text-sm text-gray-500 uppercase font-bold">Total Amount</div>
+                                <div className="text-5xl font-bold text-brand-600">฿{cartTotal.toLocaleString()}</div>
+                            </div>
+
+                            {/* Method Selector */}
+                            <div className="grid grid-cols-2 gap-4">
+                                 <button 
+                                    onClick={() => setPaymentMethod('cash')}
+                                    className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 font-bold transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-400'}`}
+                                 >
+                                    <Banknote size={32}/> CASH
+                                 </button>
+                                 <button 
+                                    onClick={() => setPaymentMethod('qr_transfer')}
+                                    className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 font-bold transition ${paymentMethod === 'qr_transfer' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400'}`}
+                                 >
+                                    <QrCode size={32}/> QR SCAN
+                                 </button>
+                            </div>
+
+                            {/* Cash Input */}
+                            {paymentMethod === 'cash' && (
+                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Cash Received</label>
+                                        <div className="relative mt-1">
+                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">฿</div>
+                                             <input 
+                                                type="number" 
+                                                autoFocus
+                                                className="w-full p-3 pl-8 text-xl font-bold border rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                                                value={cashReceived}
+                                                onChange={e => setCashReceived(e.target.value)}
+                                                placeholder="0.00"
+                                             />
+                                        </div>
+                                    </div>
+                                    {/* Quick Amount Buttons */}
+                                    <div className="flex gap-2">
+                                        {[100, 500, 1000].map(amt => (
+                                             <button key={amt} onClick={() => setCashReceived(amt.toString())} className="flex-1 bg-white border border-gray-300 rounded py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 shadow-sm">
+                                                ฿{amt}
+                                             </button>
+                                        ))}
+                                        <button onClick={() => setCashReceived(cartTotal.toString())} className="flex-1 bg-brand-100 border border-brand-200 rounded py-2 text-sm font-bold text-brand-700 shadow-sm">Exact</button>
+                                    </div>
+
+                                    {/* Change Display */}
+                                    <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                                        <span className="font-bold text-gray-600">Change:</span>
+                                        <span className={`text-2xl font-bold ${change < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                            ฿{Math.max(0, change).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                             {/* QR Display */}
+                            {paymentMethod === 'qr_transfer' && (
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 text-center">
+                                    <p className="font-bold text-blue-800 mb-2">Scan to Pay</p>
+                                    <div className="bg-white p-2 inline-block rounded-lg shadow-sm">
+                                        <QrCode size={128} className="text-gray-800"/>
+                                    </div>
+                                    <p className="text-xs text-blue-600 mt-2 animate-pulse">Waiting for payment confirmation...</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t bg-gray-50 flex gap-3">
+                            <button onClick={handlePrintBill} className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 shadow-sm">
+                                <Printer size={18}/> Print Bill
+                            </button>
+                            <button 
+                                onClick={handleFinalizePayment}
+                                disabled={paymentMethod === 'cash' && change < 0}
+                                className="flex-[2] py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle size={18}/> Confirm Payment
                             </button>
                         </div>
                     </div>
