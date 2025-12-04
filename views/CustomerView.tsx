@@ -137,8 +137,6 @@ export const CustomerView: React.FC = () => {
   });
 
   // Location / Distance
-  const [distance, setDistance] = useState<string | null>(null);
-  const [checkingLocation, setCheckingLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Custom Pizza Name State
@@ -151,8 +149,18 @@ export const CustomerView: React.FC = () => {
 
   const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
-  // Active Order Tracking
-  const activeOrder = orders.find(o => o.customerPhone === customer?.phone && o.status !== 'completed' && o.status !== 'cancelled');
+  // Active Order Tracking (Enhanced for Guests using Local Storage ID)
+  const [localOrderId, setLocalOrderId] = useState(() => {
+      if (typeof window !== 'undefined') return localStorage.getItem('damac_last_order');
+      return null;
+  });
+
+  const activeOrder = useMemo(() => {
+    return orders.find(o => 
+        (customer && o.customerPhone === customer.phone && o.status !== 'completed' && o.status !== 'cancelled') ||
+        (o.id === localOrderId && o.status !== 'completed' && o.status !== 'cancelled')
+    );
+  }, [orders, customer, localOrderId]);
 
   // Quick Access / Buy Again Logic
   const recentItems = useMemo(() => {
@@ -190,7 +198,6 @@ export const CustomerView: React.FC = () => {
   useEffect(() => {
       if (tableSession) {
           setOrderType('dine-in');
-          // Optional: Add to cart toast or something to notify user
       }
   }, [tableSession]);
   
@@ -359,7 +366,8 @@ export const CustomerView: React.FC = () => {
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
-        // Automatically open tracker on success
+        // Refresh local order ID from storage to ensure tracker picks it up
+        setLocalOrderId(localStorage.getItem('damac_last_order'));
         setShowTracker(true);
      }
   };

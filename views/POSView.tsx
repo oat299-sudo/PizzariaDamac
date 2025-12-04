@@ -377,7 +377,7 @@ export const POSView: React.FC = () => {
                     ) : (
                         <div className="bg-brand-600 p-1 rounded-lg"><DollarSign size={16} /></div>
                     )}
-                    <span className="font-bold text-lg tracking-tight">POS v2.0</span>
+                    <span className="font-bold text-lg tracking-tight">POS v2.1 (Manual)</span>
                 </div>
                  <div className="flex items-center gap-3">
                     {activeTab === 'order' && (
@@ -406,7 +406,7 @@ export const POSView: React.FC = () => {
                                 <DollarSign size={24} strokeWidth={3} />
                             </div>
                         )}
-                        <div className="absolute -bottom-2 w-full text-center text-[8px] text-gray-500 font-mono">v2.0</div>
+                        <div className="absolute -bottom-2 w-full text-center text-[8px] text-gray-500 font-mono">v2.1</div>
                     </div>
                     
                     <nav className="flex flex-col gap-4 w-full px-2">

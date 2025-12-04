@@ -55,6 +55,7 @@ interface StoreContextType {
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
   expenses: Expense[];
   addExpense: (expense: Expense) => Promise<void>;
@@ -754,6 +755,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             pickupTime,
             tableNumber
         };
+        
+        // SAVE ORDER ID TO LOCAL STORAGE FOR GUEST TRACKING
+        localStorage.setItem('damac_last_order', newOrder.id);
 
         // Always update local state first for responsiveness
         setOrders(prev => [newOrder, ...prev]);
@@ -821,6 +825,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           } catch(e) { console.error("Status update error", e); }
       }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+  };
+  
+  const deleteOrder = async (orderId: string) => {
+      if (isSupabaseConfigured) {
+          try {
+             await supabase.from('orders').delete().eq('id', orderId);
+          } catch(e) { console.error("Delete order error", e); }
+      }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
   };
   
   // Expenses
@@ -926,7 +939,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, deleteTopping,
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, getAllCustomers, customerLogin, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, reorderItem, generateLuckyPizza,
+      orders, placeOrder, updateOrderStatus, deleteOrder, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense, fetchOrders,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
       generateTimeSlots, canOrderForToday, seedDatabase,
