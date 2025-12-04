@@ -377,7 +377,7 @@ export const POSView: React.FC = () => {
                     ) : (
                         <div className="bg-brand-600 p-1 rounded-lg"><DollarSign size={16} /></div>
                     )}
-                    <span className="font-bold text-lg tracking-tight">POS</span>
+                    <span className="font-bold text-lg tracking-tight">POS v2.0</span>
                 </div>
                  <div className="flex items-center gap-3">
                     {activeTab === 'order' && (
@@ -406,6 +406,7 @@ export const POSView: React.FC = () => {
                                 <DollarSign size={24} strokeWidth={3} />
                             </div>
                         )}
+                        <div className="absolute -bottom-2 w-full text-center text-[8px] text-gray-500 font-mono">v2.0</div>
                     </div>
                     
                     <nav className="flex flex-col gap-4 w-full px-2">
@@ -739,152 +740,8 @@ export const POSView: React.FC = () => {
                                  </div>
                              </div>
                          </div>
-
-                         {/* 2. MEDIA MANAGER (New) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <div className="flex justify-between items-center mb-4">
-                                 <h3 className="font-bold text-brand-600 text-sm uppercase flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
-                                 <button onClick={handleSaveMediaSettings} className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                     <Save size={14}/> Save Media Links
-                                 </button>
-                             </div>
-                             
-                             {/* Big Banner Upload */}
-                             <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                                 <label className="text-sm font-bold text-gray-700 mb-2 block">Main Banner Image</label>
-                                 <div className="flex flex-col md:flex-row gap-4 items-start">
-                                     {mediaForm.promoBannerUrl ? (
-                                         <div className="w-full md:w-64 h-32 rounded-lg overflow-hidden border bg-black">
-                                             <img src={mediaForm.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
-                                         </div>
-                                     ) : (
-                                         <div className="w-full md:w-64 h-32 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">No Banner</div>
-                                     )}
-                                     <div className="flex-1 space-y-3 w-full">
-                                         <label className="flex items-center justify-center gap-2 w-full p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition font-bold text-gray-600 text-sm">
-                                             <Upload size={16}/> Upload New Photo
-                                             <input type="file" hidden accept="image/*" onChange={handleBannerUpload} />
-                                         </label>
-                                         <div className="relative">
-                                             <Link size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                             <input 
-                                                 className="w-full border rounded p-2 pl-9 text-xs" 
-                                                 placeholder="Or paste image URL..." 
-                                                 value={mediaForm.promoBannerUrl || ''} 
-                                                 onChange={e => setMediaForm({ ...mediaForm, promoBannerUrl: e.target.value })}
-                                             />
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
-
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                 {/* Review Links */}
-                                 <div>
-                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><Star size={12}/> Review Videos (Max 5)</h4>
-                                     <p className="text-[10px] text-gray-400 mb-2">Paste YouTube, TikTok, or Facebook Reel links.</p>
-                                     <div className="space-y-2">
-                                         {[0, 1, 2, 3, 4].map(idx => (
-                                             <div key={idx} className="flex gap-2 items-center">
-                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
-                                                 <input 
-                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
-                                                     placeholder="https://..."
-                                                     value={mediaForm.reviewLinks?.[idx] || ''}
-                                                     onChange={e => updateLocalMediaLink('review', idx, e.target.value)}
-                                                 />
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-
-                                 {/* Vibe Links */}
-                                 <div>
-                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><PlayCircle size={12}/> Vibe Videos (Max 5)</h4>
-                                     <p className="text-[10px] text-gray-400 mb-2">Show off the atmosphere of your restaurant.</p>
-                                     <div className="space-y-2">
-                                         {[0, 1, 2, 3, 4].map(idx => (
-                                             <div key={idx} className="flex gap-2 items-center">
-                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
-                                                 <input 
-                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
-                                                     placeholder="https://..."
-                                                     value={mediaForm.vibeLinks?.[idx] || ''}
-                                                     onChange={e => updateLocalMediaLink('vibe', idx, e.target.value)}
-                                                 />
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-                             </div>
-                         </div>
                          
-                         {/* 3. News Manager (New) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News Manager</h3>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 {/* Form */}
-                                 <div>
-                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Add New News</h4>
-                                     <form onSubmit={handleAddNews} className="space-y-3">
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
-                                         <textarea className="w-full border rounded p-2 text-sm h-20" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Image URL (Optional)" value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}/>
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Link URL (Optional)" value={newsForm.linkUrl} onChange={e => setNewsForm({...newsForm, linkUrl: e.target.value})}/>
-                                         <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Add News</button>
-                                     </form>
-                                 </div>
-                                 {/* List */}
-                                 <div className="border-l pl-6 max-h-60 overflow-y-auto space-y-3">
-                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Existing News</h4>
-                                     {storeSettings.newsItems && storeSettings.newsItems.length > 0 ? (
-                                         storeSettings.newsItems.map(item => (
-                                             <div key={item.id} className="border p-2 rounded flex justify-between items-start bg-gray-50">
-                                                 <div>
-                                                     <div className="font-bold text-sm">{item.title}</div>
-                                                     <div className="text-[10px] text-gray-500 line-clamp-1">{item.summary}</div>
-                                                 </div>
-                                                 <button onClick={() => deleteNewsItem(item.id)} className="text-red-500"><Trash2 size={14}/></button>
-                                             </div>
-                                         ))
-                                     ) : <p className="text-xs text-gray-400">No news items.</p>}
-                                 </div>
-                             </div>
-                         </div>
-                         
-                         {/* 4. Contact & Links */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <div className="flex justify-between items-center mb-3">
-                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
-                                 <button onClick={handleSaveContactSettings} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                     <Save size={14}/> Save Settings
-                                 </button>
-                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.reviewUrl || ''} onChange={e => setContactForm({ ...contactForm, reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Map URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.mapUrl || ''} onChange={e => setContactForm({ ...contactForm, mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Facebook size={12}/> Facebook URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.facebookUrl || ''} onChange={e => setContactForm({ ...contactForm, facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MessageCircle size={12}/> Line URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.lineUrl || ''} onChange={e => setContactForm({ ...contactForm, lineUrl: e.target.value })} placeholder="https://line.me/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Phone size={12}/> Contact Phone</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.contactPhone || ''} onChange={e => setContactForm({ ...contactForm, contactPhone: e.target.value })} placeholder="099..."/>
-                                 </div>
-                             </div>
-                         </div>
-                         
-                         {/* 5. Table QR Code Generator (New) */}
+                         {/* 2. Table QR Code Generator (MOVED TO TOP) */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200 ring-2 ring-brand-100">
                              <h3 className="font-bold text-gray-700 text-xs uppercase mb-3 flex items-center gap-2">
                                  <QrCode size={14}/> Table QR Generator <span className="bg-red-500 text-white text-[10px] px-1 rounded animate-pulse">NEW</span>
@@ -967,6 +824,150 @@ export const POSView: React.FC = () => {
                              </div>
                          </div>
 
+                         {/* 3. MEDIA MANAGER (New) */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <div className="flex justify-between items-center mb-4">
+                                 <h3 className="font-bold text-brand-600 text-sm uppercase flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
+                                 <button onClick={handleSaveMediaSettings} className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                                     <Save size={14}/> Save Media Links
+                                 </button>
+                             </div>
+                             
+                             {/* Big Banner Upload */}
+                             <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                 <label className="text-sm font-bold text-gray-700 mb-2 block">Main Banner Image</label>
+                                 <div className="flex flex-col md:flex-row gap-4 items-start">
+                                     {mediaForm.promoBannerUrl ? (
+                                         <div className="w-full md:w-64 h-32 rounded-lg overflow-hidden border bg-black">
+                                             <img src={mediaForm.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
+                                         </div>
+                                     ) : (
+                                         <div className="w-full md:w-64 h-32 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">No Banner</div>
+                                     )}
+                                     <div className="flex-1 space-y-3 w-full">
+                                         <label className="flex items-center justify-center gap-2 w-full p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition font-bold text-gray-600 text-sm">
+                                             <Upload size={16}/> Upload New Photo
+                                             <input type="file" hidden accept="image/*" onChange={handleBannerUpload} />
+                                         </label>
+                                         <div className="relative">
+                                             <Link size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                             <input 
+                                                 className="w-full border rounded p-2 pl-9 text-xs" 
+                                                 placeholder="Or paste image URL..." 
+                                                 value={mediaForm.promoBannerUrl || ''} 
+                                                 onChange={e => setMediaForm({ ...mediaForm, promoBannerUrl: e.target.value })}
+                                             />
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                 {/* Review Links */}
+                                 <div>
+                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><Star size={12}/> Review Videos (Max 5)</h4>
+                                     <p className="text-[10px] text-gray-400 mb-2">Paste YouTube, TikTok, or Facebook Reel links.</p>
+                                     <div className="space-y-2">
+                                         {[0, 1, 2, 3, 4].map(idx => (
+                                             <div key={idx} className="flex gap-2 items-center">
+                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
+                                                 <input 
+                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
+                                                     placeholder="https://..."
+                                                     value={mediaForm.reviewLinks?.[idx] || ''}
+                                                     onChange={e => updateLocalMediaLink('review', idx, e.target.value)}
+                                                 />
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+
+                                 {/* Vibe Links */}
+                                 <div>
+                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><PlayCircle size={12}/> Vibe Videos (Max 5)</h4>
+                                     <p className="text-[10px] text-gray-400 mb-2">Show off the atmosphere of your restaurant.</p>
+                                     <div className="space-y-2">
+                                         {[0, 1, 2, 3, 4].map(idx => (
+                                             <div key={idx} className="flex gap-2 items-center">
+                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
+                                                 <input 
+                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
+                                                     placeholder="https://..."
+                                                     value={mediaForm.vibeLinks?.[idx] || ''}
+                                                     onChange={e => updateLocalMediaLink('vibe', idx, e.target.value)}
+                                                 />
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                         
+                         {/* 4. News Manager (New) */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News Manager</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 {/* Form */}
+                                 <div>
+                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Add New News</h4>
+                                     <form onSubmit={handleAddNews} className="space-y-3">
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
+                                         <textarea className="w-full border rounded p-2 text-sm h-20" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Image URL (Optional)" value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}/>
+                                         <input className="w-full border rounded p-2 text-sm" placeholder="Link URL (Optional)" value={newsForm.linkUrl} onChange={e => setNewsForm({...newsForm, linkUrl: e.target.value})}/>
+                                         <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Add News</button>
+                                     </form>
+                                 </div>
+                                 {/* List */}
+                                 <div className="border-l pl-6 max-h-60 overflow-y-auto space-y-3">
+                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Existing News</h4>
+                                     {storeSettings.newsItems && storeSettings.newsItems.length > 0 ? (
+                                         storeSettings.newsItems.map(item => (
+                                             <div key={item.id} className="border p-2 rounded flex justify-between items-start bg-gray-50">
+                                                 <div>
+                                                     <div className="font-bold text-sm">{item.title}</div>
+                                                     <div className="text-[10px] text-gray-500 line-clamp-1">{item.summary}</div>
+                                                 </div>
+                                                 <button onClick={() => deleteNewsItem(item.id)} className="text-red-500"><Trash2 size={14}/></button>
+                                             </div>
+                                         ))
+                                     ) : <p className="text-xs text-gray-400">No news items.</p>}
+                                 </div>
+                             </div>
+                         </div>
+                         
+                         {/* 5. Contact & Links */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <div className="flex justify-between items-center mb-3">
+                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
+                                 <button onClick={handleSaveContactSettings} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                                     <Save size={14}/> Save Settings
+                                 </button>
+                             </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.reviewUrl || ''} onChange={e => setContactForm({ ...contactForm, reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Map URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.mapUrl || ''} onChange={e => setContactForm({ ...contactForm, mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Facebook size={12}/> Facebook URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.facebookUrl || ''} onChange={e => setContactForm({ ...contactForm, facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MessageCircle size={12}/> Line URL</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.lineUrl || ''} onChange={e => setContactForm({ ...contactForm, lineUrl: e.target.value })} placeholder="https://line.me/..."/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Phone size={12}/> Contact Phone</label>
+                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.contactPhone || ''} onChange={e => setContactForm({ ...contactForm, contactPhone: e.target.value })} placeholder="099..."/>
+                                 </div>
+                             </div>
+                         </div>
+                         
                          {/* 6. Menu Actions */}
                          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
