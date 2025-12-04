@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
@@ -377,7 +376,7 @@ export const POSView: React.FC = () => {
                     ) : (
                         <div className="bg-brand-600 p-1 rounded-lg"><DollarSign size={16} /></div>
                     )}
-                    <span className="font-bold text-lg tracking-tight">POS v2.1 (Manual)</span>
+                    <span className="font-bold text-lg tracking-tight">POS v2.1</span>
                 </div>
                  <div className="flex items-center gap-3">
                     {activeTab === 'order' && (
@@ -754,7 +753,7 @@ export const POSView: React.FC = () => {
                                              <li>Set Website Address (e.g. https://pizza-damac.com)</li>
                                              <li>Enter Table Number (e.g. 5)</li>
                                              <li>Click "Print QR" & Stick on table</li>
-                                             <li>Customer scans -> App opens in "Table Mode"</li>
+                                             <li>Customer scans &rarr; App opens in "Table Mode"</li>
                                          </ol>
                                      </div>
                                      <div className="space-y-3">
