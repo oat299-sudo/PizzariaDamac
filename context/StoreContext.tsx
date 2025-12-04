@@ -74,6 +74,9 @@ interface StoreContextType {
   // News & Media
   addNewsItem: (item: NewsItem) => Promise<void>;
   deleteNewsItem: (id: string) => Promise<void>;
+
+  // Table QR
+  tableSession: string | null;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -107,7 +110,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
   };
 
-  // --- View Navigation ---
+  // --- View Navigation & Table Session ---
   // Initialize from URL params so direct links work
   const [currentView, setCurrentView] = useState<AppView>(() => {
     if (typeof window !== 'undefined') {
@@ -117,12 +120,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
     return 'customer';
   });
+  
+  // Check for Table Param (QR Code Scan)
+  const [tableSession, setTableSession] = useState<string | null>(() => {
+      if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          return params.get('table');
+      }
+      return null;
+  });
 
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const view = params.get('view');
+      const table = params.get('table');
       setCurrentView((view === 'kitchen' || view === 'pos') ? view : 'customer');
+      if (table) setTableSession(table);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -136,6 +150,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             url.searchParams.delete('view');
         } else {
             url.searchParams.set('view', view);
+        }
+        // Preserve table param if it exists
+        if (tableSession) {
+            url.searchParams.set('table', tableSession);
         }
         window.history.pushState({}, '', url.toString());
         window.scrollTo(0, 0);
@@ -912,7 +930,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       expenses, addExpense, deleteExpense, fetchOrders,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
       generateTimeSlots, canOrderForToday, seedDatabase,
-      addNewsItem, deleteNewsItem
+      addNewsItem, deleteNewsItem,
+      tableSession
     }}>
       {children}
     </StoreContext.Provider>

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -56,6 +56,10 @@ export const POSView: React.FC = () => {
         imageUrl: '',
         linkUrl: ''
     });
+    
+    // Table QR State
+    const [qrTableNum, setQrTableNum] = useState('1');
+    const [qrBaseUrl, setQrBaseUrl] = useState(() => window.location.origin);
 
     // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
     const [mediaForm, setMediaForm] = useState({
@@ -346,6 +350,16 @@ export const POSView: React.FC = () => {
     const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
     const netProfit = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
 
+    // Helper to group toppings
+    const groupedToppings = {
+        sauce: toppings.filter(t => t.category === 'sauce'),
+        cheese: toppings.filter(t => t.category === 'cheese'),
+        seasoning: toppings.filter(t => t.category === 'seasoning'),
+        meat: toppings.filter(t => t.category === 'meat'),
+        vegetable: toppings.filter(t => t.category === 'vegetable'),
+        other: toppings.filter(t => !t.category || t.category === 'other'),
+    };
+
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
@@ -360,6 +374,14 @@ export const POSView: React.FC = () => {
                     <span className="font-bold text-lg tracking-tight">POS</span>
                 </div>
                  <div className="flex items-center gap-3">
+                    {activeTab === 'order' && (
+                       <button 
+                         onClick={() => setIsEditMode(!isEditMode)} 
+                         className={`p-1.5 rounded-full ${isEditMode ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-800 text-gray-400'}`}
+                       >
+                         <Edit2 size={16}/>
+                       </button>
+                    )}
                     <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${isStoreOpen ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         <div className={`w-2 h-2 rounded-full ${isStoreOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>
                         {isStoreOpen ? 'OPEN' : 'CLOSED'}
@@ -410,12 +432,12 @@ export const POSView: React.FC = () => {
             </aside>
 
             {/* --- MAIN CONTENT --- */}
-            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-0 md:pb-0 h-full">
+            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0 h-full">
                 
                 {/* VIEW: ORDER */}
                 {activeTab === 'order' && (
                     <>
-                        <div className="flex-1 flex flex-col overflow-hidden relative h-full pb-16 md:pb-0">
+                        <div className="flex-1 flex flex-col overflow-hidden relative h-full pb-0 md:pb-0">
                             {/* Categories Bar */}
                             <div className="bg-white/95 backdrop-blur z-10 sticky top-0 shadow-sm md:shadow-none p-2 md:p-6 md:pt-6 shrink-0">
                                 <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
@@ -854,8 +876,89 @@ export const POSView: React.FC = () => {
                                  </div>
                              </div>
                          </div>
+                         
+                         {/* 5. Table QR Code Generator (New) */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><QrCode size={14}/> Table QR Generator</h3>
+                             <div className="flex flex-col md:flex-row gap-6 items-start">
+                                 <div className="space-y-4 max-w-sm">
+                                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                         <h4 className="font-bold text-blue-800 text-xs uppercase mb-2">How it works:</h4>
+                                         <ol className="list-decimal list-inside text-xs text-blue-700 space-y-1">
+                                             <li>Set Website Address (e.g. https://pizza-damac.com)</li>
+                                             <li>Enter Table Number (e.g. 5)</li>
+                                             <li>Click "Print QR" & Stick on table</li>
+                                             <li>Customer scans -> App opens in "Table Mode"</li>
+                                         </ol>
+                                     </div>
+                                     <div className="space-y-3">
+                                         <div>
+                                            <label className="text-xs font-bold text-gray-700 block mb-1">Website Address (Base URL):</label>
+                                            <input 
+                                                type="text" 
+                                                className="border rounded p-2 w-full text-xs" 
+                                                value={qrBaseUrl} 
+                                                onChange={e => setQrBaseUrl(e.target.value)}
+                                                placeholder="https://..."
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-1">Change this from 'localhost' to your real website URL so phones can scan it!</p>
+                                         </div>
+                                         <div className="flex gap-2 items-center">
+                                             <label className="text-xs font-bold text-gray-700 whitespace-nowrap">Table Number:</label>
+                                             <input 
+                                                type="number" 
+                                                className="border rounded p-2 w-24 text-center font-bold" 
+                                                placeholder="1" 
+                                                value={qrTableNum} 
+                                                onChange={e => setQrTableNum(e.target.value)}
+                                             />
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 {qrTableNum && (
+                                     <div className="flex gap-6 items-center p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                         <img 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${qrBaseUrl}/?table=${qrTableNum}`)}`} 
+                                            alt={`Table ${qrTableNum} QR`} 
+                                            className="w-32 h-32"
+                                         />
+                                         <div className="space-y-2">
+                                             <div className="font-bold text-lg">Table {qrTableNum}</div>
+                                             <a 
+                                                 href={`${qrBaseUrl}/?table=${qrTableNum}`} 
+                                                 target="_blank"
+                                                 className="text-xs text-blue-600 hover:underline block mb-2"
+                                             >
+                                                 Test Link
+                                             </a>
+                                             <button 
+                                                 onClick={() => {
+                                                     const w = window.open('', '_blank');
+                                                     w?.document.write(`
+                                                         <html>
+                                                             <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+                                                                 <h1 style="font-size:48px;margin-bottom:10px;">Table ${qrTableNum}</h1>
+                                                                 <p style="margin-bottom:30px;font-size:24px;">Scan to Order</p>
+                                                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${qrBaseUrl}/?table=${qrTableNum}`)}" style="width:400px;height:400px;" />
+                                                                 <p style="margin-top:30px;color:#666;">Pizza Damac</p>
+                                                                 <script>window.print();</script>
+                                                             </body>
+                                                         </html>
+                                                     `);
+                                                     w?.document.close();
+                                                 }}
+                                                 className="bg-gray-900 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
+                                             >
+                                                 <Printer size={14}/> Print QR
+                                             </button>
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                         </div>
 
-                         {/* 5. Menu Actions */}
+                         {/* 6. Menu Actions */}
                          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
                              <div className="flex flex-wrap gap-4">
@@ -874,6 +977,26 @@ export const POSView: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            {/* --- MOBILE BOTTOM NAV --- */}
+            <div className="md:hidden bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                <button onClick={() => setActiveTab('order')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
+                    <ShoppingBag size={20}/>
+                    <span className="text-[10px] font-bold">Order</span>
+                </button>
+                <button onClick={() => setActiveTab('sales')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'sales' ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <PieChart size={20}/>
+                    <span className="text-[10px] font-bold">Sales</span>
+                </button>
+                <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'expenses' ? 'text-yellow-600' : 'text-gray-400'}`}>
+                    <Calculator size={20}/>
+                    <span className="text-[10px] font-bold">Expenses</span>
+                </button>
+                <button onClick={() => setActiveTab('manage')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
+                    <Settings size={20}/>
+                    <span className="text-[10px] font-bold">Manage</span>
+                </button>
+            </div>
 
             {/* Modal: Add/Edit Item */}
             {showItemModal && (
@@ -941,6 +1064,53 @@ export const POSView: React.FC = () => {
                              <button onClick={handleSaveItem} className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-black shadow-lg">
                                  {itemForm.id ? t('updateItem') : t('saveItem')}
                              </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Modal: Customize Item (POS) */}
+            {selectedPizza && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                             <div>
+                                 <h2 className="text-xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
+                                 <p className="text-sm text-brand-600 font-bold">Base: ฿{selectedPizza.basePrice}</p>
+                             </div>
+                             <button onClick={() => setSelectedPizza(null)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X size={20}/></button>
+                        </div>
+                        
+                        {/* Toppings Grid (Simplified for POS) */}
+                        <div className="p-4 overflow-y-auto bg-white flex-1">
+                             <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-1"><ChefHat size={14}/> Customize / Add Toppings</h3>
+                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                 {toppings.map(topping => {
+                                     const isSelected = selectedToppings.some(t => t.id === topping.id);
+                                     return (
+                                         <button
+                                             key={topping.id}
+                                             onClick={() => toggleTopping(topping)}
+                                             className={`p-3 rounded-xl border text-left transition relative overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                         >
+                                             <div className="flex justify-between items-center relative z-10">
+                                                 <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
+                                                 {isSelected && <CheckCircle2 size={16} className="text-brand-600"/>}
+                                             </div>
+                                             <div className="text-xs opacity-70 mt-1 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
+                                         </button>
+                                     )
+                                 })}
+                             </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                            <div className="font-bold text-xl">Total: ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}</div>
+                            <button onClick={confirmAddToCart} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-brand-700">
+                                <Plus size={20}/> Add to Cart
+                            </button>
                         </div>
                     </div>
                 </div>

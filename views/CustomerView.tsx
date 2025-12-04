@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers } from 'lucide-react';
 
 // --- EMBED HELPER ---
-const VideoCard: React.FC<{ url: string }> = ({ url }) => {
+const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
     if (!url) return null;
     
     let embedSrc = '';
@@ -96,7 +96,7 @@ export const CustomerView: React.FC = () => {
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
-    toppings, fetchOrders
+    toppings, fetchOrders, tableSession
   } = useStore();
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
@@ -123,7 +123,7 @@ export const CustomerView: React.FC = () => {
   const [loginPassword, setLoginPassword] = useState('');
 
   // Delivery / Checkout State
-  const [orderType, setOrderType] = useState<'online' | 'delivery'>('online');
+  const [orderType, setOrderType] = useState<'online' | 'delivery' | 'dine-in'>('online');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
@@ -184,6 +184,14 @@ export const CustomerView: React.FC = () => {
       setDeliveryAddress(customer.address);
     }
   }, [customer]);
+  
+  // Effect: Force Dine-in mode if Table Session (QR) is active
+  useEffect(() => {
+      if (tableSession) {
+          setOrderType('dine-in');
+          // Optional: Add to cart toast or something to notify user
+      }
+  }, [tableSession]);
   
   // Reset date if store opens
   useEffect(() => {
@@ -325,7 +333,8 @@ export const CustomerView: React.FC = () => {
   };
 
   const handlePlaceOrderClick = async () => {
-     if (!customer) {
+     // Guest ordering allowed for Table Session
+     if (!customer && !tableSession) {
         setShowAuthModal(true);
         return;
      }
@@ -342,7 +351,9 @@ export const CustomerView: React.FC = () => {
             fee: 0 // Will be calculated by staff
         } : undefined,
         paymentMethod: paymentMethod,
-        pickupTime: pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP'
+        pickupTime: orderType === 'online' && pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP',
+        tableNumber: tableSession || undefined, // PASS TABLE NUMBER
+        source: 'store'
      });
      setIsSubmitting(false);
      if (success) {
@@ -471,7 +482,12 @@ export const CustomerView: React.FC = () => {
 
               <div className="flex items-center gap-3">
                  <button onClick={toggleLanguage} className="w-9 h-9 rounded-full bg-orange-100 font-bold text-xs text-brand-700 hover:bg-orange-200 transition">{language.toUpperCase()}</button>
-                 {customer ? (
+                 {/* TABLE QR BANNER */}
+                 {tableSession ? (
+                    <div className="bg-green-600 text-white px-3 py-1.5 rounded-full text-xs font-bold animate-pulse flex items-center gap-1">
+                        <Utensils size={12}/> Table {tableSession}
+                    </div>
+                 ) : customer ? (
                      <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 bg-orange-100 rounded-full py-1.5 px-3 hover:bg-orange-200 transition">
                          <User size={16} className="text-brand-700"/>
                          <span className="text-sm font-bold hidden md:inline text-brand-900">{customer.name}</span>
@@ -487,9 +503,19 @@ export const CustomerView: React.FC = () => {
               </div>
            </div>
         </header>
+        
+        {/* TABLE MODE BANNER */}
+        {tableSession && (
+             <div className="bg-green-600 text-white p-3 text-center sticky top-16 z-20 shadow-md">
+                 <div className="font-bold text-lg flex items-center justify-center gap-2">
+                     <Utensils size={20}/> You are ordering for Table {tableSession}
+                 </div>
+                 <p className="text-xs opacity-90">Please place your order, and we will bring it to your table.</p>
+             </div>
+        )}
 
         {/* Categories */}
-        <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
+        <div className={`bg-white border-b sticky z-30 shadow-sm ${tableSession ? 'top-28' : 'top-16'}`}>
             <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
                 {CATEGORIES.map(cat => (
                     <button 
@@ -515,8 +541,8 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* Guest Banner */}
-        {!customer && activeCategory === 'promotion' && (
+        {/* Guest Banner (Only show if NOT in table mode, because table guests might be anon) */}
+        {!customer && activeCategory === 'promotion' && !tableSession && (
             <div className="bg-brand-600 text-white py-3 text-center cursor-pointer hover:bg-brand-700 transition" onClick={() => setShowAuthModal(true)}>
                 <span className="font-bold flex items-center justify-center gap-2">
                     <User size={18}/> Please Login or Register to start ordering and earning points!
@@ -608,60 +634,31 @@ export const CustomerView: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {storeSettings.newsItems.map(news => (
                              <div key={news.id} className="bg-white rounded-xl p-4 shadow-sm border border-orange-200 flex flex-col md:flex-row gap-4 items-center">
-                                <div className="w-full md:w-32 h-32 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                                <div className="w-full md:w-32 h-32 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                                     <img src={news.imageUrl} className="w-full h-full object-cover"/>
                                 </div>
                                 <div className="flex-1">
-                                    <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">{new Date(news.date).toLocaleDateString()}</span>
-                                    <h3 className="font-bold text-lg leading-tight mb-1">{news.title}</h3>
-                                    <p className="text-gray-600 text-sm line-clamp-2">{news.summary}</p>
-                                    {news.linkUrl && <a href={news.linkUrl} target="_blank" rel="noreferrer" className="text-brand-600 text-xs font-bold mt-2 hover:underline inline-block">Read More</a>}
+                                    <h3 className="font-bold text-gray-800">{news.title}</h3>
+                                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">{news.summary}</p>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className="text-xs text-gray-400">{new Date(news.date).toLocaleDateString()}</span>
+                                        {news.linkUrl && (
+                                            <a href={news.linkUrl} target="_blank" className="text-brand-600 text-xs font-bold flex items-center gap-1 hover:underline">
+                                                Read More <ArrowRight size={12}/>
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                             </div>
                         ))}
                     </div>
                  </div>
             </section>
         )}
 
-        {/* Best Sellers (Only show on Promotion page or if not browsing a specific other category) */}
-        {menu.some(p => p.isBestSeller) && activeCategory !== 'promotion' && (
-             <div className="max-w-7xl mx-auto px-4 py-6">
-                 <h2 className="font-bold text-xl mb-4 flex items-center gap-2 text-gray-800"><Star className="text-yellow-500" fill="currentColor"/> Best Sellers</h2>
-                 <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4">
-                     {menu.filter(p => p.isBestSeller).map(item => (
-                         <div key={'bs-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[200px] bg-white rounded-xl shadow-sm p-3 border border-yellow-100 cursor-pointer hover:shadow-md transition">
-                             <img src={item.image} className="w-full h-24 object-cover rounded-lg mb-2"/>
-                             <h3 className="font-bold text-sm truncate">{getLocalizedItem(item).name}</h3>
-                             <p className="text-brand-600 font-bold text-sm">฿{item.basePrice}</p>
-                         </div>
-                     ))}
-                 </div>
-             </div>
-        )}
-
-        {/* Store Status Banner */}
-        {!isStoreOpen && !canOrderForToday() && (
-             <div className="bg-red-600 text-white p-4 text-center sticky top-28 z-20 shadow-md">
-                 <div className="font-bold text-lg flex items-center justify-center gap-2">
-                     <Clock size={20}/> {t('storeClosed')}
-                 </div>
-                 <p className="text-sm opacity-90">{closedMessage}</p>
-                 <p className="text-xs mt-1 font-bold bg-white/20 inline-block px-2 py-1 rounded">Pre-ordering available for Tomorrow</p>
-             </div>
-        )}
-        {!isStoreOpen && canOrderForToday() && (
-             <div className="bg-orange-500 text-white p-4 text-center sticky top-28 z-20 shadow-md">
-                 <div className="font-bold text-lg flex items-center justify-center gap-2">
-                     <Clock size={20}/> Pre-Order for Lunch
-                 </div>
-                 <p className="text-sm opacity-90">First available slot today is {timeSlots[0]}</p>
-             </div>
-        )}
-
-        {/* Menu Grid - FOR OTHER CATEGORIES (Not Promotion) */}
+        {/* Regular Menu Grid (If NOT promotion, OR below sections) */}
         {activeCategory !== 'promotion' && (
-            <main className="max-w-7xl mx-auto px-4 py-6 flex-1">
+            <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {menu.filter(p => p.category === activeCategory).map(item => {
                         const localized = getLocalizedItem(item);
@@ -687,523 +684,553 @@ export const CustomerView: React.FC = () => {
             </main>
         )}
         
-        {/* Contact Us Footer Section */}
-        <section className="bg-gray-800 text-gray-300 py-8">
-            <div className="max-w-7xl mx-auto px-4">
-                 <h2 className="text-xl font-bold text-white mb-6 flex items-center justify-center gap-2"><MapPin className="text-brand-500"/> {t('findUs')}</h2>
-                 <div className="flex flex-wrap justify-center gap-6 md:gap-12">
-                     
-                     {/* Map */}
-                     <a href={storeSettings.mapUrl || "https://maps.google.com"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
-                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-green-600 group-hover:text-white transition text-green-500"><MapPin size={24}/></div>
-                         <span className="text-xs font-bold">Maps</span>
-                     </a>
-
-                     {/* Facebook */}
-                     <a href={storeSettings.facebookUrl || "#"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
-                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-blue-600 group-hover:text-white transition text-blue-500"><Facebook size={24}/></div>
-                         <span className="text-xs font-bold">Facebook</span>
-                     </a>
-
-                     {/* Line */}
-                     <a href={storeSettings.lineUrl || "#"} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
-                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-green-500 group-hover:text-white transition text-green-400"><MessageCircle size={24}/></div>
-                         <span className="text-xs font-bold">Line</span>
-                     </a>
-
-                     {/* Phone */}
-                     <a href={`tel:${storeSettings.contactPhone}`} className="flex flex-col items-center gap-2 text-gray-400 hover:text-white transition group">
-                         <div className="bg-gray-700 p-3 rounded-full group-hover:bg-orange-500 group-hover:text-white transition text-orange-400"><Phone size={24}/></div>
-                         <span className="text-xs font-bold">Call</span>
-                     </a>
-                 </div>
-            </div>
-        </section>
-        
-        {/* Footer with Staff Access */}
-        <footer className="bg-gray-900 text-gray-500 py-8 border-t border-gray-800">
-            <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="text-sm">© 2025 Pizza Damac Nonthaburi</div>
-                <div className="flex gap-4">
-                    <button onClick={() => navigateTo('kitchen')} className="flex items-center gap-2 hover:text-white transition"><ChefHat size={16}/> {t('kitchen')}</button>
-                    <button onClick={() => navigateTo('pos')} className="flex items-center gap-2 hover:text-white transition"><Lock size={16}/> {t('pos')}</button>
+        {/* --- FOOTER --- */}
+        <footer className="bg-gray-900 text-white py-12 mt-auto">
+            <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
+                <div>
+                     <h3 className="font-bold text-xl mb-4 text-brand-500 flex items-center justify-center md:justify-start gap-2"><ChefHat/> Pizza Damac</h3>
+                     <p className="text-gray-400 text-sm">Authentic Italian Pizza in Nonthaburi.<br/>Fresh ingredients, delicious taste.</p>
                 </div>
+                <div className="flex flex-col items-center md:items-start">
+                    <h3 className="font-bold text-lg mb-4">{t('findUs')}</h3>
+                    <div className="flex gap-4">
+                        <a href={storeSettings.mapUrl} target="_blank" className="bg-gray-800 p-2 rounded-full hover:bg-brand-600 transition"><MapPin size={20}/></a>
+                        <a href={storeSettings.facebookUrl} target="_blank" className="bg-gray-800 p-2 rounded-full hover:bg-brand-600 transition"><Facebook size={20}/></a>
+                        <a href={storeSettings.lineUrl} target="_blank" className="bg-gray-800 p-2 rounded-full hover:bg-brand-600 transition"><MessageCircle size={20}/></a>
+                        <a href={`tel:${storeSettings.contactPhone}`} className="bg-gray-800 p-2 rounded-full hover:bg-brand-600 transition"><Phone size={20}/></a>
+                    </div>
+                </div>
+                <div className="flex flex-col items-center md:items-start">
+                    <h3 className="font-bold text-lg mb-4">Opening Hours</h3>
+                    <p className="text-gray-400 text-sm">Everyday: 11:00 - 20:30</p>
+                </div>
+            </div>
+            
+            <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-500 text-xs">
+                <div className="flex justify-center gap-4 mb-4">
+                    <button onClick={() => navigateTo('kitchen')} className="hover:text-white transition flex items-center gap-1"><Lock size={10}/> Kitchen Display</button>
+                    <button onClick={() => navigateTo('pos')} className="hover:text-white transition flex items-center gap-1"><Lock size={10}/> POS System</button>
+                </div>
+                <p>&copy; 2024 Pizza Damac. All rights reserved.</p>
             </div>
         </footer>
 
-        {/* ACTIVE ORDER LIVE TRACKER (Floating) */}
-        {activeOrder && (
-            <div className="fixed bottom-4 left-4 right-4 z-40 md:left-auto md:right-8 md:bottom-8 md:w-96 animate-fade-in">
-                <div className="bg-gray-900 text-white p-4 rounded-xl shadow-2xl border border-gray-700">
-                    <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-2">
-                             <div className="relative">
-                                 <Activity size={20} className="text-green-400 animate-pulse"/>
-                             </div>
-                             <span className="font-bold text-sm">Order Status #{activeOrder.id.slice(-4)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button onClick={handleManualRefresh} className={`text-xs bg-gray-700 p-1.5 rounded hover:bg-gray-600 transition ${isRefreshing ? 'animate-spin' : ''}`}>
-                                <RotateCw size={14}/>
-                            </button>
-                            <button onClick={() => setShowProfile(true)} className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">View</button>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                         <span className="text-lg font-bold text-brand-400 uppercase">{t(activeOrder.status as any)}</span>
-                         <span className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</span>
-                    </div>
-                    {/* Simple Progress Bar */}
-                    <div className="w-full bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
-                        <div 
-                            className={`h-full bg-brand-500 transition-all duration-1000 ${
-                                activeOrder.status === 'confirmed' ? 'w-[25%]' : 
-                                activeOrder.status === 'cooking' ? 'w-[60%]' :
-                                activeOrder.status === 'ready' ? 'w-[100%]' : 'w-[5%]'
-                            }`}
-                        ></div>
-                    </div>
-                    
-                    {/* Rate Us Button (Moved Here) */}
-                    <div className="mt-4 pt-3 border-t border-gray-700 text-center">
-                        <a href={storeSettings.reviewUrl || "#"} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center justify-center gap-1">
-                            <Star size={12} fill="currentColor"/> Review us on Google Maps
-                        </a>
-                    </div>
-                </div>
-            </div>
+        {/* --- LIVE ORDER TRACKER --- */}
+        {activeOrder && !showTracker && !isCartOpen && (
+             <div className="fixed bottom-4 right-4 z-40 animate-bounce-short">
+                 <button onClick={() => setShowTracker(true)} className="bg-brand-600 text-white p-3 rounded-full shadow-lg border-2 border-white flex items-center gap-2">
+                     <Activity className="animate-pulse"/>
+                     <span className="font-bold text-sm hidden md:inline">{t('trackOrder')}</span>
+                 </button>
+             </div>
         )}
 
-        {/* Customization Modal */}
-        {selectedPizza && (
-            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-4">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-                     {/* Header */}
-                     <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                        <h3 className="font-bold text-xl">{getLocalizedItem(selectedPizza).name}</h3>
-                        <button onClick={() => setSelectedPizza(null)} className="p-2 bg-gray-200 rounded-full"><X size={20}/></button>
+        {showTracker && activeOrder && (
+             <div className="fixed bottom-4 right-4 z-40 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in">
+                 <div className="bg-brand-600 p-3 text-white flex justify-between items-center">
+                     <h3 className="font-bold flex items-center gap-2"><Activity size={18}/> Status: {t(activeOrder.status as any)}</h3>
+                     <div className="flex gap-2">
+                         <button onClick={handleManualRefresh} className={`p-1 hover:bg-white/20 rounded ${isRefreshing ? 'animate-spin' : ''}`}><RotateCw size={16}/></button>
+                         <button onClick={() => setShowTracker(false)}><X size={18}/></button>
                      </div>
+                 </div>
+                 <div className="p-4">
+                     <div className="flex justify-between items-center mb-2">
+                         <span className="text-xs text-gray-500">Order #{activeOrder.id.slice(-4)}</span>
+                         <span className="text-xs font-bold text-brand-600">{activeOrder.status === 'cooking' ? 'Cooking...' : 'Updating...'}</span>
+                     </div>
+                     <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-3">
+                         <div className={`h-full transition-all duration-1000 ${
+                             activeOrder.status === 'pending' ? 'w-1/5 bg-yellow-400' :
+                             activeOrder.status === 'confirmed' ? 'w-2/5 bg-blue-500' :
+                             activeOrder.status === 'cooking' ? 'w-3/5 bg-orange-500 animate-pulse' :
+                             activeOrder.status === 'ready' ? 'w-4/5 bg-green-500' :
+                             'w-full bg-green-600'
+                         }`}></div>
+                     </div>
+                     <p className="text-xs text-center text-gray-500 mb-3">
+                         {activeOrder.status === 'cooking' ? 'Your delicious pizza is in the oven!' : 'We are preparing your order.'}
+                     </p>
                      
-                     {/* Content */}
-                     <div className="p-4 overflow-y-auto flex-1">
-                         {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
-                             // Combo Builder Interface
-                             <div>
-                                 <p className="text-sm text-gray-500 mb-4">Select {selectedPizza.comboCount} pizzas for your combo:</p>
-                                 {isComboBuilderOpen ? (
-                                     <div className="space-y-3">
-                                         {new Array(selectedPizza.comboCount).fill(0).map((_, idx) => (
-                                             <div key={idx} onClick={() => handleOpenComboSlot(idx)} className={`p-4 border rounded-xl cursor-pointer flex justify-between items-center ${comboSelections[idx] ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-dashed border-gray-300'}`}>
-                                                 {comboSelections[idx] ? (
-                                                     <div>
-                                                         <div className="font-bold text-green-800">{language==='th' && comboSelections[idx].nameTh ? comboSelections[idx].nameTh : comboSelections[idx].name}</div>
-                                                         <div className="text-xs text-gray-500">
-                                                             {comboSelections[idx].toppings.length > 0 ? `+ ${comboSelections[idx].toppings.length} toppings` : 'No extra toppings'}
-                                                         </div>
+                     {/* Rate Us Button (Shown here) */}
+                     <a href={storeSettings.reviewUrl} target="_blank" className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition">
+                         <Star size={12} fill="orange" className="text-orange-400"/> {t('reviewGoogle')}
+                     </a>
+                 </div>
+             </div>
+        )}
+
+        {/* --- CUSTOMIZATION MODAL --- */}
+        {selectedPizza && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                {isComboBuilderOpen ? (
+                     <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                             <h2 className="text-xl font-bold flex items-center gap-2"><Layers className="text-brand-600"/> Build Your {selectedPizza.name}</h2>
+                             <button onClick={() => {setIsComboBuilderOpen(false); setSelectedPizza(null)}} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+                         </div>
+                         <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
+                             {/* Combo Slots */}
+                             {!currentComboSlot && currentComboSlot !== 0 ? (
+                                 <div className="space-y-4">
+                                     <p className="text-center text-gray-500 mb-4">Select {selectedPizza.comboCount} pizzas for your bundle.</p>
+                                     <div className="grid grid-cols-1 gap-4">
+                                         {Array.from({length: selectedPizza.comboCount || 2}).map((_, idx) => (
+                                             <button 
+                                                 key={idx}
+                                                 onClick={() => handleOpenComboSlot(idx)}
+                                                 className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center justify-between transition ${comboSelections[idx] ? 'border-brand-500 bg-brand-50' : 'border-gray-300 hover:border-brand-300 bg-white'}`}
+                                             >
+                                                 <div className="flex items-center gap-3">
+                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${comboSelections[idx] ? 'bg-brand-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                                         {idx + 1}
                                                      </div>
-                                                 ) : (
-                                                     <span className="text-gray-400 font-bold">Select Pizza #{idx + 1}</span>
-                                                 )}
-                                                 <ChevronRight size={16} className="text-gray-400"/>
-                                             </div>
+                                                     <span className={`font-bold ${comboSelections[idx] ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                         {comboSelections[idx] ? comboSelections[idx].name : 'Select Pizza...'}
+                                                     </span>
+                                                 </div>
+                                                 <ChevronRight size={20} className="text-gray-400"/>
+                                             </button>
                                          ))}
                                      </div>
-                                 ) : null}
-                                 
-                                 {/* Pizza Selector for Combo Slot */}
-                                 {currentComboSlot !== null && (
-                                     <div className="absolute inset-0 bg-white z-10 flex flex-col">
-                                         <div className="p-4 border-b flex items-center gap-2 bg-gray-50">
-                                             <button onClick={() => setCurrentComboSlot(null)}><ArrowLeft size={20}/></button>
-                                             <h3 className="font-bold">Select for Slot #{currentComboSlot + 1}</h3>
-                                         </div>
-                                         <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 gap-3">
-                                             {menu.filter(p => p.category === 'pizza').map(p => (
-                                                 <div key={p.id} onClick={() => handleSelectComboPizza(p)} className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
-                                                     <img src={p.image} className="w-12 h-12 rounded object-cover"/>
-                                                     <div className="font-bold text-sm">{getLocalizedItem(p).name}</div>
+                                 </div>
+                             ) : (
+                                 // Pizza Selector for Slot
+                                 <div>
+                                     <button onClick={() => setCurrentComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back to Bundle</button>
+                                     <h3 className="font-bold text-lg mb-4">Choose Pizza #{currentComboSlot + 1}</h3>
+                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                         {menu.filter(p => p.category === 'pizza').map(pizza => (
+                                             <button 
+                                                 key={pizza.id} 
+                                                 onClick={() => handleSelectComboPizza(pizza)}
+                                                 className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border hover:border-brand-500 text-left transition"
+                                             >
+                                                 <img src={pizza.image} className="w-12 h-12 rounded-lg object-cover"/>
+                                                 <div>
+                                                     <div className="font-bold text-sm text-gray-800">{getLocalizedItem(pizza).name}</div>
                                                  </div>
-                                             ))}
-                                         </div>
+                                             </button>
+                                         ))}
                                      </div>
-                                 )}
-                             </div>
-                         ) : (
-                             // Standard Customization OR Make Your Own Pizza
-                             <>
-                                 {selectedPizza.id === 'custom_base' || selectedPizza.name.includes("Create") ? (
-                                     // "Create Your Own" Flow
-                                     <div className="space-y-6">
-                                         <div className="mb-4">
-                                             <label className="block text-sm font-bold mb-1">{t('nameCreation')}</label>
-                                             <input className="w-full border rounded p-2" value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. My Super Pizza"/>
-                                         </div>
-
-                                         {/* 1. SAUCES (Required, Select One) */}
-                                         <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                                            <h4 className="font-bold text-red-800 text-sm uppercase mb-2 flex items-center gap-2"><Droplets size={16}/> 1. Choose Sauce <span className="text-red-500 text-xs">(Required)</span></h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {groupedToppings.sauce.map(t => {
-                                                    const isSelected = selectedToppings.find(sel => sel.id === t.id);
-                                                    return (
-                                                        <button 
-                                                            key={t.id} 
-                                                            onClick={() => toggleTopping(t)}
-                                                            className={`p-3 rounded-lg border text-left flex justify-between items-center bg-white ${isSelected ? 'border-brand-500 ring-2 ring-brand-500 text-brand-700' : 'border-gray-200'}`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                {isSelected ? <CheckCircle2 size={16} className="text-brand-500" /> : <div className="w-4 h-4 rounded-full border border-gray-300"></div>}
-                                                                <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                         </div>
-
-                                         {/* 2. CHEESES */}
-                                         <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Utensils size={16}/> 2. Select Cheeses</h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {groupedToppings.cheese.map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
-                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                                        <span className="text-xs">+฿{t.price}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                         </div>
-
-                                         {/* 3. SEASONING */}
-                                         <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Sparkles size={16}/> 3. Seasoning</h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {groupedToppings.seasoning.map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
-                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                                        <span className="text-xs">{t.price > 0 ? `+฿${t.price}` : 'Free'}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                         </div>
-
-                                         {/* 4. MEAT & VEGGIES */}
-                                         <div>
-                                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-2 flex items-center gap-2"><Carrot size={16}/> 4. Toppings (Meat & Veggies)</h4>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {[...groupedToppings.meat, ...groupedToppings.vegetable, ...groupedToppings.other].map(t => (
-                                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-gray-200'}`}>
-                                                        <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                                        <span className="text-xs">+฿{t.price}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                         </div>
-                                     </div>
-                                 ) : (
-                                     // Standard Pizza - Just extra toppings list
-                                     <>
-                                         <h4 className="font-bold text-gray-500 text-xs uppercase mb-3">{t('customizeToppings')}</h4>
-                                         <div className="grid grid-cols-2 gap-2">
-                                             {/* Exclude sauces from standard extra toppings unless you want them */}
-                                             {toppings.filter(t => t.category !== 'sauce').map(t => (
-                                                 <button 
-                                                    key={t.id} 
-                                                    onClick={() => toggleTopping(t)}
-                                                    className={`p-3 rounded-lg border text-left flex justify-between ${selectedToppings.includes(t) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200'}`}
-                                                >
-                                                     <span className="text-sm font-medium">{language === 'th' && t.nameTh ? t.nameTh : t.name}</span>
-                                                     <span className="text-xs">+฿{t.price}</span>
-                                                 </button>
-                                             ))}
-                                         </div>
-                                     </>
-                                 )}
-                             </>
-                         )}
+                                 </div>
+                             )}
+                         </div>
+                         <div className="p-4 border-t bg-white flex justify-between items-center">
+                             <div className="font-bold text-xl text-gray-900">฿{selectedPizza.basePrice}</div>
+                             {!currentComboSlot && currentComboSlot !== 0 && (
+                                 <button 
+                                     disabled={comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0)}
+                                     onClick={handleAddComboToCart}
+                                     className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                 >
+                                     Add Bundle
+                                 </button>
+                             )}
+                         </div>
                      </div>
-                     
-                     {/* Footer */}
-                     <div className="p-4 border-t bg-gray-50 flex gap-3">
-                         <button onClick={handleSaveFavorite} className="p-3 bg-white border border-gray-300 rounded-xl text-gray-500"><Heart size={20}/></button>
-                         
-                         {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
-                             <button 
-                                onClick={handleAddComboToCart}
-                                disabled={comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0)}
-                                className="flex-1 bg-brand-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 disabled:opacity-50 disabled:bg-gray-400"
-                             >
-                                 {comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0) ? `Select ${selectedPizza.comboCount} items` : t('addToOrder')}
-                             </button>
-                         ) : (
-                             <button onClick={handleAddToCart} className="flex-1 bg-brand-600 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2">
-                                 {t('addToOrder')} - ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}
-                             </button>
-                         )}
-                     </div>
-                </div>
+                ) : (
+                    // Standard Customization
+                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        {/* Header */}
+                        <div className="relative h-48 md:h-56">
+                            <img src={selectedPizza.image} className="w-full h-full object-cover"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                            <button onClick={() => setSelectedPizza(null)} className="absolute top-4 right-4 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition"><X size={20}/></button>
+                            <div className="absolute bottom-4 left-4 text-white">
+                                <h2 className="text-2xl md:text-3xl font-bold">{getLocalizedItem(selectedPizza).name}</h2>
+                                <p className="text-white/80 text-sm mt-1">{getLocalizedItem(selectedPizza).description}</p>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
+                            {/* Make Your Own Logic */}
+                            {selectedPizza.id === 'custom_base' && (
+                                <div className="mb-6">
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('nameCreation')}</label>
+                                     <input 
+                                         type="text" 
+                                         className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-brand-500 outline-none transition" 
+                                         placeholder="e.g. My Super Pizza"
+                                         value={customName}
+                                         onChange={e => setCustomName(e.target.value)}
+                                     />
+                                </div>
+                            )}
+
+                            {/* Toppings Section */}
+                            {selectedPizza.category === 'pizza' && (
+                                <>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-gray-800 flex items-center gap-2"><ChefHat size={18}/> {t('customizeToppings')}</h3>
+                                        <button onClick={() => {
+                                            const lucky = generateLuckyPizza();
+                                            if (lucky) {
+                                                setSelectedPizza(lucky.pizza);
+                                                setSelectedToppings(lucky.toppings);
+                                            }
+                                        }} className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded-full flex items-center gap-1 hover:bg-purple-200 transition">
+                                            <Dices size={12}/> {t('fateDecide')}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Categorized Toppings */}
+                                    {Object.entries(groupedToppings).map(([key, group]) => {
+                                        if (group.length === 0) return null;
+                                        // Only show Sauce section for Custom Pizza
+                                        if (key === 'sauce' && selectedPizza.id !== 'custom_base') return null;
+
+                                        return (
+                                            <div key={key} className="mb-6">
+                                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 ml-1">{key}</h4>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {group.map(topping => {
+                                                        const isSelected = selectedToppings.some(t => t.id === topping.id);
+                                                        return (
+                                                            <button
+                                                                key={topping.id}
+                                                                onClick={() => toggleTopping(topping)}
+                                                                className={`p-3 rounded-xl border text-left transition relative overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                                            >
+                                                                <div className="flex justify-between items-center relative z-10">
+                                                                    <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
+                                                                    {isSelected && <CheckCircle2 size={16} className="text-brand-600"/>}
+                                                                </div>
+                                                                <div className="text-xs opacity-70 mt-1 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 md:p-6 bg-white border-t border-gray-100 flex justify-between items-center shrink-0">
+                            <div className="flex flex-col">
+                                <span className="text-xs text-gray-400 uppercase font-bold">Total Price</span>
+                                <span className="text-2xl font-bold text-gray-900">฿{selectedPizza.basePrice + selectedToppings.reduce((s,t) => s + t.price, 0)}</span>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={handleSaveFavorite} className="p-3 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition">
+                                    <Heart size={24}/>
+                                </button>
+                                <button onClick={handleAddToCart} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-700 shadow-lg shadow-brand-200 transition flex items-center gap-2">
+                                    <Plus size={20}/> {t('addToOrder')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         )}
 
-        {/* Cart Sidebar/Modal */}
+        {/* --- CHECKOUT / CART MODAL --- */}
         {isCartOpen && (
-            <div className="fixed inset-0 z-50 bg-black/50 flex justify-end">
-                <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl">
-                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                        <h2 className="font-bold text-xl">{t('yourOrder')}</h2>
-                        <button onClick={() => setIsCartOpen(false)}><X size={24}/></button>
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full md:w-[450px] h-full shadow-2xl flex flex-col animate-slide-in">
+                    <div className="p-5 border-b flex justify-between items-center bg-gray-50">
+                        <h2 className="font-bold text-xl flex items-center gap-2"><ShoppingBag className="text-brand-600"/> {t('yourOrder')}</h2>
+                        <button onClick={() => setIsCartOpen(false)} className="bg-gray-200 p-2 rounded-full hover:bg-gray-300"><X size={20}/></button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {cart.length === 0 ? <p className="text-center text-gray-500 mt-10">{t('cartEmpty')}</p> : cart.map(item => (
-                            <div key={item.id} className="flex justify-between items-start border-b pb-4">
-                                <div>
-                                    <div className="font-bold text-lg">{item.name} <span className="text-brand-600 text-sm">x{item.quantity}</span></div>
-                                    <div className="text-sm text-gray-500">{item.selectedToppings.map(t => language==='th'?t.nameTh:t.name).join(', ')}</div>
-                                    {/* Combo breakdown */}
-                                    {item.subItems && (
-                                        <div className="mt-1 pl-2 border-l-2 border-brand-100">
-                                            {item.subItems.map((sub, i) => (
-                                                <div key={i} className="text-xs text-gray-500">
-                                                    • {language==='th' && sub.nameTh ? sub.nameTh : sub.name}
-                                                    {sub.toppings.length > 0 && ` (+${sub.toppings.length} tops)`}
-                                                </div>
-                                            ))}
-                                        </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
+                        {cart.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+                                <ShoppingBag size={64} className="text-gray-200"/>
+                                <p className="font-medium">{t('cartEmpty')}</p>
+                                <button onClick={() => setIsCartOpen(false)} className="text-brand-600 font-bold hover:underline">Browse Menu</button>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Order Type Selector */}
+                                <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex mb-6">
+                                    {tableSession ? (
+                                        <button className="flex-1 py-2 text-sm font-bold rounded-lg bg-green-100 text-green-700">
+                                            Table {tableSession}
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button 
+                                                onClick={() => setOrderType('online')} 
+                                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${orderType === 'online' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                Pickup
+                                            </button>
+                                            <button 
+                                                disabled
+                                                className="flex-1 py-2 text-sm font-bold rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center gap-1"
+                                            >
+                                                Delivery <span className="text-[9px] bg-gray-200 px-1 rounded">OFF</span>
+                                            </button>
+                                        </>
                                     )}
                                 </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    <span className="font-bold">฿{item.totalPrice}</span>
-                                    <button onClick={() => removeFromCart(item.id)} className="text-red-500 text-xs">{t('delete')}</button>
+                                
+                                {/* Items List */}
+                                <div className="space-y-4 mb-6">
+                                    {cart.map(item => (
+                                        <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800">{item.name}</h4>
+                                                    <p className="text-xs text-gray-500">
+                                                        {item.selectedToppings.map(t => language === 'th' ? t.nameTh : t.name).join(', ')}
+                                                        {item.subItems?.map(s => `+ ${s.name}`).join(', ')}
+                                                    </p>
+                                                </div>
+                                                <div className="font-bold text-gray-900">฿{item.totalPrice}</div>
+                                            </div>
+                                            <button onClick={() => removeFromCart(item.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><X size={16}/></button>
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                    {cart.length > 0 && (
-                        <div className="p-4 border-t bg-gray-50 space-y-4">
-                             {/* Date Selector (Today / Tomorrow) */}
-                             <div className="flex gap-2">
-                                 <button 
-                                    onClick={() => setOrderDate('today')} 
-                                    disabled={!isStoreOpen && !canOrderForToday()} // Fully disabled if night
-                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderDate==='today'?'bg-brand-600 text-white':'bg-white text-gray-500'} ${!isStoreOpen && !canOrderForToday() ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                 >
-                                     Today
-                                 </button>
-                                 <button 
-                                    onClick={() => setOrderDate('tomorrow')} 
-                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderDate==='tomorrow'?'bg-brand-600 text-white':'bg-white text-gray-500'}`}
-                                 >
-                                     Tomorrow
-                                 </button>
-                             </div>
-
-                             <div className="flex gap-2">
-                                 <button 
-                                    onClick={() => setOrderType('online')} 
-                                    className={`flex-1 py-2 rounded-lg border font-bold ${orderType==='online'?'bg-gray-900 text-white':'bg-white text-gray-500'}`}
-                                 >
-                                     {t('pickupTime')}
-                                 </button>
-                                 <button 
-                                    disabled
-                                    className="flex-1 py-2 rounded-lg border font-bold bg-gray-100 text-gray-400 cursor-not-allowed flex flex-col items-center justify-center leading-none gap-1"
-                                    title="Delivery currently unavailable"
-                                 >
-                                     <span>{t('deliveryAddress')}</span>
-                                     <span className="text-[10px] uppercase tracking-wider">Temporarily Off</span>
-                                 </button>
-                             </div>
-                             
-                             {orderType === 'online' && (
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 block">Select Time ({orderDate === 'today' ? 'Today' : 'Tomorrow'})</label>
-                                     <select className="w-full p-2 border rounded" value={pickupTime} onChange={e => setPickupTime(e.target.value)}>
-                                         <option value="">{orderDate === 'today' ? 'ASAP (approx 20 mins)' : 'Select Time'}</option>
-                                         {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
-                                     </select>
-                                 </div>
-                             )}
-
-                             {orderType === 'delivery' && (
-                                 <div className="space-y-2">
-                                     <textarea className="w-full p-3 border rounded-lg text-sm" placeholder={t('deliveryAddress')} value={deliveryAddress} onChange={e=>setDeliveryAddress(e.target.value)}/>
-                                     {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
-                                         <select className="w-full p-2 text-sm border rounded bg-gray-50" onChange={e => {if(e.target.value) setDeliveryAddress(e.target.value)}}>
-                                             <option value="">{t('selectAddress')}</option>
-                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,30)}...</option>)}
-                                         </select>
+                                
+                                {/* Order Options */}
+                                <div className="space-y-4">
+                                     {/* Address for Delivery */}
+                                     {orderType === 'delivery' && (
+                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                             <div className="flex justify-between items-center mb-2">
+                                                 <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
+                                                 {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
+                                                     <select 
+                                                         onChange={(e) => setDeliveryAddress(e.target.value)} 
+                                                         className="text-xs border rounded p-1 max-w-[150px]"
+                                                     >
+                                                         <option value="">Saved...</option>
+                                                         {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)}
+                                                     </select>
+                                                 )}
+                                             </div>
+                                             <textarea 
+                                                className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
+                                                rows={2} 
+                                                placeholder="Enter full address..."
+                                                value={deliveryAddress}
+                                                onChange={e => setDeliveryAddress(e.target.value)}
+                                             />
+                                             <p className="text-xs text-orange-600 mt-2 bg-orange-50 p-2 rounded flex gap-2">
+                                                 <Info size={14} className="shrink-0"/>
+                                                 {t('deliveryNoticeDesc')}
+                                             </p>
+                                         </div>
                                      )}
-                                     <div className="bg-blue-50 p-2 rounded text-xs text-blue-800 flex items-start gap-2">
-                                         <Info size={16} className="mt-0.5"/>
-                                         {t('deliveryNoticeDesc')}
+
+                                     {/* Payment Method */}
+                                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                         <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">{t('paymentMethod')}</label>
+                                         <div className="grid grid-cols-2 gap-3">
+                                             <button 
+                                                 onClick={() => setPaymentMethod('qr_transfer')}
+                                                 className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                             >
+                                                 <QrCode size={16}/> {t('qrTransfer')}
+                                             </button>
+                                             <button 
+                                                 onClick={() => setPaymentMethod('cash')}
+                                                 className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                             >
+                                                 <Banknote size={16}/> {t('cash')}
+                                             </button>
+                                         </div>
+                                     </div>
+
+                                     {/* Pickup Time (Only for Online/Pickup) */}
+                                     {orderType === 'online' && !tableSession && (
+                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                             <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">{t('pickupTime')}</label>
+                                             <select 
+                                                className="w-full p-3 bg-gray-50 border rounded-lg text-sm font-bold text-gray-700 outline-none"
+                                                value={pickupTime}
+                                                onChange={e => setPickupTime(e.target.value)}
+                                             >
+                                                 <option value="">{t('asap')}</option>
+                                                 {timeSlots.map(slot => (
+                                                     <option key={slot} value={slot}>{orderDate === 'tomorrow' ? 'Tomorrow ' : 'Today '} {slot}</option>
+                                                 ))}
+                                             </select>
+                                         </div>
+                                     )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="p-6 bg-white border-t shrink-0 pb-safe">
+                        <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                            <span>Total</span>
+                            <span>฿{cartTotal}</span>
+                        </div>
+                        <button 
+                            onClick={handlePlaceOrderClick}
+                            disabled={cart.length === 0 || isSubmitting}
+                            className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
+                        >
+                            {isSubmitting ? 'Processing...' : t('placeOrder')}
+                            {!isSubmitting && <ArrowRight size={20}/>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- AUTH MODAL --- */}
+        {showAuthModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                     <div className="relative h-32 bg-brand-600 flex items-center justify-center shrink-0">
+                         <div className="absolute inset-0 bg-black/20"></div>
+                         <h2 className="relative text-white font-bold text-3xl">{authMode === 'login' ? 'Welcome Back' : 'Join Us'}</h2>
+                         <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-white/80 hover:text-white"><X size={24}/></button>
+                     </div>
+                     
+                     <div className="p-6 flex-1 overflow-y-auto">
+                         {authMode === 'login' ? (
+                             <form onSubmit={handleLogin} className="space-y-4">
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone Number</label>
+                                     <div className="relative">
+                                         <Phone className="absolute left-3 top-3 text-gray-400" size={18}/>
+                                         <input type="tel" required className="w-full pl-10 p-3 border rounded-xl bg-gray-50 focus:bg-white transition" placeholder="0812345678" value={loginPhone} onChange={e => setLoginPhone(e.target.value)}/>
                                      </div>
                                  </div>
-                             )}
-                             
-                             <button onClick={handlePlaceOrderClick} disabled={isSubmitting} className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg">
-                                 {isSubmitting ? 'Processing...' : (
-                                     !isStoreOpen && orderDate === 'tomorrow' ? `Pre-Order for Tomorrow • ฿${cartTotal}` : `${t('placeOrder')} • ฿${cartTotal}`
-                                 )}
-                             </button>
-                        </div>
-                    )}
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Password</label>
+                                     <div className="relative">
+                                         <Lock className="absolute left-3 top-3 text-gray-400" size={18}/>
+                                         <input type="password" required className="w-full pl-10 p-3 border rounded-xl bg-gray-50 focus:bg-white transition" placeholder="••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)}/>
+                                     </div>
+                                 </div>
+                                 <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black shadow-lg mt-2">Login</button>
+                                 <p className="text-center text-sm text-gray-500 mt-4">
+                                     New here? <button type="button" onClick={() => setAuthMode('register')} className="text-brand-600 font-bold hover:underline">Create Account</button>
+                                 </p>
+                             </form>
+                         ) : (
+                             <form onSubmit={handleRegister} className="space-y-4">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Name</label>
+                                        <input type="text" required className="w-full p-3 border rounded-xl bg-gray-50" placeholder="John Doe" value={regName} onChange={e => setRegName(e.target.value)}/>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone</label>
+                                        <input type="tel" required className="w-full p-3 border rounded-xl bg-gray-50" placeholder="081..." value={regPhone} onChange={e => setRegPhone(e.target.value)}/>
+                                    </div>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Create Password</label>
+                                     <input type="password" required className="w-full p-3 border rounded-xl bg-gray-50" placeholder="••••••" value={regPassword} onChange={e => setRegPassword(e.target.value)}/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Birthday (Optional)</label>
+                                     <input type="date" className="w-full p-3 border rounded-xl bg-gray-50" value={regBirthday} onChange={e => setRegBirthday(e.target.value)}/>
+                                 </div>
+                                 <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+                                     <input type="checkbox" required id="pdpa" className="mt-1" checked={regPdpa} onChange={e => setRegPdpa(e.target.checked)}/>
+                                     <label htmlFor="pdpa" className="text-xs text-gray-600 cursor-pointer">{t('pdpaLabel')}</label>
+                                 </div>
+                                 <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 shadow-lg mt-2">Register & Reset Password</button>
+                                 <p className="text-center text-sm text-gray-500 mt-4">
+                                     Already have an account? <button type="button" onClick={() => setAuthMode('login')} className="text-brand-600 font-bold hover:underline">Login</button>
+                                 </p>
+                             </form>
+                         )}
+                     </div>
                 </div>
             </div>
         )}
-
-        {/* Auth Modal (Login / Register) */}
-        {showAuthModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                <div className="bg-white w-full max-w-sm rounded-2xl p-8 shadow-2xl relative">
-                    <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={24}/></button>
-                    
-                    {/* Tabs */}
-                    <div className="flex border-b mb-6">
-                        <button onClick={() => setAuthMode('login')} className={`flex-1 pb-2 font-bold ${authMode === 'login' ? 'border-b-2 border-brand-600 text-brand-600' : 'text-gray-400'}`}>Login</button>
-                        <button onClick={() => setAuthMode('register')} className={`flex-1 pb-2 font-bold ${authMode === 'register' ? 'border-b-2 border-brand-600 text-brand-600' : 'text-gray-400'}`}>Register</button>
-                    </div>
-
-                    {authMode === 'register' ? (
-                        <form onSubmit={handleRegister} className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Name</label>
-                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regName} onChange={e=>setRegName(e.target.value)} required/>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
-                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regPhone} onChange={e=>setRegPhone(e.target.value)} required type="tel"/>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
-                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={regPassword} onChange={e=>setRegPassword(e.target.value)} required type="password"/>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
-                                <textarea className="w-full bg-gray-50 border rounded-lg p-3" value={regAddress} onChange={e=>setRegAddress(e.target.value)}/>
-                            </div>
-                            <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
-                                <input type="checkbox" className="mt-1" checked={regPdpa} onChange={e=>setRegPdpa(e.target.checked)}/>
-                                <span className="text-xs">{t('pdpaLabel')}</span>
-                            </label>
-                            <button type="submit" className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-black transition">{t('startEarning')}</button>
-                            <p className="text-[10px] text-gray-500 text-center mt-2">
-                                If you already have an account with this number, registering again will reset your password but keep your points safe.
-                            </p>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleLogin} className="space-y-4">
-                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
-                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={loginPhone} onChange={e=>setLoginPhone(e.target.value)} required type="tel"/>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-500 uppercase">Password</label>
-                                <input className="w-full bg-gray-50 border rounded-lg p-3" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required type="password"/>
-                            </div>
-                            <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-brand-700 transition">Login</button>
-                        </form>
-                    )}
-                </div>
-            </div>
-        )}
-
-        {/* Profile Modal */}
+        
+        {/* PROFILE MODAL */}
         {showProfile && customer && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
-                     <button onClick={() => setShowProfile(false)} className="absolute top-4 right-4"><X size={20}/></button>
-                     <div className="flex flex-col items-center mb-6">
-                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                            <User size={40} className="text-gray-400"/>
+             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col">
+                     <div className="bg-gray-900 p-6 text-white text-center relative shrink-0">
+                         <button onClick={() => setShowProfile(false)} className="absolute top-4 right-4 text-white/60 hover:text-white"><X size={24}/></button>
+                         <div className="w-20 h-20 bg-brand-500 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-3 shadow-lg border-4 border-gray-800">
+                             {customer.name.charAt(0)}
                          </div>
-                         <h3 className="font-bold text-xl">{customer.name}</h3>
-                         <p className="text-gray-500 text-sm">{customer.phone}</p>
-                         <div className="mt-3 flex gap-2">
-                             <div className="bg-yellow-50 text-yellow-800 px-3 py-1 rounded-lg text-sm font-bold border border-yellow-100 flex items-center gap-1">
-                                 <Star size={14}/> {customer.loyaltyPoints} Points
+                         <h2 className="text-2xl font-bold">{customer.name}</h2>
+                         <p className="text-brand-300 font-medium">{customer.loyaltyPoints} Points</p>
+                     </div>
+                     
+                     <div className="p-6 flex-1 overflow-y-auto bg-gray-50">
+                         {/* Points Progress */}
+                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
+                             <div className="flex justify-between items-center mb-2">
+                                 <span className="font-bold text-gray-700 text-sm">Reward Progress</span>
+                                 <span className="text-xs font-bold text-brand-600">{customer.loyaltyPoints} / 10</span>
                              </div>
-                             <div className="bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-sm font-bold border border-blue-100">
-                                 {customer.tier || 'Member'}
+                             <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden mb-3">
+                                 <div className="bg-brand-500 h-full transition-all" style={{ width: `${Math.min(100, (customer.loyaltyPoints / 10) * 100)}%` }}></div>
+                             </div>
+                             {customer.loyaltyPoints >= 10 ? (
+                                 <button onClick={() => { claimReward(); setShowProfile(false); setIsCartOpen(true); }} className="w-full py-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold rounded-lg shadow-md animate-pulse">
+                                     {t('claimReward')}
+                                 </button>
+                             ) : (
+                                 <p className="text-xs text-center text-gray-500">{10 - customer.loyaltyPoints} more points {t('toFreePizza')}</p>
+                             )}
+                         </div>
+                         
+                         {/* Favorites */}
+                         <div className="mb-6">
+                             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Heart size={16} className="text-red-500"/> {t('savedFavorites')}</h3>
+                             <div className="space-y-3">
+                                 {customer.savedFavorites && customer.savedFavorites.length > 0 ? (
+                                     customer.savedFavorites.map(fav => (
+                                         <div key={fav.id} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center">
+                                             <div>
+                                                 <div className="font-bold text-sm">{fav.name}</div>
+                                                 <div className="text-xs text-gray-500 line-clamp-1">{fav.toppings.map(t => t.name).join(', ')}</div>
+                                             </div>
+                                             <button className="bg-brand-100 text-brand-600 p-2 rounded-full hover:bg-brand-200"><Plus size={16}/></button>
+                                         </div>
+                                     ))
+                                 ) : <p className="text-xs text-gray-400 text-center py-4 bg-white rounded-xl border border-dashed">No favorites yet</p>}
+                             </div>
+                         </div>
+                         
+                         {/* Order History */}
+                         <div>
+                             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={16}/> {t('recentOrders')}</h3>
+                             <div className="space-y-3">
+                                 {orders.filter(o => o.customerPhone === customer.phone).slice(0, 5).map(order => (
+                                     <div key={order.id} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+                                         <div className="flex justify-between items-center mb-2">
+                                              <span className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</span>
+                                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${getStatusColor(order.status)}`}>{order.status}</span>
+                                         </div>
+                                         <div className="flex justify-between items-center">
+                                              <div>
+                                                  {order.items.map((item, idx) => (
+                                                      <div key={idx} className="text-sm font-bold text-gray-800">{item.name} <span className="text-gray-400 font-normal">x{item.quantity}</span></div>
+                                                  ))}
+                                              </div>
+                                              <div className="text-right">
+                                                  <div className="font-bold text-gray-900">฿{order.totalAmount}</div>
+                                                  <button onClick={() => { reorderItem(order.id); setShowProfile(false); setIsCartOpen(true); }} className="text-xs text-brand-600 font-bold hover:underline mt-1">{t('reorder')}</button>
+                                              </div>
+                                         </div>
+                                     </div>
+                                 ))}
                              </div>
                          </div>
                      </div>
                      
-                     <div className="space-y-4">
-                         <div>
-                             <h4 className="font-bold text-sm text-gray-500 uppercase mb-2">{t('savedFavorites')}</h4>
-                             {customer.savedFavorites && customer.savedFavorites.length > 0 ? (
-                                 <div className="space-y-2">
-                                     {customer.savedFavorites.map(fav => (
-                                         <div key={fav.id} className="bg-gray-50 p-3 rounded-xl flex justify-between items-center">
-                                             <span className="font-bold text-sm">{fav.name}</span>
-                                             <button onClick={() => {
-                                                 // Reorder logic for favorite
-                                                 const pizza = menu.find(p => p.id === fav.pizzaId);
-                                                 if (pizza) {
-                                                     setSelectedPizza(pizza);
-                                                     setSelectedToppings(fav.toppings);
-                                                     setShowProfile(false);
-                                                 }
-                                             }} className="text-brand-600 text-xs font-bold hover:underline">{t('buyAgain')}</button>
-                                         </div>
-                                     ))}
-                                 </div>
-                             ) : <p className="text-sm text-gray-400">No favorites saved yet.</p>}
-                         </div>
-
-                         <div>
-                             <h4 className="font-bold text-sm text-gray-500 uppercase mb-2">{t('recentOrders')}</h4>
-                             {orders.filter(o => o.customerPhone === customer.phone).length > 0 ? (
-                                 <div className="space-y-3">
-                                     {orders
-                                         .filter(o => o.customerPhone === customer.phone)
-                                         .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                                         .map(order => (
-                                         <div key={order.id} className="border-b py-3 last:border-0">
-                                             <div className="flex justify-between items-center mb-1">
-                                                 <div>
-                                                    <span className="font-bold text-sm mr-2">#{order.id.slice(-4)}</span>
-                                                    <span className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</span>
-                                                 </div>
-                                                 <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${getStatusColor(order.status)}`}>{t(order.status as any) || order.status}</span>
-                                             </div>
-                                             
-                                             {/* LIST ORDER ITEMS */}
-                                             <div className="text-xs text-gray-600 mt-1 mb-2 pl-2 border-l-2 border-gray-100">
-                                                 {order.items.map((item, idx) => (
-                                                     <div key={idx} className="truncate">
-                                                         {item.quantity}x {language==='th' && item.nameTh ? item.nameTh : item.name}
-                                                     </div>
-                                                 ))}
-                                             </div>
-
-                                             <div className="flex justify-between items-center">
-                                                 <span className="font-bold text-brand-600">฿{order.totalAmount}</span>
-                                                 <button 
-                                                    onClick={() => {
-                                                        reorderItem(order.id);
-                                                        setShowProfile(false);
-                                                        setIsCartOpen(true);
-                                                    }}
-                                                    className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 hover:bg-black transition"
-                                                 >
-                                                    <History size={12}/> {t('reorder')}
-                                                 </button>
-                                             </div>
-                                         </div>
-                                     ))}
-                                 </div>
-                             ) : <p className="text-sm text-gray-400">No orders yet.</p>}
-                         </div>
-                         
-                         <button onClick={() => {
-                             setCustomer(null as any); 
-                             window.location.reload();
-                         }} className="w-full py-3 text-red-600 font-bold border border-red-100 rounded-xl hover:bg-red-50">{t('logout')}</button>
+                     <div className="p-4 bg-white border-t">
+                         <button onClick={() => { setCustomer(null as any); localStorage.removeItem('damac_customer'); setShowProfile(false); }} className="w-full py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Log Out</button>
                      </div>
-                </div>
-            </div>
+                 </div>
+             </div>
         )}
+
     </div>
   );
 };
