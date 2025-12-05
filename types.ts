@@ -21,6 +21,7 @@ export interface Pizza {
   category: ProductCategory;
   isBestSeller?: boolean;
   comboCount?: number; // New: How many pizzas allowed in this combo
+  allowedPromotions?: string[]; // IDs of promotions this item can be added to. If empty/undefined, allowed in all.
 }
 
 export interface SubItem {

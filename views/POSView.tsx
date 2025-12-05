@@ -39,7 +39,7 @@ export const POSView: React.FC = () => {
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
     const [itemForm, setItemForm] = useState<Partial<Pizza>>({
-        name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0
+        name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: []
     });
     
     // Manage Toppings State
@@ -360,12 +360,12 @@ export const POSView: React.FC = () => {
     };
 
     const handleOpenAddModal = () => {
-        setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0 });
+        setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: [] });
         setShowItemModal(true);
     };
 
     const handleEditMenuItem = (item: Pizza) => {
-        setItemForm({ ...item, comboCount: item.comboCount || 0 });
+        setItemForm({ ...item, comboCount: item.comboCount || 0, allowedPromotions: item.allowedPromotions || [] });
         setShowItemModal(true);
     };
 
@@ -1112,11 +1112,11 @@ export const POSView: React.FC = () => {
 
                 {/* VIEW: MANAGE (Unified Dashboard) */}
                 {activeTab === 'manage' && (
-                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
-                         <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Settings className="text-red-600"/> Manager Dashboard</h2>
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100 space-y-6">
+                         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Settings className="text-red-600"/> Manager Dashboard</h2>
                          
                          {/* 1. Store Status & Holiday */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Store size={14}/> Store Operations</h3>
                              <div className="flex items-center justify-between mb-4 bg-gray-50 p-3 rounded-lg">
                                  <span className="font-bold text-lg text-gray-800">{isStoreOpen ? 'Store is OPEN' : 'Store is CLOSED'}</span>
@@ -1138,6 +1138,120 @@ export const POSView: React.FC = () => {
                                          <input type="date" className="bg-white border rounded p-2 text-xs" value={storeSettings.holidayEnd || ''} onChange={e => updateStoreSettings({ holidayEnd: e.target.value })}/>
                                      </div>
                                  </div>
+                             </div>
+                         </div>
+
+                         {/* 2. QR Code Generator */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><QrCode size={14}/> Table QR Generator</h3>
+                             <div className="flex items-end gap-3 flex-wrap">
+                                 <div>
+                                     <label className="text-xs text-gray-400 mb-1 block">Table Number</label>
+                                     <input className="border rounded p-2 w-20 text-center font-bold" value={qrTableNum} onChange={e => setQrTableNum(e.target.value)}/>
+                                 </div>
+                                 <a 
+                                     href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
+                                     target="_blank"
+                                     download={`table-${qrTableNum}.png`}
+                                     className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-black"
+                                 >
+                                     <Download size={16}/> Download QR
+                                 </a>
+                                 <span className="text-xs text-gray-400">Link: {getCleanQrUrl()}?table={qrTableNum}</span>
+                             </div>
+                         </div>
+
+                         {/* 3. Contact & Payment Settings */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Phone size={14}/> Contact & Payment</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                 <div>
+                                     <label className="text-xs text-gray-400 mb-1 block">PromptPay Number / Tax ID</label>
+                                     <input className="w-full border rounded p-2 bg-blue-50 border-blue-200 text-blue-900 font-bold" value={contactForm.promptPayNumber} onChange={e => setContactForm({...contactForm, promptPayNumber: e.target.value})}/>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs text-gray-400 mb-1 block">Shop Phone</label>
+                                     <input className="w-full border rounded p-2" value={contactForm.contactPhone} onChange={e => setContactForm({...contactForm, contactPhone: e.target.value})}/>
+                                 </div>
+                             </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <input className="w-full border rounded p-2 text-xs" placeholder="Facebook URL" value={contactForm.facebookUrl} onChange={e => setContactForm({...contactForm, facebookUrl: e.target.value})}/>
+                                 <input className="w-full border rounded p-2 text-xs" placeholder="LINE URL" value={contactForm.lineUrl} onChange={e => setContactForm({...contactForm, lineUrl: e.target.value})}/>
+                                 <input className="w-full border rounded p-2 text-xs" placeholder="Google Maps URL" value={contactForm.mapUrl} onChange={e => setContactForm({...contactForm, mapUrl: e.target.value})}/>
+                                 <input className="w-full border rounded p-2 text-xs" placeholder="Google Review URL" value={contactForm.reviewUrl} onChange={e => setContactForm({...contactForm, reviewUrl: e.target.value})}/>
+                             </div>
+                             <button onClick={handleSaveContactSettings} className="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs">Save Contact Info</button>
+                         </div>
+
+                         {/* 4. Media Manager */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><ImageIcon size={14}/> {t('mediaManager')}</h3>
+                             
+                             <div className="mb-6">
+                                 <label className="text-xs text-gray-400 mb-1 block">Promo Banner (Image/Video URL)</label>
+                                 <div className="flex gap-2">
+                                     <input className="flex-1 border rounded p-2 text-xs" value={mediaForm.promoBannerUrl} onChange={e => setMediaForm({...mediaForm, promoBannerUrl: e.target.value})}/>
+                                     <label className="cursor-pointer bg-gray-200 px-3 py-2 rounded text-xs font-bold hover:bg-gray-300">
+                                         Upload <input type="file" hidden accept="image/*,video/*" onChange={handleBannerUpload} />
+                                     </label>
+                                 </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div>
+                                     <label className="text-xs text-gray-400 mb-2 block">Review Links (YouTube/TikTok)</label>
+                                     {mediaForm.reviewLinks.map((link, i) => (
+                                         <input key={i} className="w-full border rounded p-2 text-xs mb-2" value={link} onChange={e => updateLocalMediaLink('review', i, e.target.value)} placeholder={`Link #${i+1}`}/>
+                                     ))}
+                                     <button onClick={() => setMediaForm(p => ({...p, reviewLinks: [...p.reviewLinks, '']}))} className="text-xs text-brand-600 font-bold">+ Add Link</button>
+                                 </div>
+                                 <div>
+                                     <label className="text-xs text-gray-400 mb-2 block">Vibe Links (Lemon8/Social)</label>
+                                     {mediaForm.vibeLinks.map((link, i) => (
+                                         <input key={i} className="w-full border rounded p-2 text-xs mb-2" value={link} onChange={e => updateLocalMediaLink('vibe', i, e.target.value)} placeholder={`Link #${i+1}`}/>
+                                     ))}
+                                     <button onClick={() => setMediaForm(p => ({...p, vibeLinks: [...p.vibeLinks, '']}))} className="text-xs text-brand-600 font-bold">+ Add Link</button>
+                                 </div>
+                             </div>
+                             <button onClick={handleSaveMediaSettings} className="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs">Save Media Settings</button>
+                         </div>
+
+                         {/* 5. News & Events */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News & Events</h3>
+                             <form onSubmit={handleAddNews} className="flex flex-col gap-3 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                 <input className="border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
+                                 <input className="border rounded p-2 text-sm" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
+                                 <div className="flex gap-2">
+                                     <input className="flex-1 border rounded p-2 text-xs" placeholder="Image URL" value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}/>
+                                     <input className="flex-1 border rounded p-2 text-xs" placeholder="Link URL (Optional)" value={newsForm.linkUrl} onChange={e => setNewsForm({...newsForm, linkUrl: e.target.value})}/>
+                                 </div>
+                                 <button type="submit" className="bg-brand-600 text-white py-2 rounded font-bold text-xs hover:bg-brand-700">Add News Item</button>
+                             </form>
+                             <div className="space-y-2">
+                                 {storeSettings.newsItems?.map(item => (
+                                     <div key={item.id} className="flex justify-between items-center p-2 border rounded bg-white">
+                                         <span className="text-sm font-bold truncate flex-1">{item.title}</span>
+                                         <button onClick={() => deleteNewsItem(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14}/></button>
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+
+                         {/* 6. Database Tools */}
+                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
+                             <div className="flex gap-3">
+                                 <button onClick={handleExportCustomers} className="flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-200">
+                                     <Download size={14}/> Export Customer CSV
+                                 </button>
+                                 <button onClick={seedDatabase} className="flex items-center gap-2 bg-orange-100 text-orange-700 px-4 py-2 rounded-lg font-bold text-xs hover:bg-orange-200">
+                                     <RefreshCw size={14}/> Sync/Seed Database
+                                 </button>
+                                 <label className="cursor-pointer flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-bold text-xs hover:bg-gray-200">
+                                     <Upload size={14}/> Upload Shop Logo
+                                     <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                                 </label>
                              </div>
                          </div>
                     </div>
@@ -1197,18 +1311,47 @@ export const POSView: React.FC = () => {
                             {/* Combo Settings */}
                             <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
                                 <label className="text-xs font-bold text-orange-800 uppercase flex items-center gap-1 mb-1">
-                                    <Layers size={12}/> Combo Settings
+                                    <Layers size={12}/> Combo & Promotion Settings
                                 </label>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm text-gray-600">Pizza Count (0 = Not a combo)</span>
-                                    <input 
-                                        type="number" 
-                                        className="w-20 border rounded p-1 text-center font-bold" 
-                                        value={itemForm.comboCount} 
-                                        onChange={e => setItemForm({...itemForm, comboCount: parseInt(e.target.value) || 0})}
-                                    />
-                                </div>
-                                <p className="text-[10px] text-gray-500 mt-1">If set &gt; 0, customer will be asked to select this many pizzas.</p>
+                                
+                                {itemForm.category === 'promotion' ? (
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-600">Pizza Count (Items allowed in set)</span>
+                                        <input 
+                                            type="number" 
+                                            className="w-20 border rounded p-1 text-center font-bold" 
+                                            value={itemForm.comboCount} 
+                                            onChange={e => setItemForm({...itemForm, comboCount: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-bold text-gray-600">Combo Eligibility (Check all that apply)</div>
+                                        <p className="text-[10px] text-gray-500 mb-2">If none selected, item is allowed in ALL combos by default.</p>
+                                        <div className="max-h-32 overflow-y-auto border rounded p-2 bg-white grid grid-cols-1 gap-2">
+                                            {menu.filter(p => p.category === 'promotion').map(promo => {
+                                                const isChecked = (itemForm.allowedPromotions || []).includes(promo.id);
+                                                return (
+                                                    <label key={promo.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={isChecked}
+                                                            onChange={(e) => {
+                                                                const current = itemForm.allowedPromotions || [];
+                                                                if (e.target.checked) {
+                                                                    setItemForm({...itemForm, allowedPromotions: [...current, promo.id]});
+                                                                } else {
+                                                                    setItemForm({...itemForm, allowedPromotions: current.filter(id => id !== promo.id)});
+                                                                }
+                                                            }}
+                                                        />
+                                                        {promo.name}
+                                                    </label>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
@@ -1289,7 +1432,16 @@ export const POSView: React.FC = () => {
                                         <h3 className="font-bold text-lg mb-4">Choose Pizza #{activeComboSlot + 1}</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                             {/* FILTER OUT PROMOTIONS to avoid recursion */}
-                                            {menu.filter(p => p.category !== 'promotion' && (p.comboCount || 0) === 0).map(pizza => (
+                                            {/* NEW: Filter by allowedPromotions */}
+                                            {menu.filter(p => {
+                                                if (p.category === 'promotion') return false;
+                                                if ((p.comboCount || 0) > 0) return false;
+                                                // Check eligibility
+                                                if (p.allowedPromotions && p.allowedPromotions.length > 0) {
+                                                    return p.allowedPromotions.includes(selectedPizza.id);
+                                                }
+                                                return true; // Allowed in all if empty
+                                            }).map(pizza => (
                                                 <button 
                                                     key={pizza.id} 
                                                     onClick={() => handleComboPizzaSelect(pizza)}
