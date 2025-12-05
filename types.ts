@@ -139,6 +139,9 @@ export interface StoreSettings {
   mapUrl?: string;
   contactPhone?: string;
   
+  // Payment
+  promptPayNumber?: string; // New: Mobile or Tax ID
+
   // Media Lists
   reviewLinks?: string[]; // Up to 5
   vibeLinks?: string[]; // Up to 5

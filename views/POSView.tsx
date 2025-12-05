@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
+import { generatePromptPayPayload } from '../utils/promptpay';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils } from 'lucide-react';
 
 export const POSView: React.FC = () => {
@@ -81,7 +82,8 @@ export const POSView: React.FC = () => {
         mapUrl: '',
         facebookUrl: '',
         lineUrl: '',
-        contactPhone: ''
+        contactPhone: '',
+        promptPayNumber: '' // Added for PromptPay
     });
     
     // Receipt Data for Printing
@@ -100,7 +102,8 @@ export const POSView: React.FC = () => {
                 mapUrl: storeSettings.mapUrl || '',
                 facebookUrl: storeSettings.facebookUrl || '',
                 lineUrl: storeSettings.lineUrl || '',
-                contactPhone: storeSettings.contactPhone || ''
+                contactPhone: storeSettings.contactPhone || '',
+                promptPayNumber: storeSettings.promptPayNumber || ''
             });
             setTempClosedMsg(storeSettings.closedMessage);
         }
@@ -445,9 +448,10 @@ export const POSView: React.FC = () => {
             mapUrl: contactForm.mapUrl,
             facebookUrl: contactForm.facebookUrl,
             lineUrl: contactForm.lineUrl,
-            contactPhone: contactForm.contactPhone
+            contactPhone: contactForm.contactPhone,
+            promptPayNumber: contactForm.promptPayNumber
         });
-        alert("Contact Settings Saved Successfully!");
+        alert("Contact & Payment Settings Saved Successfully!");
     };
     
     // Helper to clean URL for QR
@@ -1195,12 +1199,19 @@ export const POSView: React.FC = () => {
                          {/* 5. Contact & Links */}
                          <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
                              <div className="flex justify-between items-center mb-3">
-                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Links</h3>
+                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Payment Links</h3>
                                  <button onClick={handleSaveContactSettings} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
                                      <Save size={14}/> Save Settings
                                  </button>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 md:col-span-2">
+                                     <label className="text-xs font-bold text-blue-800 mb-1 flex items-center gap-1"><QrCode size={12}/> PromptPay Number (Phone or Tax ID)</label>
+                                     <div className="flex gap-2 items-center">
+                                         <input className="w-full border rounded p-2 text-sm font-mono font-bold" value={contactForm.promptPayNumber || ''} onChange={e => setContactForm({ ...contactForm, promptPayNumber: e.target.value })} placeholder="081... or 010..."/>
+                                         <div className="text-[10px] text-blue-600 max-w-[200px]">Used to generate QR Codes for customers.</div>
+                                     </div>
+                                 </div>
                                  <div>
                                      <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
                                      <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.reviewUrl || ''} onChange={e => setContactForm({ ...contactForm, reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
@@ -1468,14 +1479,26 @@ export const POSView: React.FC = () => {
                                 </div>
                             )}
                             
-                             {/* QR Display */}
+                             {/* QR Display (DYNAMIC PROMPTPAY) */}
                             {paymentMethod === 'qr_transfer' && (
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 text-center">
-                                    <p className="font-bold text-blue-800 mb-2">Scan to Pay</p>
+                                    <p className="font-bold text-blue-800 mb-2">Scan to Pay (PromptPay)</p>
                                     <div className="bg-white p-2 inline-block rounded-lg shadow-sm">
-                                        <QrCode size={128} className="text-gray-800"/>
+                                        <img 
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                                                generatePromptPayPayload(
+                                                    storeSettings.promptPayNumber || '0994979199', 
+                                                    selectedOrder ? selectedOrder.totalAmount : cartTotal
+                                                )
+                                            )}`} 
+                                            alt="PromptPay QR" 
+                                            className="w-48 h-48 mx-auto"
+                                        />
                                     </div>
-                                    <p className="text-xs text-blue-600 mt-2 animate-pulse">Waiting for payment confirmation...</p>
+                                    <p className="text-xs text-blue-600 mt-2">
+                                        Amount: ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}<br/>
+                                        Ref: {storeSettings.promptPayNumber}
+                                    </p>
                                 </div>
                             )}
                         </div>
