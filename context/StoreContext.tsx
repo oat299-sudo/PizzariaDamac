@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { 
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
@@ -366,6 +367,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   // JSON or Array columns
                   reviewLinks: data.review_links || [],
                   vibeLinks: data.vibe_links || [],
+                  eventGalleryUrls: data.event_gallery_urls || DEFAULT_STORE_SETTINGS.eventGalleryUrls, // Map new column
                   newsItems: data.news_items || []
               });
           }
@@ -953,6 +955,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
              if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber; 
              if (settings.reviewLinks !== undefined) payload.review_links = settings.reviewLinks;
              if (settings.vibeLinks !== undefined) payload.vibe_links = settings.vibeLinks;
+             if (settings.eventGalleryUrls !== undefined) payload.event_gallery_urls = settings.eventGalleryUrls;
              
              await supabase.from('store_settings').update(payload).eq('id', 1);
          } catch (e) { console.error(e); }

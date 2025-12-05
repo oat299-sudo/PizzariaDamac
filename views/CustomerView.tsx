@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
-import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION } from '../constants';
+import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
 import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers } from 'lucide-react';
 
 // --- EMBED HELPER ---
@@ -481,6 +480,11 @@ export const CustomerView: React.FC = () => {
       other: toppings.filter(t => !t.category || t.category === 'other'),
   };
 
+  // Resolve Catering Images - Add safe fallback
+  const cateringImages = (storeSettings.eventGalleryUrls && storeSettings.eventGalleryUrls.length > 0)
+        ? storeSettings.eventGalleryUrls
+        : (DEFAULT_STORE_SETTINGS.eventGalleryUrls || []);
+
   return (
     <div className="min-h-screen bg-orange-50 pb-24 md:pb-0 font-sans text-gray-900 flex flex-col">
         {/* Header */}
@@ -552,7 +556,7 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* Guest Banner (Only show if NOT in table mode, because table guests might be anon) */}
+        {/* Guest Banner */}
         {!customer && activeCategory === 'promotion' && !tableSession && (
             <div className="bg-brand-600 text-white py-3 text-center cursor-pointer hover:bg-brand-700 transition" onClick={() => setShowAuthModal(true)}>
                 <span className="font-bold flex items-center justify-center gap-2">
@@ -588,7 +592,7 @@ export const CustomerView: React.FC = () => {
             </section>
         )}
 
-        {/* REORDER: PROMOTIONS GRID - NOW IMMEDIATELY AFTER BANNER IF CATEGORY IS PROMOTION */}
+        {/* REORDER: PROMOTIONS GRID */}
         {activeCategory === 'promotion' && (
             <main className="max-w-7xl mx-auto px-4 py-8 border-b">
                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-brand-800">
@@ -667,7 +671,7 @@ export const CustomerView: React.FC = () => {
             </section>
         )}
 
-        {/* Regular Menu Grid (If NOT promotion, OR below sections) */}
+        {/* Regular Menu Grid */}
         {activeCategory !== 'promotion' && (
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -694,6 +698,38 @@ export const CustomerView: React.FC = () => {
                 </div>
             </main>
         )}
+        
+        {/* --- EVENTS & CATERING SECTION (DYNAMIC) --- */}
+        <section className="bg-gray-900 text-white py-12">
+            <div className="max-w-7xl mx-auto px-4">
+                <div className="text-center mb-10">
+                    <h2 className="text-3xl font-bold mb-4 flex items-center justify-center gap-2">
+                        <Sparkles className="text-yellow-400" /> {t('hireForEvents')}
+                    </h2>
+                    <p className="text-gray-300 max-w-2xl mx-auto">
+                        {t('eventDesc')}
+                    </p>
+                    <div className="mt-6 flex justify-center gap-4">
+                        <a href={storeSettings.lineUrl} target="_blank" className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 transition transform hover:scale-105">
+                            <MessageCircle size={20} /> {t('contactLine')}
+                        </a>
+                        <a href={`tel:${storeSettings.contactPhone}`} className="bg-white hover:bg-gray-100 text-gray-900 px-6 py-3 rounded-full font-bold flex items-center gap-2 transition transform hover:scale-105">
+                            <Phone size={20} /> {t('callUs')}
+                        </a>
+                    </div>
+                </div>
+
+                {/* Event Gallery Dynamic */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {cateringImages.map((img, i) => (
+                        <div key={i} className="rounded-xl overflow-hidden shadow-lg h-64 relative group">
+                            <img src={img} className="w-full h-full object-cover transition duration-500 group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition"></div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
         
         {/* --- FOOTER --- */}
         <footer className="bg-gray-900 text-white py-12 mt-auto">

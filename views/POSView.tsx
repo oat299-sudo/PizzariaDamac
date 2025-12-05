@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2 } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -84,7 +84,8 @@ export const POSView: React.FC = () => {
     const [mediaForm, setMediaForm] = useState({
         promoBannerUrl: '',
         reviewLinks: [] as string[],
-        vibeLinks: [] as string[]
+        vibeLinks: [] as string[],
+        eventGalleryUrls: [] as string[]
     });
 
     const [contactForm, setContactForm] = useState({
@@ -105,7 +106,8 @@ export const POSView: React.FC = () => {
             setMediaForm({
                 promoBannerUrl: storeSettings.promoBannerUrl || '',
                 reviewLinks: storeSettings.reviewLinks || [],
-                vibeLinks: storeSettings.vibeLinks || []
+                vibeLinks: storeSettings.vibeLinks || [],
+                eventGalleryUrls: storeSettings.eventGalleryUrls || []
             });
             setContactForm({
                 reviewUrl: storeSettings.reviewUrl || '',
@@ -247,6 +249,7 @@ export const POSView: React.FC = () => {
     };
 
     // Cart customization
+    // ... [No changes to Cart logic]
     const handleCustomize = (pizza: Pizza) => {
         if (isEditMode && activeTab === 'order') return; 
         setSelectedPizza(pizza);
@@ -539,6 +542,21 @@ export const POSView: React.FC = () => {
             reader.readAsDataURL(file);
         }
     };
+    
+    // Event Gallery Upload
+    const handleEventImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const res = reader.result as string;
+                const newGallery = [...(mediaForm.eventGalleryUrls || []), res];
+                setMediaForm(prev => ({ ...prev, eventGalleryUrls: newGallery }));
+                alert("Image added! Don't forget to click 'Save Media Settings'.");
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleAddTopping = () => {
         if (newToppingName && newToppingPrice) {
@@ -598,6 +616,7 @@ export const POSView: React.FC = () => {
     };
     
     // EXPORT FUNCTIONS
+    // ... [No changes]
     const handleExportSales = () => {
         const filteredSales = activeOrders.filter(o => filterByDate(o.createdAt, salesFilter));
         const csvData = filteredSales.map(o => ({
@@ -645,18 +664,22 @@ export const POSView: React.FC = () => {
         // Filter empty links to keep DB clean
         const cleanReviews = (mediaForm.reviewLinks || []).filter(l => l && l.trim() !== '');
         const cleanVibes = (mediaForm.vibeLinks || []).filter(l => l && l.trim() !== '');
+        // Event Gallery
+        const cleanEvents = (mediaForm.eventGalleryUrls || []).filter(l => l && l.trim() !== '');
 
         updateStoreSettings({
             promoBannerUrl: mediaForm.promoBannerUrl,
             reviewLinks: cleanReviews,
-            vibeLinks: cleanVibes
+            vibeLinks: cleanVibes,
+            eventGalleryUrls: cleanEvents
         });
         
         // Update local state to reflect cleaned arrays (removes empty slots from UI)
         setMediaForm(prev => ({
             ...prev,
             reviewLinks: cleanReviews,
-            vibeLinks: cleanVibes
+            vibeLinks: cleanVibes,
+            eventGalleryUrls: cleanEvents
         }));
 
         alert("Media Settings Saved Successfully!");
@@ -675,12 +698,14 @@ export const POSView: React.FC = () => {
     };
 
     // Filter Menu
+    // ... [No changes]
     const filteredMenu = menu.filter(item => {
         const cat = item.category || 'pizza';
         return cat === activeCategory;
     });
 
     // --- SALES CALCULATIONS (Filtered) ---
+    // ... [No changes]
     const activeOrders = orders.filter(o => o.status !== 'cancelled');
     const filteredOrders = activeOrders.filter(o => filterByDate(o.createdAt, salesFilter));
     const filteredExpenses = expenses.filter(e => filterByDate(e.date, salesFilter));
@@ -707,7 +732,7 @@ export const POSView: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
-            {/* --- RECEIPT PRINTER (HIDDEN) --- */}
+            {/* ... [Receipt Printer] ... */}
             <div className="hidden print:block print:w-[80mm] print:font-mono print:text-xs p-2 bg-white text-black">
                 {receiptData && (
                     <div className="text-center">
@@ -746,6 +771,8 @@ export const POSView: React.FC = () => {
                 )}
             </div>
 
+            {/* ... [Mobile Header, Sidebar, Main Content logic same as before] ... */}
+            
             {/* --- MOBILE LAYOUT HEADER --- */}
             <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14 print:hidden">
                 <div className="flex items-center gap-2">
@@ -996,9 +1023,13 @@ export const POSView: React.FC = () => {
                     </>
                 )}
                 
+                {/* VIEW: ACTIVE TABLES, SALES, EXPENSES, QR GENERATOR */}
+                {/* ... (Previous code remains, including activeTab === 'tables', 'sales', 'expenses', 'qr') */}
+                
                 {/* VIEW: ACTIVE TABLES (CHECK BILL) */}
                 {activeTab === 'tables' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                         {/* ... (Same as before) ... */}
                          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
                              <Utensils className="text-green-600"/> Active Tables
                          </h2>
@@ -1018,7 +1049,7 @@ export const POSView: React.FC = () => {
                                         onClick={() => !isPaid && handleCheckTableBill(order)}
                                         className={`bg-white rounded-xl shadow-md p-6 border-l-8 cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition relative overflow-hidden ${isPaid ? 'border-green-500' : 'border-red-500'}`}
                                      >
-                                         {/* Delete Button (Top Right) */}
+                                         {/* ... Table Card Content ... */}
                                          <button 
                                              onClick={(e) => { e.stopPropagation(); handleCancelTable(order.id); }}
                                              className="absolute top-4 right-4 p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 z-10"
@@ -1027,7 +1058,6 @@ export const POSView: React.FC = () => {
                                              <Trash2 size={16}/>
                                          </button>
 
-                                         {/* Status Badge */}
                                          <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                              {isPaid ? <CheckCircle2 size={12}/> : <AlertCircle size={12}/>}
                                              {isPaid ? 'PAID' : 'UNPAID'}
@@ -1082,9 +1112,9 @@ export const POSView: React.FC = () => {
                 {/* VIEW: SALES REPORT */}
                 {activeTab === 'sales' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                        {/* ... (Same as before) ... */}
                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><PieChart className="text-blue-600"/> {t('salesReport')}</h2>
-                            
                             <div className="flex gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                                 {['day', 'month', 'year', 'all'].map(f => (
                                     <button 
@@ -1096,38 +1126,26 @@ export const POSView: React.FC = () => {
                                     </button>
                                 ))}
                             </div>
-
                             <div className="flex gap-2">
-                                <button 
-                                    onClick={handleExportSales}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition"
-                                >
+                                <button onClick={handleExportSales} className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition">
                                     <FileSpreadsheet size={14}/> Export CSV
                                 </button>
-                                <button 
-                                    onClick={() => setIsSalesEditMode(!isSalesEditMode)}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs border ${isSalesEditMode ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                >
+                                <button onClick={() => setIsSalesEditMode(!isSalesEditMode)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs border ${isSalesEditMode ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
                                     {isSalesEditMode ? <Unlock size={14}/> : <Lock size={14}/>}
                                     {isSalesEditMode ? 'Edit Mode ON' : 'Manage Data'}
                                 </button>
                             </div>
                         </div>
-                        
+                        {/* Sales Summary Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2">
                                      {t('grossSales')} ({salesFilter})
                                  </h3>
                                  <p className="text-3xl font-bold text-gray-900 mt-2">฿{totalGrossSales.toLocaleString()}</p>
-                                 {/* CASH BREAKDOWN */}
                                  <div className="mt-4 pt-4 border-t flex justify-between text-xs">
-                                     <div className="flex items-center gap-1 text-green-700 font-bold">
-                                         <Banknote size={14}/> Cash: ฿{cashSales.toLocaleString()}
-                                     </div>
-                                     <div className="flex items-center gap-1 text-blue-700 font-bold">
-                                         <CreditCard size={14}/> Online: ฿{onlineSales.toLocaleString()}
-                                     </div>
+                                     <div className="flex items-center gap-1 text-green-700 font-bold"><Banknote size={14}/> Cash: ฿{cashSales.toLocaleString()}</div>
+                                     <div className="flex items-center gap-1 text-blue-700 font-bold"><CreditCard size={14}/> Online: ฿{onlineSales.toLocaleString()}</div>
                                  </div>
                              </div>
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
@@ -1139,7 +1157,7 @@ export const POSView: React.FC = () => {
                                  <p className={`text-3xl font-bold mt-2 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>฿{netProfit.toLocaleString()}</p>
                              </div>
                         </div>
-
+                        {/* Transaction History */}
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                             <h3 className="p-6 border-b font-bold text-lg">{t('transactionHistory')}</h3>
                             <div className="overflow-x-auto">
@@ -1161,33 +1179,12 @@ export const POSView: React.FC = () => {
                                             <tr key={order.id} className="text-sm hover:bg-gray-50 transition">
                                                 <td className="p-4 font-mono font-bold text-gray-600">#{order.id.slice(-4)}</td>
                                                 <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                                                <td className="p-4">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.source === 'store' ? 'bg-gray-100' : 'bg-green-100 text-green-800'}`}>{order.source}</span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.paymentMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-                                                        {order.paymentMethod === 'cash' ? <Banknote size={12}/> : <CreditCard size={12}/>}
-                                                        {order.paymentMethod === 'cash' ? 'CASH' : 'ONLINE'}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                        {order.status}
-                                                    </span>
-                                                </td>
+                                                <td className="p-4"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.source === 'store' ? 'bg-gray-100' : 'bg-green-100 text-green-800'}`}>{order.source}</span></td>
+                                                <td className="p-4"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.paymentMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{order.paymentMethod === 'cash' ? <Banknote size={12}/> : <CreditCard size={12}/>}{order.paymentMethod === 'cash' ? 'CASH' : 'ONLINE'}</span></td>
+                                                <td className="p-4"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span></td>
                                                 <td className="p-4 text-right font-bold">฿{order.totalAmount}</td>
                                                 <td className="p-4 text-right text-gray-500 text-xs">฿{order.netAmount}</td>
-                                                {isSalesEditMode && (
-                                                    <td className="p-4 text-center">
-                                                        <button 
-                                                            onClick={() => handleDeleteOrder(order.id)}
-                                                            className="text-red-500 hover:bg-red-50 p-2 rounded-full transition"
-                                                            title="Delete Record"
-                                                        >
-                                                            <Trash2 size={16}/>
-                                                        </button>
-                                                    </td>
-                                                )}
+                                                {isSalesEditMode && <td className="p-4 text-center"><button onClick={() => handleDeleteOrder(order.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition" title="Delete Record"><Trash2 size={16}/></button></td>}
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1200,88 +1197,39 @@ export const POSView: React.FC = () => {
                 {/* VIEW: EXPENSES */}
                 {activeTab === 'expenses' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                         {/* ... (Same as before) ... */}
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Calculator className="text-yellow-600"/> Expenses & Costs</h2>
-                             
                              <div className="flex gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                                 {['day', 'month', 'year', 'all'].map(f => (
-                                    <button 
-                                        key={f} 
-                                        onClick={() => setExpensesFilter(f as any)}
-                                        className={`px-3 py-1 text-xs font-bold rounded uppercase transition ${expensesFilter === f ? 'bg-yellow-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
-                                    >
-                                        {f === 'day' ? 'Today' : f}
-                                    </button>
+                                    <button key={f} onClick={() => setExpensesFilter(f as any)} className={`px-3 py-1 text-xs font-bold rounded uppercase transition ${expensesFilter === f ? 'bg-yellow-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>{f === 'day' ? 'Today' : f}</button>
                                 ))}
                             </div>
-                            
-                            <button 
-                                onClick={handleExportExpenses}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition"
-                            >
-                                <FileSpreadsheet size={14}/> Export CSV
-                            </button>
+                            <button onClick={handleExportExpenses} className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition"><FileSpreadsheet size={14}/> Export CSV</button>
                          </div>
-                         
                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                              {/* Form */}
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                  <h3 className="font-bold text-lg mb-4">{t('recordExpense')}</h3>
                                  <form onSubmit={handleAddExpense} className="space-y-4">
-                                     <div>
-                                         <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
-                                         <input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} required placeholder="e.g. Tomatoes"/>
-                                     </div>
+                                     <div><label className="text-xs font-bold text-gray-500 uppercase">Description</label><input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} required placeholder="e.g. Tomatoes"/></div>
                                      <div className="grid grid-cols-2 gap-4">
-                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Amount (฿)</label>
-                                            <input type="number" className="w-full bg-gray-50 border rounded p-3" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required placeholder="0.00"/>
-                                         </div>
-                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
-                                            <select className="w-full bg-gray-50 border rounded p-3" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as any})}>
-                                                {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                         </div>
+                                         <div><label className="text-xs font-bold text-gray-500 uppercase">Amount (฿)</label><input type="number" className="w-full bg-gray-50 border rounded p-3" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required placeholder="0.00"/></div>
+                                         <div><label className="text-xs font-bold text-gray-500 uppercase">Category</label><select className="w-full bg-gray-50 border rounded p-3" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as any})}>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                                      </div>
-                                     <div>
-                                         <label className="text-xs font-bold text-gray-500 uppercase">Note (Optional)</label>
-                                         <input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})}/>
-                                     </div>
+                                     <div><label className="text-xs font-bold text-gray-500 uppercase">Note (Optional)</label><input className="w-full bg-gray-50 border rounded p-3" value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})}/></div>
                                      <button type="submit" className="w-full bg-yellow-500 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-yellow-600 transition">Record Expense</button>
                                  </form>
-                                 
-                                 {/* Quick Expense Buttons (Presets) */}
-                                 <div className="mt-6 pt-6 border-t">
-                                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">{t('quickExpense')}</h4>
-                                     <div className="flex flex-wrap gap-2">
-                                         {PRESET_EXPENSES.map((preset, idx) => (
-                                             <button 
-                                                key={idx}
-                                                onClick={() => setExpenseForm({ ...expenseForm, description: preset.label, category: preset.category as any })}
-                                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200"
-                                             >
-                                                 {preset.label}
-                                             </button>
-                                         ))}
-                                     </div>
-                                 </div>
+                                 <div className="mt-6 pt-6 border-t"><h4 className="text-xs font-bold text-gray-500 uppercase mb-3">{t('quickExpense')}</h4><div className="flex flex-wrap gap-2">{PRESET_EXPENSES.map((preset, idx) => (<button key={idx} onClick={() => setExpenseForm({ ...expenseForm, description: preset.label, category: preset.category as any })} className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200">{preset.label}</button>))}</div></div>
                              </div>
-
                              {/* List */}
                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[500px]">
                                  <h3 className="p-4 border-b font-bold text-lg bg-gray-50">Recent Expenses ({expensesFilter})</h3>
                                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                      {filteredExpenses.length === 0 ? <p className="text-gray-400 text-center mt-10">No expenses recorded for this period.</p> : filteredExpenses.map(exp => (
                                          <div key={exp.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
-                                             <div>
-                                                 <div className="font-bold text-gray-800">{exp.description}</div>
-                                                 <div className="text-xs text-gray-500">{new Date(exp.date).toLocaleDateString()} • {exp.category}</div>
-                                             </div>
-                                             <div className="flex items-center gap-4">
-                                                 <span className="font-bold text-red-600">-฿{exp.amount}</span>
-                                                 <button onClick={() => deleteExpense(exp.id)} className="text-gray-400 hover:text-red-500"><X size={16}/></button>
-                                             </div>
+                                             <div><div className="font-bold text-gray-800">{exp.description}</div><div className="text-xs text-gray-500">{new Date(exp.date).toLocaleDateString()} • {exp.category}</div></div>
+                                             <div className="flex items-center gap-4"><span className="font-bold text-red-600">-฿{exp.amount}</span><button onClick={() => deleteExpense(exp.id)} className="text-gray-400 hover:text-red-500"><X size={16}/></button></div>
                                          </div>
                                      ))}
                                  </div>
@@ -1293,61 +1241,19 @@ export const POSView: React.FC = () => {
                 {/* VIEW: QR GENERATOR (Dedicated) */}
                 {activeTab === 'qr' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100 flex flex-col items-center justify-center relative">
+                         {/* ... (Same as before) ... */}
                          <div className="bg-white rounded-2xl p-8 shadow-xl border border-purple-100 max-w-lg w-full text-center">
                              <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                  <QrCode size={32}/>
                              </div>
                              <h2 className="text-2xl font-bold text-gray-900 mb-2">Table QR Generator</h2>
                              <p className="text-gray-500 mb-8">Create specific ordering links for each table.</p>
-                             
                              <div className="flex flex-col gap-4">
-                                 <div className="text-left">
-                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Table Number</label>
-                                     <div className="flex gap-2">
-                                         <input 
-                                            className="border-2 border-gray-200 rounded-xl p-3 text-xl font-bold text-center w-full focus:border-purple-500 outline-none transition" 
-                                            value={qrTableNum} 
-                                            onChange={e => setQrTableNum(e.target.value)}
-                                            placeholder="1"
-                                         />
-                                     </div>
-                                 </div>
-                                 
-                                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                     <img 
-                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
-                                         className="w-48 h-48 mx-auto mix-blend-multiply"
-                                         alt="QR Code"
-                                     />
-                                 </div>
-                                 
-                                 <div className="grid grid-cols-2 gap-3">
-                                     <button 
-                                         onClick={handlePrintQrCard}
-                                         className="bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black shadow-lg flex items-center justify-center gap-2 transition"
-                                     >
-                                         <Printer size={20}/> Print Card
-                                     </button>
-                                     
-                                     <a 
-                                         href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
-                                         target="_blank"
-                                         download={`table-${qrTableNum}.png`}
-                                         className="bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-lg flex items-center justify-center gap-2 transition"
-                                     >
-                                         <Download size={20}/> Save Image
-                                     </a>
-                                 </div>
-                                 <button 
-                                     onClick={() => setShowQrFullScreen(true)}
-                                     className="bg-white border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 flex items-center justify-center gap-2 transition"
-                                 >
-                                     <Maximize2 size={20}/> Show on Screen
-                                 </button>
-                                 
-                                 <div className="text-xs text-gray-400 break-all bg-gray-50 p-2 rounded border mt-2">
-                                     {getCleanQrUrl()}?table={qrTableNum}
-                                 </div>
+                                 <div className="text-left"><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Table Number</label><div className="flex gap-2"><input className="border-2 border-gray-200 rounded-xl p-3 text-xl font-bold text-center w-full focus:border-purple-500 outline-none transition" value={qrTableNum} onChange={e => setQrTableNum(e.target.value)} placeholder="1"/></div></div>
+                                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`} className="w-48 h-48 mx-auto mix-blend-multiply" alt="QR Code"/></div>
+                                 <div className="grid grid-cols-2 gap-3"><button onClick={handlePrintQrCard} className="bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black shadow-lg flex items-center justify-center gap-2 transition"><Printer size={20}/> Print Card</button><a href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`} target="_blank" download={`table-${qrTableNum}.png`} className="bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-lg flex items-center justify-center gap-2 transition"><Download size={20}/> Save Image</a></div>
+                                 <button onClick={() => setShowQrFullScreen(true)} className="bg-white border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 flex items-center justify-center gap-2 transition"><Maximize2 size={20}/> Show on Screen</button>
+                                 <div className="text-xs text-gray-400 break-all bg-gray-50 p-2 rounded border mt-2">{getCleanQrUrl()}?table={qrTableNum}</div>
                              </div>
                          </div>
                     </div>
@@ -1420,7 +1326,7 @@ export const POSView: React.FC = () => {
                                  </div>
                              </div>
 
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                  <div>
                                      <label className="text-xs text-gray-400 mb-2 block">Review Links (YouTube/TikTok)</label>
                                      {mediaForm.reviewLinks.map((link, i) => (
@@ -1436,12 +1342,55 @@ export const POSView: React.FC = () => {
                                      <button onClick={() => setMediaForm(p => ({...p, vibeLinks: [...p.vibeLinks, '']}))} className="text-xs text-brand-600 font-bold">+ Add Link</button>
                                  </div>
                              </div>
-                             <button onClick={handleSaveMediaSettings} className="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs">Save Media Settings</button>
+
+                             {/* Event Gallery Manager */}
+                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                 <label className="text-xs text-gray-500 font-bold uppercase mb-2 flex items-center gap-2"><Sparkles size={14} className="text-yellow-500"/> Catering & Event Gallery</label>
+                                 <div className="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar">
+                                     {mediaForm.eventGalleryUrls.map((url, i) => (
+                                         <div key={i} className="relative w-20 h-20 flex-shrink-0 group">
+                                             <img src={url} className="w-full h-full object-cover rounded-lg border border-gray-300"/>
+                                             <button 
+                                                 onClick={() => {
+                                                     const newUrls = mediaForm.eventGalleryUrls.filter((_, idx) => idx !== i);
+                                                     setMediaForm({...mediaForm, eventGalleryUrls: newUrls});
+                                                 }}
+                                                 className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
+                                             >
+                                                 <X size={12}/>
+                                             </button>
+                                         </div>
+                                     ))}
+                                     <label className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition flex-shrink-0">
+                                         <Plus size={20}/>
+                                         <span className="text-[10px] font-bold">Add</span>
+                                         <input type="file" hidden accept="image/*" onChange={handleEventImageUpload} />
+                                     </label>
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <input 
+                                         className="flex-1 border rounded p-2 text-xs" 
+                                         placeholder="Paste Image URL here..."
+                                         onKeyDown={(e) => {
+                                             if (e.key === 'Enter') {
+                                                 const val = (e.target as HTMLInputElement).value;
+                                                 if (val) {
+                                                     setMediaForm({...mediaForm, eventGalleryUrls: [...mediaForm.eventGalleryUrls, val]});
+                                                     (e.target as HTMLInputElement).value = '';
+                                                 }
+                                             }
+                                         }}
+                                     />
+                                 </div>
+                             </div>
+
+                             <button onClick={handleSaveMediaSettings} className="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-xs w-full md:w-auto">Save Media Settings</button>
                          </div>
 
                          {/* 5. News & Events */}
                          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
                              <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News & Events</h3>
+                             {/* ... (Same as before) ... */}
                              <form onSubmit={handleAddNews} className="flex flex-col gap-3 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
                                  <input className="border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
                                  <input className="border rounded p-2 text-sm" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
@@ -1481,7 +1430,8 @@ export const POSView: React.FC = () => {
                 )}
             </main>
 
-            {/* --- MOBILE BOTTOM NAV --- */}
+            {/* ... [Modals remain the same] ... */}
+            {/* ... Mobile Bottom Nav ... */}
             <div className="md:hidden bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] print:hidden">
                 <button onClick={() => setActiveTab('order')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
                     <ShoppingBag size={20}/>
@@ -1504,6 +1454,7 @@ export const POSView: React.FC = () => {
 
             {/* Modal: Add/Edit Item */}
             {showItemModal && (
+                // ... same modal code ...
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white w-[95%] max-w-lg rounded-2xl p-6 shadow-2xl relative">
                         <h2 className="text-xl font-bold mb-4">{itemForm.id ? 'Edit Item' : 'Add New Item'}</h2>
@@ -1627,6 +1578,8 @@ export const POSView: React.FC = () => {
                 </div>
             )}
             
+            {/* ... (Other Modals: Customize Item, Payment, Toppings - No changes) ... */}
+            
             {/* Modal: Customize Item / Combo Builder (POS) */}
             {selectedPizza && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -1671,16 +1624,13 @@ export const POSView: React.FC = () => {
                                         <button onClick={() => setActiveComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back</button>
                                         <h3 className="font-bold text-lg mb-4">Choose Pizza #{activeComboSlot + 1}</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {/* FILTER OUT PROMOTIONS to avoid recursion */}
-                                            {/* NEW: Filter by allowedPromotions */}
                                             {menu.filter(p => {
                                                 if (p.category === 'promotion') return false;
                                                 if ((p.comboCount || 0) > 0) return false;
-                                                // Check eligibility
                                                 if (p.allowedPromotions && p.allowedPromotions.length > 0) {
                                                     return p.allowedPromotions.includes(selectedPizza.id);
                                                 }
-                                                return true; // Allowed in all if empty
+                                                return true;
                                             }).map(pizza => (
                                                 <button 
                                                     key={pizza.id} 
@@ -1753,7 +1703,7 @@ export const POSView: React.FC = () => {
                 </div>
             )}
 
-            {/* Modal: PAYMENT / CHECK BILL */}
+            {/* Modal: PAYMENT / CHECK BILL (Same as before) */}
             {showPaymentModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white w-[95%] max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1868,7 +1818,7 @@ export const POSView: React.FC = () => {
                 </div>
             )}
             
-            {/* Modal: Manage Toppings */}
+            {/* Modal: Manage Toppings (Same as before) */}
              {showToppingsModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="bg-white w-[95%] max-w-md rounded-2xl p-6 shadow-2xl relative max-h-[80vh] flex flex-col">

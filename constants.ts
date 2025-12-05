@@ -26,6 +26,11 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     vibeLinks: [
         "https://www.lemon8-app.com/@midniqhtblues/7241589478358303233?region=th"
     ],
+    eventGalleryUrls: [
+        'https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=2070&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=2070&auto=format&fit=crop'
+    ],
     newsItems: []
 };
 
@@ -141,6 +146,12 @@ export const TRANSLATIONS = {
         contactUs: "Contact Us",
         findUs: "Find Us",
         
+        // Catering & Events
+        hireForEvents: "Catering & Private Events",
+        eventDesc: "Looking for the perfect food for your next event? Pizza Damac brings the authentic Italian pizza experience directly to you! Available for private parties, weddings, and corporate events.",
+        contactLine: "Contact via LINE",
+        callUs: "Call Us",
+
         // Errors & Validation
         mustRegister: "Please Login or Register to place an order.",
         addressMissing: "Please enter your full delivery address.",
@@ -281,6 +292,12 @@ export const TRANSLATIONS = {
         newsEvents: "ข่าวสาร & กิจกรรม",
         contactUs: "ติดต่อเรา",
         findUs: "แผนที่ & ติดต่อ",
+
+        // Catering & Events
+        hireForEvents: "บริการจัดเลี้ยง & ออกงาน",
+        eventDesc: "กำลังมองหาอาหารสำหรับงานปาร์ตี้อยู่ใช่ไหม? Pizza Damac พร้อมเสิร์ฟความอร่อยสไตล์อิตาเลียนแท้ๆ ถึงที่! รับจัดเลี้ยงนอกสถานที่ งานวันเกิด งานแต่ง และงานเลี้ยงสังสรรค์",
+        contactLine: "ติดต่อทาง LINE",
+        callUs: "โทรหาเรา",
 
         // Errors & Validation
         mustRegister: "กรุณาเข้าสู่ระบบ หรือ สมัครสมาชิก ก่อนสั่งซื้อ",

@@ -146,6 +146,7 @@ export interface StoreSettings {
   // Media Lists
   reviewLinks?: string[]; // Up to 5
   vibeLinks?: string[]; // Up to 5
+  eventGalleryUrls?: string[]; // New: Catering Images
   
   newsItems?: NewsItem[];
 }
