@@ -876,24 +876,33 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
+    // 1. Find Order locally
     const order = orders.find(o => o.id === orderId);
-    if (order) {
-        const updatedOrder = { 
-            ...order, 
-            status: 'completed' as OrderStatus, 
-            paymentMethod: paymentDetails.paymentMethod,
-            note: (order.note ? order.note + '. ' : '') + (paymentDetails.note || '')
-        };
-        if (isSupabaseConfigured) {
-            try {
-                await supabase.from('orders').update({ 
-                    status: 'completed',
-                    payment_method: paymentDetails.paymentMethod,
-                    note: updatedOrder.note
-                }).eq('id', orderId);
-            } catch (e) { console.error(e); }
+    if (!order) return;
+
+    // 2. Prepare Updates
+    const updatedOrder = { 
+        ...order, 
+        status: 'completed' as OrderStatus, 
+        paymentMethod: paymentDetails.paymentMethod,
+        note: (order.note ? order.note + '. ' : '') + (paymentDetails.note || '')
+    };
+    
+    // 3. Update Local State Immediately
+    setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+
+    // 4. Update Database
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('orders').update({ 
+                status: 'completed',
+                payment_method: paymentDetails.paymentMethod,
+                note: updatedOrder.note
+            }).eq('id', orderId);
+        } catch (e) { 
+            console.error("DB Update Failed for CompleteOrder", e); 
+            // Optional: Revert local state or show error if critical
         }
-        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
     }
   };
 
