@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -15,7 +15,7 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder
+        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus
     } = useStore();
     
     // Unified Tab State
@@ -26,6 +26,10 @@ export const POSView: React.FC = () => {
     const [activeCategory, setActiveCategory] = useState<ProductCategory>('pizza');
     const [showMobileCart, setShowMobileCart] = useState(false);
     
+    // Combo Builder State
+    const [comboSelections, setComboSelections] = useState<SubItem[]>([]);
+    const [activeComboSlot, setActiveComboSlot] = useState<number | null>(null);
+
     // Admin / Edit features
     const [isEditMode, setIsEditMode] = useState(false);
     const [isSalesEditMode, setIsSalesEditMode] = useState(false);
@@ -141,6 +145,12 @@ export const POSView: React.FC = () => {
         setSelectedPizza(pizza);
         setSelectedToppings([]);
         setEditingCartItem(null);
+        
+        // Reset Combo State
+        if (pizza.category === 'promotion' && (pizza.comboCount || 0) > 0) {
+            setComboSelections(new Array(pizza.comboCount).fill(null));
+            setActiveComboSlot(null);
+        }
     };
 
     const handleEditCartItem = (item: CartItem) => {
@@ -161,6 +171,7 @@ export const POSView: React.FC = () => {
         }
     };
 
+    // Confirm Standard Add
     const confirmAddToCart = () => {
         if (!selectedPizza) return;
         const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
@@ -170,7 +181,6 @@ export const POSView: React.FC = () => {
             updateCartItem({
                 ...editingCartItem,
                 selectedToppings: selectedToppings,
-                // Combo sub-items would be handled differently, simplifying for generic POS edit
             });
         } else {
             const item: CartItem = {
@@ -191,6 +201,45 @@ export const POSView: React.FC = () => {
         setEditingCartItem(null);
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
+    
+    // Combo Logic Handlers
+    const handleComboSlotClick = (index: number) => {
+        setActiveComboSlot(index);
+    }
+    
+    const handleComboPizzaSelect = (pizza: Pizza) => {
+        if (activeComboSlot === null) return;
+        
+        const newSelections = [...comboSelections];
+        newSelections[activeComboSlot] = {
+            pizzaId: pizza.id,
+            name: pizza.name,
+            nameTh: pizza.nameTh,
+            toppings: [] // No extra toppings in POS for speed
+        };
+        setComboSelections(newSelections);
+        setActiveComboSlot(null); // Return to builder
+    }
+    
+    const confirmAddComboToCart = () => {
+        if (!selectedPizza) return;
+        
+        const localized = getLocalizedItem(selectedPizza);
+        const item: CartItem = {
+            id: Date.now().toString() + Math.random().toString(),
+            pizzaId: selectedPizza.id,
+            name: localized.name,
+            nameTh: selectedPizza.nameTh,
+            basePrice: selectedPizza.basePrice,
+            selectedToppings: [], 
+            subItems: comboSelections,
+            quantity: 1,
+            totalPrice: selectedPizza.basePrice // Assuming no extra toppings charge for basic combo selection in POS
+        };
+        addToCart(item);
+        setSelectedPizza(null);
+        setComboSelections([]);
+    }
 
     // Handler: Send to Kitchen (Pay Later)
     const handleSendToKitchen = async () => {
@@ -235,6 +284,15 @@ export const POSView: React.FC = () => {
     const handleCloseTable = async (orderId: string) => {
         if(confirm("Close this table? (Mark as completed)")) {
             await completeOrder(orderId, { paymentMethod: 'cash' }); // Default to cash if closing without paying flow, or assume paid
+        }
+    }
+    
+    // Force Cancel Table (Ghost Table Fix)
+    const handleCancelTable = async (orderId: string) => {
+        if(confirm("Force Cancel/Delete this table order? It will be removed from Active Tables.")) {
+            // If we have a 'cancelled' status in types, use it. Otherwise 'completed' or delete.
+            // Using updateOrderStatus from store context to set status to 'cancelled'
+            await updateOrderStatus(orderId, 'cancelled');
         }
     }
 
@@ -758,6 +816,9 @@ export const POSView: React.FC = () => {
                                                     <div className="font-bold text-gray-800 text-sm md:text-base flex items-center gap-2">
                                                         {item.name} <Edit2 size={12} className="text-gray-400"/>
                                                     </div>
+                                                    <p className="text-xs text-gray-500 line-clamp-1">
+                                                        {item.subItems ? item.subItems.map(s => s.name).join(', ') : item.selectedToppings.map(t => t.name).join(', ')}
+                                                    </p>
                                                 </div>
                                                 <div className="font-bold text-gray-800">฿{item.totalPrice}</div>
                                             </div>
@@ -825,13 +886,22 @@ export const POSView: React.FC = () => {
                                         onClick={() => !isPaid && handleCheckTableBill(order)}
                                         className={`bg-white rounded-xl shadow-md p-6 border-l-8 cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition relative overflow-hidden ${isPaid ? 'border-green-500' : 'border-red-500'}`}
                                      >
+                                         {/* Delete Button (Top Right) */}
+                                         <button 
+                                             onClick={(e) => { e.stopPropagation(); handleCancelTable(order.id); }}
+                                             className="absolute top-4 right-4 p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 z-10"
+                                             title="Force Cancel / Delete Table"
+                                         >
+                                             <Trash2 size={16}/>
+                                         </button>
+
                                          {/* Status Badge */}
-                                         <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                         <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                              {isPaid ? <CheckCircle2 size={12}/> : <AlertCircle size={12}/>}
                                              {isPaid ? 'PAID' : 'UNPAID'}
                                          </div>
 
-                                         <div className="flex justify-between items-start mb-4">
+                                         <div className="flex justify-between items-start mt-8 mb-4">
                                              <div>
                                                  <div className="text-xs font-bold text-gray-500 uppercase mb-1">Table No.</div>
                                                  <div className="text-4xl font-bold text-gray-900">{order.tableNumber || '?'}</div>
@@ -1074,257 +1144,6 @@ export const POSView: React.FC = () => {
                                  </div>
                              </div>
                          </div>
-                         
-                         {/* 2. Table QR Code Generator (MOVED TO TOP) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200 ring-2 ring-brand-100">
-                             <h3 className="font-bold text-gray-700 text-xs uppercase mb-3 flex items-center gap-2">
-                                 <QrCode size={14}/> Table QR Generator <span className="bg-red-500 text-white text-[10px] px-1 rounded animate-pulse">NEW</span>
-                             </h3>
-                             <div className="flex flex-col md:flex-row gap-6 items-start">
-                                 <div className="space-y-4 max-w-sm">
-                                     <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                                         <h4 className="font-bold text-blue-800 text-xs uppercase mb-2">How it works:</h4>
-                                         <ol className="list-decimal list-inside text-xs text-blue-700 space-y-1">
-                                             <li>Set Website Address (e.g. https://pizza-damac.com)</li>
-                                             <li>Enter Table Number (e.g. 5)</li>
-                                             <li>Click "Print QR" & Stick on table</li>
-                                             <li>Customer scans &rarr; App opens in "Table Mode"</li>
-                                         </ol>
-                                     </div>
-                                     <div className="space-y-3">
-                                         <div>
-                                            <label className="text-xs font-bold text-gray-700 block mb-1">Website Address (Base URL):</label>
-                                            <input 
-                                                type="text" 
-                                                className="border rounded p-2 w-full text-xs" 
-                                                value={qrBaseUrl} 
-                                                onChange={e => setQrBaseUrl(e.target.value)}
-                                                placeholder="https://..."
-                                            />
-                                            <p className="text-[10px] text-gray-400 mt-1">Change this from 'localhost' to your real website URL so phones can scan it!</p>
-                                         </div>
-                                         <div className="flex gap-2 items-center">
-                                             <label className="text-xs font-bold text-gray-700 whitespace-nowrap">Table Number:</label>
-                                             <input 
-                                                type="number" 
-                                                className="border rounded p-2 w-24 text-center font-bold" 
-                                                placeholder="1" 
-                                                value={qrTableNum} 
-                                                onChange={e => setQrTableNum(e.target.value)}
-                                             />
-                                         </div>
-                                     </div>
-                                 </div>
-                                 
-                                 {qrTableNum && (
-                                     <div className="flex gap-6 items-center p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                                         <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${getCleanQrUrl()}/?table=${qrTableNum}`)}`} 
-                                            alt={`Table ${qrTableNum} QR`} 
-                                            className="w-32 h-32"
-                                         />
-                                         <div className="space-y-2">
-                                             <div className="font-bold text-lg">Table {qrTableNum}</div>
-                                             <a 
-                                                 href={`${getCleanQrUrl()}/?table=${qrTableNum}`} 
-                                                 target="_blank"
-                                                 className="text-xs text-blue-600 hover:underline block mb-2"
-                                             >
-                                                 Test Link
-                                             </a>
-                                             <button 
-                                                 onClick={() => {
-                                                     const w = window.open('', '_blank');
-                                                     w?.document.write(`
-                                                         <html>
-                                                             <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
-                                                                 <h1 style="font-size:48px;margin-bottom:10px;">Table ${qrTableNum}</h1>
-                                                                 <p style="margin-bottom:30px;font-size:24px;">Scan to Order</p>
-                                                                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${getCleanQrUrl()}/?table=${qrTableNum}`)}" style="width:400px;height:400px;" />
-                                                                 <p style="margin-top:30px;color:#666;">Pizza Damac</p>
-                                                                 <script>window.print();</script>
-                                                             </body>
-                                                         </html>
-                                                     `);
-                                                     w?.document.close();
-                                                 }}
-                                                 className="bg-gray-900 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2"
-                                             >
-                                                 <Printer size={14}/> Print QR
-                                             </button>
-                                         </div>
-                                     </div>
-                                 )}
-                             </div>
-                         </div>
-
-                         {/* 3. MEDIA MANAGER (New) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <div className="flex justify-between items-center mb-4">
-                                 <h3 className="font-bold text-brand-600 text-sm uppercase flex items-center gap-2"><Video size={16}/> {t('mediaManager')}</h3>
-                                 <button onClick={handleSaveMediaSettings} className="bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                     <Save size={14}/> Save Media Links
-                                 </button>
-                             </div>
-                             
-                             {/* Big Banner Upload */}
-                             <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                                 <label className="text-sm font-bold text-gray-700 mb-2 block">Main Banner Image</label>
-                                 <div className="flex flex-col md:flex-row gap-4 items-start">
-                                     {mediaForm.promoBannerUrl ? (
-                                         <div className="w-full md:w-64 h-32 rounded-lg overflow-hidden border bg-black">
-                                             <img src={mediaForm.promoBannerUrl} className="w-full h-full object-cover opacity-80" />
-                                         </div>
-                                     ) : (
-                                         <div className="w-full md:w-64 h-32 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400">No Banner</div>
-                                     )}
-                                     <div className="flex-1 space-y-3 w-full">
-                                         <label className="flex items-center justify-center gap-2 w-full p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition font-bold text-gray-600 text-sm">
-                                             <Upload size={16}/> Upload New Photo
-                                             <input type="file" hidden accept="image/*" onChange={handleBannerUpload} />
-                                         </label>
-                                         <div className="relative">
-                                             <Link size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                             <input 
-                                                 className="w-full border rounded p-2 pl-9 text-xs" 
-                                                 placeholder="Or paste image URL..." 
-                                                 value={mediaForm.promoBannerUrl || ''} 
-                                                 onChange={e => setMediaForm({ ...mediaForm, promoBannerUrl: e.target.value })}
-                                             />
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
-
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                 {/* Review Links */}
-                                 <div>
-                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><Star size={12}/> Review Videos (Max 5)</h4>
-                                     <p className="text-[10px] text-gray-400 mb-2">Paste YouTube, TikTok, or Facebook Reel links.</p>
-                                     <div className="space-y-2">
-                                         {[0, 1, 2, 3, 4].map(idx => (
-                                             <div key={idx} className="flex gap-2 items-center">
-                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
-                                                 <input 
-                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
-                                                     placeholder="https://..."
-                                                     value={mediaForm.reviewLinks?.[idx] || ''}
-                                                     onChange={e => updateLocalMediaLink('review', idx, e.target.value)}
-                                                 />
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-
-                                 {/* Vibe Links */}
-                                 <div>
-                                     <h4 className="font-bold text-gray-800 text-xs uppercase mb-3 flex items-center gap-2"><PlayCircle size={12}/> Vibe Videos (Max 5)</h4>
-                                     <p className="text-[10px] text-gray-400 mb-2">Show off the atmosphere of your restaurant.</p>
-                                     <div className="space-y-2">
-                                         {[0, 1, 2, 3, 4].map(idx => (
-                                             <div key={idx} className="flex gap-2 items-center">
-                                                 <span className="text-xs font-bold text-gray-300 w-4">{idx + 1}.</span>
-                                                 <input 
-                                                     className="flex-1 bg-gray-50 border rounded p-2 text-xs" 
-                                                     placeholder="https://..."
-                                                     value={mediaForm.vibeLinks?.[idx] || ''}
-                                                     onChange={e => updateLocalMediaLink('vibe', idx, e.target.value)}
-                                                 />
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-                             </div>
-                         </div>
-                         
-                         {/* 4. News Manager (New) */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Newspaper size={14}/> News Manager</h3>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 {/* Form */}
-                                 <div>
-                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Add New News</h4>
-                                     <form onSubmit={handleAddNews} className="space-y-3">
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Title" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} required/>
-                                         <textarea className="w-full border rounded p-2 text-sm h-20" placeholder="Summary" value={newsForm.summary} onChange={e => setNewsForm({...newsForm, summary: e.target.value})} required/>
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Image URL (Optional)" value={newsForm.imageUrl} onChange={e => setNewsForm({...newsForm, imageUrl: e.target.value})}/>
-                                         <input className="w-full border rounded p-2 text-sm" placeholder="Link URL (Optional)" value={newsForm.linkUrl} onChange={e => setNewsForm({...newsForm, linkUrl: e.target.value})}/>
-                                         <button type="submit" className="bg-brand-600 text-white px-4 py-2 rounded-lg font-bold text-sm w-full">Add News</button>
-                                     </form>
-                                 </div>
-                                 {/* List */}
-                                 <div className="border-l pl-6 max-h-60 overflow-y-auto space-y-3">
-                                     <h4 className="text-xs font-bold text-gray-800 mb-2">Existing News</h4>
-                                     {storeSettings.newsItems && storeSettings.newsItems.length > 0 ? (
-                                         storeSettings.newsItems.map(item => (
-                                             <div key={item.id} className="border p-2 rounded flex justify-between items-start bg-gray-50">
-                                                 <div>
-                                                     <div className="font-bold text-sm">{item.title}</div>
-                                                     <div className="text-[10px] text-gray-500 line-clamp-1">{item.summary}</div>
-                                                 </div>
-                                                 <button onClick={() => deleteNewsItem(item.id)} className="text-red-500"><Trash2 size={14}/></button>
-                                             </div>
-                                         ))
-                                     ) : <p className="text-xs text-gray-400">No news items.</p>}
-                                 </div>
-                             </div>
-                         </div>
-                         
-                         {/* 5. Contact & Links */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm mb-6 border border-gray-200">
-                             <div className="flex justify-between items-center mb-3">
-                                 <h3 className="font-bold text-gray-500 text-xs uppercase flex items-center gap-2"><MessageCircle size={14}/> Contact & Payment Links</h3>
-                                 <button onClick={handleSaveContactSettings} className="bg-gray-800 hover:bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                                     <Save size={14}/> Save Settings
-                                 </button>
-                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 md:col-span-2">
-                                     <label className="text-xs font-bold text-blue-800 mb-1 flex items-center gap-1"><QrCode size={12}/> PromptPay Number (Phone or Tax ID)</label>
-                                     <div className="flex gap-2 items-center">
-                                         <input className="w-full border rounded p-2 text-sm font-mono font-bold" value={contactForm.promptPayNumber || ''} onChange={e => setContactForm({ ...contactForm, promptPayNumber: e.target.value })} placeholder="081... or 010..."/>
-                                         <div className="text-[10px] text-blue-600 max-w-[200px]">Used to generate QR Codes for customers.</div>
-                                     </div>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Star size={12}/> Review URL (Google)</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.reviewUrl || ''} onChange={e => setContactForm({ ...contactForm, reviewUrl: e.target.value })} placeholder="https://maps.app.goo.gl/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MapPin size={12}/> Map URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.mapUrl || ''} onChange={e => setContactForm({ ...contactForm, mapUrl: e.target.value })} placeholder="https://maps.google.com..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Facebook size={12}/> Facebook URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.facebookUrl || ''} onChange={e => setContactForm({ ...contactForm, facebookUrl: e.target.value })} placeholder="https://facebook.com/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><MessageCircle size={12}/> Line URL</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.lineUrl || ''} onChange={e => setContactForm({ ...contactForm, lineUrl: e.target.value })} placeholder="https://line.me/..."/>
-                                 </div>
-                                 <div>
-                                     <label className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1"><Phone size={12}/> Contact Phone</label>
-                                     <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={contactForm.contactPhone || ''} onChange={e => setContactForm({ ...contactForm, contactPhone: e.target.value })} placeholder="099..."/>
-                                 </div>
-                             </div>
-                         </div>
-                         
-                         {/* 6. Menu Actions */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><Database size={14}/> Data Management</h3>
-                             <div className="flex flex-wrap gap-4">
-                                 <button onClick={seedDatabase} className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 font-bold text-sm flex items-center gap-2">
-                                     <Upload size={16}/> Upload Menu to Database
-                                 </button>
-                                 <button onClick={() => setShowToppingsModal(true)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-300 font-bold text-sm flex items-center gap-2">
-                                     <Layers size={16}/> Manage Toppings
-                                 </button>
-                                 <button onClick={handleExportCustomers} className="bg-green-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-green-700 font-bold text-sm flex items-center gap-2">
-                                     <Download size={16}/> Export Customers (CSV)
-                                 </button>
-                             </div>
-                             <p className="text-[10px] text-gray-400 mt-2">Use "Upload Menu" to sync your local code mock menu with Supabase.</p>
-                         </div>
                     </div>
                 )}
             </main>
@@ -1429,50 +1248,119 @@ export const POSView: React.FC = () => {
                 </div>
             )}
             
-            {/* Modal: Customize Item (POS) */}
+            {/* Modal: Customize Item / Combo Builder (POS) */}
             {selectedPizza && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
-                        {/* Header */}
-                        <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
-                             <div>
-                                 <h2 className="text-xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
-                                 <p className="text-sm text-brand-600 font-bold">Base: ฿{selectedPizza.basePrice}</p>
-                             </div>
-                             <button onClick={() => setSelectedPizza(null)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X size={20}/></button>
+                    {(selectedPizza.comboCount || 0) > 0 ? (
+                        // COMBO BUILDER UI
+                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+                            <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                    <Layers className="text-brand-600"/> Build {getLocalizedItem(selectedPizza).name}
+                                </h2>
+                                <button onClick={() => setSelectedPizza(null)} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
+                                {activeComboSlot === null ? (
+                                    // Slot List
+                                    <div className="space-y-4">
+                                        <p className="text-center text-gray-500 mb-4">Select {selectedPizza.comboCount} pizzas for the deal.</p>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {Array.from({length: selectedPizza.comboCount || 2}).map((_, idx) => (
+                                                <button 
+                                                    key={idx}
+                                                    onClick={() => handleComboSlotClick(idx)}
+                                                    className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center justify-between transition ${comboSelections[idx] ? 'border-brand-500 bg-brand-50' : 'border-gray-300 hover:border-brand-300 bg-white'}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${comboSelections[idx] ? 'bg-brand-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                                            {idx + 1}
+                                                        </div>
+                                                        <span className={`font-bold ${comboSelections[idx] ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                            {comboSelections[idx] ? comboSelections[idx].name : 'Select Pizza...'}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronRight size={20} className="text-gray-400"/>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    // Pizza Selector
+                                    <div>
+                                        <button onClick={() => setActiveComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back</button>
+                                        <h3 className="font-bold text-lg mb-4">Choose Pizza #{activeComboSlot + 1}</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {menu.filter(p => p.category === 'pizza').map(pizza => (
+                                                <button 
+                                                    key={pizza.id} 
+                                                    onClick={() => handleComboPizzaSelect(pizza)}
+                                                    className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl shadow-sm border hover:border-brand-500 text-center transition"
+                                                >
+                                                    <img src={pizza.image} className="w-16 h-16 rounded-lg object-cover"/>
+                                                    <div className="font-bold text-xs text-gray-800 line-clamp-2">{getLocalizedItem(pizza).name}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="p-4 border-t bg-white flex justify-between items-center rounded-b-2xl">
+                                <div className="font-bold text-xl text-gray-900">Total: ฿{selectedPizza.basePrice}</div>
+                                {activeComboSlot === null && (
+                                    <button 
+                                        disabled={comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0)}
+                                        onClick={confirmAddComboToCart}
+                                        className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                                    >
+                                        Add Bundle
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        
-                        {/* Toppings Grid (Simplified for POS) */}
-                        <div className="p-4 overflow-y-auto bg-white flex-1">
-                             <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-1"><ChefHat size={14}/> Customize / Add Toppings</h3>
-                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                 {toppings.map(topping => {
-                                     const isSelected = selectedToppings.some(t => t.id === topping.id);
-                                     return (
-                                         <button
-                                             key={topping.id}
-                                             onClick={() => toggleTopping(topping)}
-                                             className={`p-3 rounded-xl border text-left transition relative overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
-                                         >
-                                             <div className="flex justify-between items-center relative z-10">
-                                                 <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
-                                                 {isSelected && <CheckCircle2 size={16} className="text-brand-600"/>}
-                                             </div>
-                                             <div className="text-xs opacity-70 mt-1 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
-                                         </button>
-                                     )
-                                 })}
-                             </div>
-                        </div>
+                    ) : (
+                        // STANDARD UI
+                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+                            <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
+                                    <p className="text-sm text-brand-600 font-bold">Base: ฿{selectedPizza.basePrice}</p>
+                                </div>
+                                <button onClick={() => setSelectedPizza(null)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X size={20}/></button>
+                            </div>
+                            
+                            <div className="p-4 overflow-y-auto bg-white flex-1">
+                                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-1"><ChefHat size={14}/> Customize / Add Toppings</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {toppings.map(topping => {
+                                        const isSelected = selectedToppings.some(t => t.id === topping.id);
+                                        return (
+                                            <button
+                                                key={topping.id}
+                                                onClick={() => toggleTopping(topping)}
+                                                className={`p-3 rounded-xl border text-left transition relative overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                            >
+                                                <div className="flex justify-between items-center relative z-10">
+                                                    <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
+                                                    {isSelected && <CheckCircle2 size={16} className="text-brand-600"/>}
+                                                </div>
+                                                <div className="text-xs opacity-70 mt-1 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
 
-                        {/* Footer */}
-                        <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
-                            <div className="font-bold text-xl">Total: ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}</div>
-                            <button onClick={confirmAddToCart} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-brand-700">
-                                <Plus size={20}/> Add to Cart
-                            </button>
+                            <div className="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                                <div className="font-bold text-xl">Total: ฿{selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)}</div>
+                                <button onClick={confirmAddToCart} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-brand-700">
+                                    <Plus size={20}/> Add to Cart
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             )}
 
