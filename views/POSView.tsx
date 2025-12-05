@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -18,7 +18,7 @@ export const POSView: React.FC = () => {
         addNewsItem, deleteNewsItem, getAllCustomers, completeOrder
     } = useStore();
     
-    // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage' | 'tables'
+    // Unified Tab State
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
@@ -28,7 +28,7 @@ export const POSView: React.FC = () => {
     
     // Admin / Edit features
     const [isEditMode, setIsEditMode] = useState(false);
-    const [isSalesEditMode, setIsSalesEditMode] = useState(false); // New: For deleting sales records
+    const [isSalesEditMode, setIsSalesEditMode] = useState(false);
     const [tableNumber, setTableNumber] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     
@@ -68,9 +68,9 @@ export const POSView: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
     const [cashReceived, setCashReceived] = useState<string>('');
     const [change, setChange] = useState<number>(0);
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null); // For handling existing table payments
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-    // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
+    // --- LOCAL STATE FOR SETTINGS FORMS ---
     const [mediaForm, setMediaForm] = useState({
         promoBannerUrl: '',
         reviewLinks: [] as string[],
@@ -83,7 +83,7 @@ export const POSView: React.FC = () => {
         facebookUrl: '',
         lineUrl: '',
         contactPhone: '',
-        promptPayNumber: '' // Added for PromptPay
+        promptPayNumber: '' 
     });
     
     // Receipt Data for Printing
@@ -122,6 +122,18 @@ export const POSView: React.FC = () => {
             setChange(0);
         }
     }, [cashReceived, cartTotal, paymentMethod, selectedOrder]);
+
+    // PromptPay QR Payload Generator (Memoized to prevent flickering)
+    const promptPayQRUrl = useMemo(() => {
+        if (paymentMethod !== 'qr_transfer') return '';
+        
+        const amount = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const ppNumber = storeSettings.promptPayNumber || '0994979199'; // Default Fallback
+        const payload = generatePromptPayPayload(ppNumber, amount);
+        
+        // Add timestamp to force image refresh if details change
+        return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}&t=${Date.now()}`;
+    }, [paymentMethod, selectedOrder, cartTotal, storeSettings.promptPayNumber]);
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
@@ -1482,23 +1494,21 @@ export const POSView: React.FC = () => {
                              {/* QR Display (DYNAMIC PROMPTPAY) */}
                             {paymentMethod === 'qr_transfer' && (
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 text-center">
-                                    <p className="font-bold text-blue-800 mb-2">Scan to Pay (PromptPay)</p>
-                                    <div className="bg-white p-2 inline-block rounded-lg shadow-sm">
+                                    <p className="font-bold text-blue-800 mb-2 flex items-center justify-center gap-2">
+                                        <img src="https://promptpay.io/logo.png" className="h-5" alt=""/> Scan to Pay
+                                    </p>
+                                    <div className="bg-white p-2 inline-block rounded-lg shadow-sm border border-gray-200">
+                                        {/* Use the Memoized URL to prevent flickering */}
                                         <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                                                generatePromptPayPayload(
-                                                    storeSettings.promptPayNumber || '0994979199', 
-                                                    selectedOrder ? selectedOrder.totalAmount : cartTotal
-                                                )
-                                            )}`} 
+                                            src={promptPayQRUrl} 
                                             alt="PromptPay QR" 
                                             className="w-48 h-48 mx-auto"
                                         />
                                     </div>
-                                    <p className="text-xs text-blue-600 mt-2">
-                                        Amount: ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}<br/>
-                                        Ref: {storeSettings.promptPayNumber}
-                                    </p>
+                                    <div className="mt-3 text-xs text-blue-800 bg-blue-100 p-2 rounded-lg font-mono">
+                                        <div><span className="font-bold">Pay to:</span> {storeSettings.promptPayNumber || '0994979199'}</div>
+                                        <div><span className="font-bold">Amount:</span> ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</div>
+                                    </div>
                                 </div>
                             )}
                         </div>
