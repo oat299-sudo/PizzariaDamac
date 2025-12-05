@@ -1,7 +1,13 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Pizza, Order, CartItem, CustomerProfile, OrderType, PaymentMethod, AppView, Topping, OrderSource, SavedFavorite, Expense, Language, StoreSettings, NewsItem } from '../types';
-import { INITIAL_MENU, INITIAL_TOPPINGS, GP_RATES, TRANSLATIONS, OPERATING_HOURS, DEFAULT_STORE_SETTINGS } from '../constants';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { 
+  Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
+  PaymentMethod, CustomerProfile, Expense, StoreSettings, NewsItem, 
+  SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory
+} from '../types';
+import { 
+  INITIAL_MENU, INITIAL_TOPPINGS, DEFAULT_STORE_SETTINGS, 
+  OPERATING_HOURS, GP_RATES, TRANSLATIONS, CATEGORIES 
+} from '../constants';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface StoreContextType {
@@ -9,13 +15,17 @@ interface StoreContextType {
   toggleLanguage: () => void;
   t: (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => string;
   getLocalizedItem: (item: { name: string; nameTh?: string; description?: string; descriptionTh?: string } | undefined) => { name: string; description: string };
+  
   currentView: AppView;
   navigateTo: (view: AppView) => void;
+  
   isAdminLoggedIn: boolean;
   adminLogin: (u: string, p: string) => boolean;
   adminLogout: () => void;
+  
   shopLogo: string;
   updateShopLogo: (base64: string) => void;
+  
   menu: Pizza[];
   addPizza: (pizza: Pizza) => Promise<void>;
   updatePizza: (pizza: Pizza) => Promise<void>;
@@ -25,23 +35,27 @@ interface StoreContextType {
   toggleBestSeller: (id: string) => Promise<void>;
   generateLuckyPizza: () => { pizza: Pizza; toppings: Topping[] } | null;
   seedDatabase: () => Promise<void>;
+
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
   deleteTopping: (id: string) => Promise<void>;
+  
   cart: CartItem[];
   addToCart: (item: CartItem) => void;
-  updateCartItemQuantity: (itemId: string, delta: number) => void;
-  updateCartItem: (updatedItem: CartItem) => void;
   removeFromCart: (itemId: string) => void;
+  updateCartItemQuantity: (itemId: string, delta: number) => void;
+  updateCartItem: (item: CartItem) => void;
   clearCart: () => void;
   cartTotal: number;
+  
   customer: CustomerProfile | null;
   setCustomer: (profile: CustomerProfile) => Promise<void>;
   registerCustomer: (profile: CustomerProfile) => Promise<'created' | 'updated'>;
+  customerLogin: (phone: string, pass: string) => Promise<boolean>;
   getAllCustomers: () => Promise<any[]>;
-  customerLogin: (phone: string, password: string) => Promise<boolean>;
   addToFavorites: (name: string, pizzaId: string, toppings: Topping[]) => Promise<void>;
   claimReward: () => boolean;
+
   orders: Order[];
   placeOrder: (
     type: OrderType, 
@@ -52,18 +66,19 @@ interface StoreContextType {
       pickupTime?: string;
       tableNumber?: string;
       source?: OrderSource;
+      status?: OrderStatus;
     }
   ) => Promise<boolean>;
-  updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
+  fetchOrders: () => Promise<void>;
+
   expenses: Expense[];
   addExpense: (expense: Expense) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
-  fetchOrders: () => Promise<void>; // Exposed for manual refresh
-  
-  // Store Settings
+
   isStoreOpen: boolean;
   isHoliday: boolean;
   closedMessage: string;
@@ -71,13 +86,11 @@ interface StoreContextType {
   toggleStoreStatus: (isOpen: boolean, message?: string) => Promise<void>;
   updateStoreSettings: (settings: Partial<StoreSettings>) => Promise<void>;
   generateTimeSlots: (dateOffset?: number) => string[];
-  canOrderForToday: () => boolean; // Helper to check if ordering for today is possible
-  
-  // News & Media
+  canOrderForToday: () => boolean;
+
   addNewsItem: (item: NewsItem) => Promise<void>;
   deleteNewsItem: (id: string) => Promise<void>;
 
-  // Table QR
   tableSession: string | null;
 }
 
@@ -588,8 +601,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 phone: profile.phone, 
                 name: profile.name, 
                 address: profile.address, 
-                birthday: profile.birthday,
-                password: profile.password, // Save password
+                birthday: profile.birthday, 
+                password: profile.password,
                 loyalty_points: profile.loyaltyPoints, 
                 tier: profile.tier,
                 saved_favorites: profile.savedFavorites, 
@@ -748,7 +761,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const placeOrder = async (type: OrderType, details: any = {}): Promise<boolean> => {
     // If DB is offline, we proceed with local state to allow the app to function as a demo/offline POS
     try {
-        const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store' } = details;
+        const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store', status } = details;
         
         // Save address if new (only for store orders with a logged in customer)
         if (source === 'store' && customer && type === 'delivery' && delivery?.address) {
@@ -772,7 +785,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             customerPhone: customer?.phone || 'Guest',
             type,
             source: source,
-            status: source === 'store' ? 'pending' : 'confirmed', // 3rd party auto-confirmed
+            // Use status from details, else default: 'pending' for store/POS (unpaid), 'confirmed' for external
+            status: status || (source === 'store' ? 'pending' : 'confirmed'),
             items: cart,
             totalAmount: cartTotal,
             netAmount: Math.round(netAmount || 0),
@@ -848,162 +862,173 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
-      if (isSupabaseConfigured) {
-          try {
-             await supabase.from('orders').update({ status }).eq('id', orderId);
-          } catch(e) { console.error("Status update error", e); }
-      }
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+  // --- Missing Function implementations ---
+
+  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('orders').update({ status }).eq('id', orderId);
+        } catch (e) { console.error(e); }
+    }
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
-  
-  // NEW: Complete Order with Payment Update
+
   const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
-      if (isSupabaseConfigured) {
-          try {
-             await supabase.from('orders').update({ 
-                 status: 'completed',
-                 payment_method: paymentDetails.paymentMethod,
-                 note: paymentDetails.note // Append or overwrite note
-             }).eq('id', orderId);
-          } catch(e) { console.error("Complete order error", e); }
-      }
-      // Update Local
-      setOrders(prev => prev.map(o => o.id === orderId ? { 
-          ...o, 
-          status: 'completed',
-          paymentMethod: paymentDetails.paymentMethod,
-          note: paymentDetails.note ? (o.note ? o.note + ' ' + paymentDetails.note : paymentDetails.note) : o.note
-      } : o));
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+        const updatedOrder = { 
+            ...order, 
+            status: 'completed' as OrderStatus, 
+            paymentMethod: paymentDetails.paymentMethod,
+            note: (order.note ? order.note + '. ' : '') + (paymentDetails.note || '')
+        };
+        if (isSupabaseConfigured) {
+            try {
+                await supabase.from('orders').update({ 
+                    status: 'completed',
+                    payment_method: paymentDetails.paymentMethod,
+                    note: updatedOrder.note
+                }).eq('id', orderId);
+            } catch (e) { console.error(e); }
+        }
+        setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+    }
   };
-  
+
   const deleteOrder = async (orderId: string) => {
-      if (isSupabaseConfigured) {
-          try {
-             await supabase.from('orders').delete().eq('id', orderId);
-          } catch(e) { console.error("Delete order error", e); }
-      }
-      setOrders(prev => prev.filter(o => o.id !== orderId));
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('orders').delete().eq('id', orderId);
+        } catch (e) { console.error(e); }
+    }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
   };
-  
-  // Expenses
+
   const addExpense = async (expense: Expense) => {
-      if (isSupabaseConfigured) {
-          try { await supabase.from('expenses').insert([expense]); } catch(e) { console.error("Expense add error", e); }
-      }
-      // Always local update
-      setExpenses(prev => [...prev, expense]);
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('expenses').insert([{
+                id: expense.id, description: expense.description, amount: expense.amount, 
+                category: expense.category, date: expense.date, note: expense.note
+            }]);
+        } catch (e) { console.error(e); }
+    }
+    setExpenses(prev => [...prev, expense]);
   };
+
   const deleteExpense = async (id: string) => {
-      if (isSupabaseConfigured) {
-          try { await supabase.from('expenses').delete().eq('id', id); } catch(e) { console.error("Expense delete error", e); }
-      }
-      setExpenses(prev => prev.filter(e => e.id !== id));
-  };
-  
-  // News Actions
-  const addNewsItem = async (item: NewsItem) => {
-      const newItems = [...(storeSettings.newsItems || []), item];
-      updateStoreSettings({ newsItems: newItems });
-  };
-  
-  const deleteNewsItem = async (id: string) => {
-      const newItems = (storeSettings.newsItems || []).filter(i => i.id !== id);
-      updateStoreSettings({ newsItems: newItems });
+    if (isSupabaseConfigured) {
+         try { await supabase.from('expenses').delete().eq('id', id); } catch(e) {}
+    }
+    setExpenses(prev => prev.filter(e => e.id !== id));
   };
 
-  // Settings
-  const toggleStoreStatus = async (isOpen: boolean, message: string = '') => {
-      if (isSupabaseConfigured) {
-          try {
-             await supabase.from('store_settings').upsert({ id: 'global', is_open: isOpen, closed_message: message });
-          } catch(e) { console.error("Store status sync error", e); }
-      }
-      setStoreSettings({ ...storeSettings, isOpen, closedMessage: message });
+  const toggleStoreStatus = async (isOpen: boolean, message?: string) => {
+    const newSettings = { ...storeSettings, isOpen, closedMessage: message || storeSettings.closedMessage };
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ 
+                is_open: isOpen, 
+                closed_message: message || storeSettings.closedMessage 
+            }).eq('id', 1); // Assuming single row
+        } catch (e) { console.error(e); }
+    }
+    setStoreSettings(newSettings);
   };
-  
+
   const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
-      if (isSupabaseConfigured) {
-          try {
-            // Convert camelCase to snake_case for DB
-            const dbPayload: any = { id: 'global' }; // Ensure ID is present for upsert
-            
-            if (settings.holidayStart !== undefined) dbPayload.holiday_start = settings.holidayStart;
-            if (settings.holidayEnd !== undefined) dbPayload.holiday_end = settings.holidayEnd;
-            if (settings.promoBannerUrl !== undefined) dbPayload.promo_banner_url = settings.promoBannerUrl;
-            if (settings.promoContentType !== undefined) dbPayload.promo_content_type = settings.promoContentType;
-            // New fields
-            if (settings.reviewUrl !== undefined) dbPayload.review_url = settings.reviewUrl;
-            if (settings.facebookUrl !== undefined) dbPayload.facebook_url = settings.facebookUrl;
-            if (settings.lineUrl !== undefined) dbPayload.line_url = settings.lineUrl;
-            if (settings.mapUrl !== undefined) dbPayload.map_url = settings.mapUrl;
-            if (settings.contactPhone !== undefined) dbPayload.contact_phone = settings.contactPhone;
-            
-            // Arrays
-            if (settings.reviewLinks !== undefined) dbPayload.review_links = settings.reviewLinks;
-            if (settings.vibeLinks !== undefined) dbPayload.vibe_links = settings.vibeLinks;
-            if (settings.newsItems !== undefined) dbPayload.news_items = settings.newsItems;
-
-            await supabase.from('store_settings').upsert(dbPayload); // Changed to UPSERT for reliability
-          } catch(e) { console.error("Settings sync error", e); }
-      }
-      setStoreSettings(prev => ({...prev, ...settings}));
+    const newSettings = { ...storeSettings, ...settings };
+    if (isSupabaseConfigured) {
+         try {
+             const payload: any = {};
+             if (settings.promoBannerUrl !== undefined) payload.promo_banner_url = settings.promoBannerUrl;
+             if (settings.promoContentType !== undefined) payload.promo_content_type = settings.promoContentType;
+             if (settings.holidayStart !== undefined) payload.holiday_start = settings.holidayStart;
+             if (settings.holidayEnd !== undefined) payload.holiday_end = settings.holidayEnd;
+             if (settings.reviewUrl !== undefined) payload.review_url = settings.reviewUrl;
+             if (settings.facebookUrl !== undefined) payload.facebook_url = settings.facebookUrl;
+             if (settings.lineUrl !== undefined) payload.line_url = settings.lineUrl;
+             if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
+             if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
+             if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber; 
+             if (settings.reviewLinks !== undefined) payload.review_links = settings.reviewLinks;
+             if (settings.vibeLinks !== undefined) payload.vibe_links = settings.vibeLinks;
+             
+             await supabase.from('store_settings').update(payload).eq('id', 1);
+         } catch (e) { console.error(e); }
+    }
+    setStoreSettings(newSettings);
   };
-  
+
   const generateTimeSlots = (dateOffset: number = 0) => {
-      const slots: string[] = [];
-      const startHour = OPERATING_HOURS.open; // 11
-      const endHour = OPERATING_HOURS.close; // 20.5 (8:30 PM)
+    const slots: string[] = [];
+    const startHour = OPERATING_HOURS.open;
+    const endHour = OPERATING_HOURS.close;
+    const now = new Date();
+    const currentHour = now.getHours() + now.getMinutes() / 60;
 
-      const now = new Date();
-      // Current hour in decimal (e.g. 14.5 for 2:30 PM)
-      const currentHour = now.getHours() + now.getMinutes() / 60;
+    for (let h = startHour; h < endHour; h += 0.5) {
+        // If today (offset 0), only show future slots + buffer (e.g. 30 mins)
+        if (dateOffset === 0) {
+            if (h > currentHour + 0.5) {
+                const hour = Math.floor(h);
+                const minute = (h % 1) * 60;
+                slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+            }
+        } else {
+            const hour = Math.floor(h);
+            const minute = (h % 1) * 60;
+            slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+        }
+    }
+    return slots;
+  };
 
-      for (let h = startHour; h <= endHour; h += 0.5) {
-          // If ordering for Today (offset 0)
-          if (dateOffset === 0) {
-              // 1. Morning Pre-order (Before Opening): Add 1 hour buffer from OPEN time
-              // e.g. If now is 9:00, open is 11:00. First slot = 12:00.
-              if (currentHour < startHour) {
-                  if (h < startHour + 1) continue;
-              }
-              // 2. Open Hours: Add 20 min prep buffer from NOW
-              else {
-                  if (h < currentHour + 0.33) continue; 
-              }
-          }
-          
-          const hour = Math.floor(h);
-          const minute = (h % 1) * 60;
-          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-          slots.push(timeString);
-      }
-      return slots;
+  const addNewsItem = async (item: NewsItem) => {
+    const newItems = [item, ...(storeSettings.newsItems || [])];
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ news_items: newItems }).eq('id', 1);
+        } catch (e) { console.error(e); }
+    }
+    setStoreSettings(prev => ({ ...prev, newsItems: newItems }));
+  };
+
+  const deleteNewsItem = async (id: string) => {
+    const newItems = (storeSettings.newsItems || []).filter(i => i.id !== id);
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ news_items: newItems }).eq('id', 1);
+        } catch (e) { console.error(e); }
+    }
+    setStoreSettings(prev => ({ ...prev, newsItems: newItems }));
   };
 
   return (
     <StoreContext.Provider value={{
-      language, toggleLanguage, t, getLocalizedItem,
-      currentView, navigateTo, isAdminLoggedIn, adminLogin, adminLogout,
-      shopLogo, updateShopLogo,
-      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller,
-      toppings, addTopping, deleteTopping,
-      cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
-      customer, setCustomer, registerCustomer, getAllCustomers, customerLogin, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, generateLuckyPizza,
-      expenses, addExpense, deleteExpense, fetchOrders,
-      isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
-      generateTimeSlots, canOrderForToday, seedDatabase,
-      addNewsItem, deleteNewsItem,
-      tableSession
+        language, toggleLanguage, t, getLocalizedItem,
+        currentView, navigateTo,
+        isAdminLoggedIn, adminLogin, adminLogout,
+        shopLogo, updateShopLogo,
+        menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase,
+        toppings, addTopping, deleteTopping,
+        cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
+        customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
+        orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, fetchOrders,
+        expenses, addExpense, deleteExpense,
+        isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
+        addNewsItem, deleteNewsItem,
+        tableSession
     }}>
-      {children}
+        {children}
     </StoreContext.Provider>
   );
 };
 
 export const useStore = () => {
   const context = useContext(StoreContext);
-  if (!context) throw new Error('useStore must be used within StoreProvider');
+  if (context === undefined) {
+    throw new Error('useStore must be used within a StoreProvider');
+  }
   return context;
 };

@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -109,7 +109,7 @@ export const POSView: React.FC = () => {
         }
     }, [storeSettings]);
 
-    // Active Tables Logic
+    // Active Tables Logic - Show active or unpaid orders
     const activeTables = orders.filter(o => o.tableNumber && o.status !== 'completed' && o.status !== 'cancelled');
 
     // Calculate Change
@@ -192,6 +192,29 @@ export const POSView: React.FC = () => {
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
 
+    // Handler: Send to Kitchen (Pay Later)
+    const handleSendToKitchen = async () => {
+        if (!tableNumber) {
+            alert("Please enter a Table Number to send to kitchen.");
+            return;
+        }
+        
+        const success = await placeOrder('dine-in', {
+            tableNumber: tableNumber,
+            source: 'store',
+            paymentMethod: undefined, // Explicitly undefined = Unpaid
+            status: 'confirmed', // Kitchen sees it
+            note: 'Pay Later'
+        });
+        
+        if (success) {
+            setTableNumber('');
+            setShowMobileCart(false);
+            setActiveTab('tables'); // Switch view
+        }
+    };
+
+    // Handler: Pay Now (Cash/QR)
     const handleCheckBill = () => {
         if (cart.length === 0) return;
         setSelectedOrder(null); // Clear selected order implies New Cart Payment
@@ -206,6 +229,13 @@ export const POSView: React.FC = () => {
         setCashReceived('');
         setPaymentMethod('cash');
         setShowPaymentModal(true);
+    }
+    
+    // Handler: Complete existing table (Just mark as done/paid/gone)
+    const handleCloseTable = async (orderId: string) => {
+        if(confirm("Close this table? (Mark as completed)")) {
+            await completeOrder(orderId, { paymentMethod: 'cash' }); // Default to cash if closing without paying flow, or assume paid
+        }
     }
 
     const handleFinalizePayment = async () => {
@@ -224,18 +254,19 @@ export const POSView: React.FC = () => {
             : 'Paid via QR';
         
         if (selectedOrder) {
-            // Updating EXISTING order
+            // Updating EXISTING order -> Mark COMPLETED (Removed from Active Tables)
             await completeOrder(selectedOrder.id, {
                 paymentMethod: paymentMethod,
                 note: note
             });
              alert(paymentMethod === 'cash' ? `Table ${selectedOrder.tableNumber || 'Unknown'} Paid! Change: ฿${change}` : "Order Paid via QR!");
         } else {
-            // Creating NEW order (Walk-in)
+            // Creating NEW order (Walk-in/Pay Now) -> Mark COMPLETED IMMEDIATELY
             const success = await placeOrder('dine-in', {
                 tableNumber: tableNumber || 'Walk-in',
                 source: 'store',
                 paymentMethod: paymentMethod,
+                status: 'completed', // IMPORTANT: Mark as completed so it doesn't show in Active Tables again
                 note: note
             });
             if (success) {
@@ -749,11 +780,24 @@ export const POSView: React.FC = () => {
                                      <span>฿{cartTotal}</span>
                                  </div>
                                  <div className="grid grid-cols-2 gap-3 mb-4">
-                                     <button onClick={clearCart} className="px-4 py-3 rounded-xl border border-gray-300 text-gray-600 font-bold">Clear</button>
-                                     <button onClick={handleCheckBill} disabled={cart.length === 0} className="px-4 py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                                         <Store size={18} /> Check Bill
+                                     {/* Send to Kitchen (Unpaid) */}
+                                     <button 
+                                         onClick={handleSendToKitchen} 
+                                         disabled={cart.length === 0} 
+                                         className="px-4 py-3 rounded-xl border-2 border-blue-500 text-blue-600 font-bold hover:bg-blue-50 disabled:opacity-50 flex items-center justify-center gap-2"
+                                     >
+                                         <Send size={18} /> To Kitchen
+                                     </button>
+                                     {/* Pay Now (Paid & Completed) */}
+                                     <button 
+                                         onClick={handleCheckBill} 
+                                         disabled={cart.length === 0} 
+                                         className="px-4 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                     >
+                                         <DollarSign size={18} /> Pay Now
                                      </button>
                                  </div>
+                                 <button onClick={clearCart} className="w-full text-sm text-gray-400 hover:text-gray-600 underline">Clear Cart</button>
                              </div>
                         </div>
                     </>
@@ -763,7 +807,7 @@ export const POSView: React.FC = () => {
                 {activeTab === 'tables' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
                          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                             <Utensils className="text-green-600"/> Active Tables (Dining In)
+                             <Utensils className="text-green-600"/> Active Tables
                          </h2>
                          
                          {activeTables.length === 0 ? (
@@ -773,19 +817,24 @@ export const POSView: React.FC = () => {
                              </div>
                          ) : (
                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                 {activeTables.map(order => (
+                                 {activeTables.map(order => {
+                                     const isPaid = order.paymentMethod !== undefined && order.paymentMethod !== null;
+                                     return (
                                      <div 
                                         key={order.id} 
-                                        onClick={() => handleCheckTableBill(order)}
-                                        className="bg-white rounded-xl shadow-md p-6 border-l-8 border-green-500 cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition"
+                                        onClick={() => !isPaid && handleCheckTableBill(order)}
+                                        className={`bg-white rounded-xl shadow-md p-6 border-l-8 cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition relative overflow-hidden ${isPaid ? 'border-green-500' : 'border-red-500'}`}
                                      >
+                                         {/* Status Badge */}
+                                         <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold uppercase flex items-center gap-1 ${isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                             {isPaid ? <CheckCircle2 size={12}/> : <AlertCircle size={12}/>}
+                                             {isPaid ? 'PAID' : 'UNPAID'}
+                                         </div>
+
                                          <div className="flex justify-between items-start mb-4">
                                              <div>
                                                  <div className="text-xs font-bold text-gray-500 uppercase mb-1">Table No.</div>
                                                  <div className="text-4xl font-bold text-gray-900">{order.tableNumber || '?'}</div>
-                                             </div>
-                                             <div className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${order.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                 {order.status}
                                              </div>
                                          </div>
                                          
@@ -798,6 +847,10 @@ export const POSView: React.FC = () => {
                                                  <span className="text-gray-500">Time</span>
                                                  <span className="font-bold">{new Date(order.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                                              </div>
+                                             <div className="flex justify-between text-sm">
+                                                 <span className="text-gray-500">Status</span>
+                                                 <span className="font-bold uppercase text-xs bg-gray-100 px-2 py-0.5 rounded">{order.status}</span>
+                                             </div>
                                          </div>
                                          
                                          <div className="flex justify-between items-center">
@@ -805,11 +858,20 @@ export const POSView: React.FC = () => {
                                              <span className="text-2xl font-bold text-brand-600">฿{order.totalAmount}</span>
                                          </div>
                                          
-                                         <div className="mt-4 bg-brand-50 text-brand-700 py-2 rounded-lg text-center font-bold text-sm flex items-center justify-center gap-2">
-                                             <DollarSign size={16}/> Check Bill
-                                         </div>
+                                         {isPaid ? (
+                                             <button 
+                                                 onClick={(e) => { e.stopPropagation(); handleCloseTable(order.id); }}
+                                                 className="mt-4 w-full bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-lg text-center font-bold text-sm flex items-center justify-center gap-2"
+                                             >
+                                                 <Check size={16}/> Clear Table (Done)
+                                             </button>
+                                         ) : (
+                                             <div className="mt-4 bg-red-50 text-red-700 py-2 rounded-lg text-center font-bold text-sm flex items-center justify-center gap-2">
+                                                 <DollarSign size={16}/> Check Bill
+                                             </div>
+                                         )}
                                      </div>
-                                 ))}
+                                 )})}
                              </div>
                          )}
                     </div>
