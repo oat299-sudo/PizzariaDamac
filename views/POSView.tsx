@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2 } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -35,7 +35,12 @@ export const POSView: React.FC = () => {
     const [isSalesEditMode, setIsSalesEditMode] = useState(false);
     const [tableNumber, setTableNumber] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
+    const [orderSource, setOrderSource] = useState<OrderSource>('store');
     
+    // Reporting State
+    const [salesFilter, setSalesFilter] = useState<'day' | 'month' | 'year' | 'all'>('day');
+    const [expensesFilter, setExpensesFilter] = useState<'day' | 'month' | 'year' | 'all'>('day');
+
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
     const [itemForm, setItemForm] = useState<Partial<Pizza>>({
@@ -66,6 +71,7 @@ export const POSView: React.FC = () => {
     // Table QR State
     const [qrTableNum, setQrTableNum] = useState('1');
     const [qrBaseUrl, setQrBaseUrl] = useState(() => (typeof window !== 'undefined' ? window.location.origin : ''));
+    const [showQrFullScreen, setShowQrFullScreen] = useState(false);
 
     // --- PAYMENT MODAL STATE ---
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -138,6 +144,107 @@ export const POSView: React.FC = () => {
         // Add timestamp to force image refresh if details change
         return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}&t=${Date.now()}`;
     }, [paymentMethod, selectedOrder, cartTotal, storeSettings.promptPayNumber]);
+
+    // Helper: Filter by Date Range
+    const filterByDate = (dateString: string, filter: 'day'|'month'|'year'|'all') => {
+        if (filter === 'all') return true;
+        const d = new Date(dateString);
+        const now = new Date();
+        if (filter === 'day') return d.toDateString() === now.toDateString();
+        if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        if (filter === 'year') return d.getFullYear() === now.getFullYear();
+        return true;
+    };
+
+    // Helper: Download CSV
+    const downloadCSV = (data: any[], filename: string) => {
+        if (data.length === 0) {
+            alert("No data to export");
+            return;
+        }
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(header => {
+                const val = row[header];
+                const escaped = ('' + (val ?? '')).replace(/"/g, '""'); 
+                return `"${escaped}"`;
+            }).join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    
+    // Helper to clean URL for QR
+    const getCleanQrUrl = () => {
+        // Remove trailing slash if present to avoid //?table=
+        return qrBaseUrl.replace(/\/$/, "");
+    };
+    
+    // Print Table Card Helper
+    const handlePrintQrCard = () => {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`;
+        const printWindow = window.open('', '', 'width=600,height=800');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Table ${qrTableNum} - QR Code</title>
+                    <style>
+                        body { font-family: 'Helvetica', 'Arial', sans-serif; text-align: center; padding: 40px; background: #f9f9f9; }
+                        .card { 
+                            background: white;
+                            border: 3px solid #000; 
+                            padding: 60px 40px; 
+                            border-radius: 20px; 
+                            display: inline-block; 
+                            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                            max-width: 400px;
+                            width: 100%;
+                        }
+                        h1 { font-size: 48px; margin: 0 0 10px 0; color: #000; font-weight: 800; }
+                        h2 { font-size: 24px; color: #666; margin: 0 0 30px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+                        img.qr { width: 300px; height: 300px; margin-bottom: 20px; }
+                        .logo { width: 100px; height: 100px; border-radius: 50%; margin-bottom: 20px; object-fit: cover; border: 4px solid #000; }
+                        .footer { margin-top: 30px; font-size: 16px; color: #000; font-weight: bold; }
+                        .scan-text { font-size: 18px; margin-bottom: 20px; color: #444; }
+                        @media print {
+                            body { background: white; padding: 0; }
+                            .card { box-shadow: none; border: 3px solid black; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        ${shopLogo ? `<img src="${shopLogo}" class="logo" />` : ''}
+                        <h1>Table ${qrTableNum}</h1>
+                        <h2>Pizza Damac</h2>
+                        <p class="scan-text">Scan to View Menu & Order</p>
+                        <img src="${qrUrl}" class="qr" />
+                        <div class="footer">Thank you for dining with us!</div>
+                    </div>
+                    <script>
+                        // Wait for images to load before printing
+                        window.onload = function() { 
+                            setTimeout(function() {
+                                window.print();
+                                // window.close(); // Optional: Close after print
+                            }, 500);
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    };
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
@@ -243,22 +350,23 @@ export const POSView: React.FC = () => {
 
     // Handler: Send to Kitchen (Pay Later)
     const handleSendToKitchen = async () => {
-        if (!tableNumber) {
-            alert("Please enter a Table Number to send to kitchen.");
+        if (!tableNumber && orderSource === 'store') {
+            alert("Please enter a Table Number for store orders.");
             return;
         }
         
         const success = await placeOrder('dine-in', {
-            tableNumber: tableNumber,
-            source: 'store',
+            tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : 'Walk-in'),
+            source: orderSource,
             paymentMethod: undefined, // Explicitly undefined = Unpaid
             status: 'confirmed', // Kitchen sees it
-            note: 'Pay Later'
+            note: orderSource === 'store' ? 'Pay Later' : `${orderSource.toUpperCase()} Order`
         });
         
         if (success) {
             setTableNumber('');
             setShowMobileCart(false);
+            setOrderSource('store'); // Reset
             setActiveTab('tables'); // Switch view
         }
     };
@@ -320,7 +428,7 @@ export const POSView: React.FC = () => {
             // Creating NEW order (Walk-in/Pay Now) -> Mark COMPLETED IMMEDIATELY
             const success = await placeOrder('dine-in', {
                 tableNumber: tableNumber || 'Walk-in',
-                source: 'store',
+                source: orderSource,
                 paymentMethod: paymentMethod,
                 status: 'completed', // IMPORTANT: Mark as completed so it doesn't show in Active Tables again
                 note: note
@@ -328,6 +436,7 @@ export const POSView: React.FC = () => {
             if (success) {
                  alert(paymentMethod === 'cash' ? `Order Paid! Change: ฿${change}` : "Order Paid via QR!");
                  setTableNumber('');
+                 setOrderSource('store');
                  setShowMobileCart(false);
             }
         }
@@ -485,25 +594,37 @@ export const POSView: React.FC = () => {
 
     const handleExportCustomers = async () => {
         const data = await getAllCustomers();
-        if (data.length === 0) {
-            alert("No customer data found to export.");
-            return;
-        }
+        downloadCSV(data, 'pizza_damac_customers.csv');
+    };
+    
+    // EXPORT FUNCTIONS
+    const handleExportSales = () => {
+        const filteredSales = activeOrders.filter(o => filterByDate(o.createdAt, salesFilter));
+        const csvData = filteredSales.map(o => ({
+            ID: o.id,
+            Date: new Date(o.createdAt).toLocaleDateString(),
+            Time: new Date(o.createdAt).toLocaleTimeString(),
+            Source: o.source,
+            Type: o.type,
+            Table: o.tableNumber || '',
+            Total: o.totalAmount,
+            Net: o.netAmount,
+            Payment: o.paymentMethod || 'Unpaid',
+            Status: o.status
+        }));
+        downloadCSV(csvData, `sales_report_${salesFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+    };
 
-        const headers = Object.keys(data[0]);
-        const csvContent = [
-            headers.join(','), 
-            ...data.map(row => headers.map(header => JSON.stringify(row[header as keyof typeof row])).join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'pizza_damac_customers.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const handleExportExpenses = () => {
+        const filteredExp = expenses.filter(e => filterByDate(e.date, expensesFilter));
+        const csvData = filteredExp.map(e => ({
+            Date: new Date(e.date).toLocaleDateString(),
+            Category: e.category,
+            Description: e.description,
+            Amount: e.amount,
+            Note: e.note || ''
+        }));
+        downloadCSV(csvData, `expenses_report_${expensesFilter}_${new Date().toISOString().split('T')[0]}.csv`);
     };
     
     // --- MANUAL SAVE HANDLERS ---
@@ -552,12 +673,6 @@ export const POSView: React.FC = () => {
         });
         alert("Contact & Payment Settings Saved Successfully!");
     };
-    
-    // Helper to clean URL for QR
-    const getCleanQrUrl = () => {
-        // Remove trailing slash if present to avoid //?table=
-        return qrBaseUrl.replace(/\/$/, "");
-    };
 
     // Filter Menu
     const filteredMenu = menu.filter(item => {
@@ -565,15 +680,18 @@ export const POSView: React.FC = () => {
         return cat === activeCategory;
     });
 
-    // --- SALES CALCULATIONS ---
+    // --- SALES CALCULATIONS (Filtered) ---
     const activeOrders = orders.filter(o => o.status !== 'cancelled');
-    const totalGrossSales = activeOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = activeOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
+    const filteredOrders = activeOrders.filter(o => filterByDate(o.createdAt, salesFilter));
+    const filteredExpenses = expenses.filter(e => filterByDate(e.date, salesFilter));
+
+    const totalGrossSales = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
     
     // Robust Cash vs Online breakdown
-    const cashSales = activeOrders.filter(o => o.paymentMethod === 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
-    const onlineSales = activeOrders.filter(o => o.paymentMethod !== 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
+    const cashSales = filteredOrders.filter(o => o.paymentMethod === 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
+    const onlineSales = filteredOrders.filter(o => o.paymentMethod !== 'cash').reduce((sum, o) => sum + o.totalAmount, 0);
 
 
     // Helper to group toppings
@@ -681,6 +799,9 @@ export const POSView: React.FC = () => {
                         </button>
                         <button onClick={() => setActiveTab('expenses')} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'expenses' ? 'bg-gray-800 text-yellow-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <Calculator size={24} />
+                        </button>
+                        <button onClick={() => setActiveTab('qr')} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'qr' ? 'bg-gray-800 text-purple-500 shadow-inner' : 'hover:bg-gray-800'}`}>
+                            <QrCode size={24} />
                         </button>
                          <button onClick={() => setActiveTab('manage')} className={`relative group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'manage' ? 'bg-gray-800 text-red-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <Settings size={24} />
@@ -791,10 +912,25 @@ export const POSView: React.FC = () => {
                                 <button onClick={() => setShowMobileCart(false)} className="md:hidden p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X size={20}/></button>
                              </div>
 
-                             <div className="p-4 bg-gray-50 border-b shrink-0">
+                             <div className="p-4 bg-gray-50 border-b shrink-0 space-y-3">
+                                 {/* Source Selection */}
+                                 <div className="flex items-center gap-2">
+                                     <Bike size={18} className="text-gray-500"/>
+                                     <select 
+                                        className="bg-white border border-gray-300 rounded px-2 py-2 text-sm w-full outline-none font-bold"
+                                        value={orderSource}
+                                        onChange={e => setOrderSource(e.target.value as OrderSource)}
+                                     >
+                                         <option value="store">Store / Dine-in</option>
+                                         <option value="lineman">Line Man</option>
+                                         <option value="grab">Grab Food</option>
+                                         <option value="foodpanda">Foodpanda</option>
+                                         <option value="robinhood">Robinhood</option>
+                                     </select>
+                                 </div>
                                  <div className="flex items-center gap-2">
                                      <User size={18} className="text-gray-500"/>
-                                     <input type="text" placeholder="Table Number" className="bg-white border border-gray-300 rounded px-2 py-2 text-base w-full outline-none" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/>
+                                     <input type="text" placeholder={orderSource === 'store' ? "Table No. (e.g. 1)" : "Order ID / Ref"} className="bg-white border border-gray-300 rounded px-2 py-2 text-base w-full outline-none" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/>
                                  </div>
                              </div>
 
@@ -946,21 +1082,42 @@ export const POSView: React.FC = () => {
                 {/* VIEW: SALES REPORT */}
                 {activeTab === 'sales' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
-                        <div className="flex justify-between items-center mb-6">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><PieChart className="text-blue-600"/> {t('salesReport')}</h2>
-                            <button 
-                                onClick={() => setIsSalesEditMode(!isSalesEditMode)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs border ${isSalesEditMode ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                            >
-                                {isSalesEditMode ? <Unlock size={14}/> : <Lock size={14}/>}
-                                {isSalesEditMode ? 'Edit Mode ON' : 'Manage Data'}
-                            </button>
+                            
+                            <div className="flex gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                                {['day', 'month', 'year', 'all'].map(f => (
+                                    <button 
+                                        key={f} 
+                                        onClick={() => setSalesFilter(f as any)}
+                                        className={`px-3 py-1 text-xs font-bold rounded uppercase transition ${salesFilter === f ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                                    >
+                                        {f === 'day' ? 'Today' : f}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={handleExportSales}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition"
+                                >
+                                    <FileSpreadsheet size={14}/> Export CSV
+                                </button>
+                                <button 
+                                    onClick={() => setIsSalesEditMode(!isSalesEditMode)}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs border ${isSalesEditMode ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    {isSalesEditMode ? <Unlock size={14}/> : <Lock size={14}/>}
+                                    {isSalesEditMode ? 'Edit Mode ON' : 'Manage Data'}
+                                </button>
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                  <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2">
-                                     {t('grossSales')}
+                                     {t('grossSales')} ({salesFilter})
                                  </h3>
                                  <p className="text-3xl font-bold text-gray-900 mt-2">฿{totalGrossSales.toLocaleString()}</p>
                                  {/* CASH BREAKDOWN */}
@@ -974,11 +1131,11 @@ export const POSView: React.FC = () => {
                                  </div>
                              </div>
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('expenses')}</h3>
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('expenses')} ({salesFilter})</h3>
                                  <p className="text-3xl font-bold text-red-600 mt-2">฿{totalExpenses.toLocaleString()}</p>
                              </div>
                              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('netProfit')}</h3>
+                                 <h3 className="text-sm font-bold text-gray-500 uppercase">{t('netProfit')} ({salesFilter})</h3>
                                  <p className={`text-3xl font-bold mt-2 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>฿{netProfit.toLocaleString()}</p>
                              </div>
                         </div>
@@ -991,20 +1148,21 @@ export const POSView: React.FC = () => {
                                         <tr>
                                             <th className="p-4 text-left">Order ID</th>
                                             <th className="p-4 text-left">Date</th>
-                                            <th className="p-4 text-left">Type</th>
+                                            <th className="p-4 text-left">Source</th>
                                             <th className="p-4 text-left">Payment</th>
                                             <th className="p-4 text-left">Status</th>
                                             <th className="p-4 text-right">Amount</th>
+                                            <th className="p-4 text-right">Net</th>
                                             {isSalesEditMode && <th className="p-4 text-center">Action</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {orders.slice(0, 50).map(order => (
+                                        {filteredOrders.slice(0, 50).map(order => (
                                             <tr key={order.id} className="text-sm hover:bg-gray-50 transition">
                                                 <td className="p-4 font-mono font-bold text-gray-600">#{order.id.slice(-4)}</td>
                                                 <td className="p-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                                                 <td className="p-4">
-                                                    <span className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded font-bold text-xs uppercase">{order.source}</span>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.source === 'store' ? 'bg-gray-100' : 'bg-green-100 text-green-800'}`}>{order.source}</span>
                                                 </td>
                                                 <td className="p-4">
                                                     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded font-bold text-xs uppercase ${order.paymentMethod === 'cash' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
@@ -1018,6 +1176,7 @@ export const POSView: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="p-4 text-right font-bold">฿{order.totalAmount}</td>
+                                                <td className="p-4 text-right text-gray-500 text-xs">฿{order.netAmount}</td>
                                                 {isSalesEditMode && (
                                                     <td className="p-4 text-center">
                                                         <button 
@@ -1041,7 +1200,28 @@ export const POSView: React.FC = () => {
                 {/* VIEW: EXPENSES */}
                 {activeTab === 'expenses' && (
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
-                         <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2"><Calculator className="text-yellow-600"/> Expenses & Costs</h2>
+                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                             <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Calculator className="text-yellow-600"/> Expenses & Costs</h2>
+                             
+                             <div className="flex gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                                {['day', 'month', 'year', 'all'].map(f => (
+                                    <button 
+                                        key={f} 
+                                        onClick={() => setExpensesFilter(f as any)}
+                                        className={`px-3 py-1 text-xs font-bold rounded uppercase transition ${expensesFilter === f ? 'bg-yellow-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                                    >
+                                        {f === 'day' ? 'Today' : f}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <button 
+                                onClick={handleExportExpenses}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-bold text-xs bg-green-100 text-green-700 hover:bg-green-200 transition"
+                            >
+                                <FileSpreadsheet size={14}/> Export CSV
+                            </button>
+                         </div>
                          
                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                              {/* Form */}
@@ -1090,9 +1270,9 @@ export const POSView: React.FC = () => {
 
                              {/* List */}
                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[500px]">
-                                 <h3 className="p-4 border-b font-bold text-lg bg-gray-50">Recent Expenses</h3>
+                                 <h3 className="p-4 border-b font-bold text-lg bg-gray-50">Recent Expenses ({expensesFilter})</h3>
                                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                     {expenses.length === 0 ? <p className="text-gray-400 text-center mt-10">No expenses recorded.</p> : expenses.map(exp => (
+                                     {filteredExpenses.length === 0 ? <p className="text-gray-400 text-center mt-10">No expenses recorded for this period.</p> : filteredExpenses.map(exp => (
                                          <div key={exp.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-gray-50">
                                              <div>
                                                  <div className="font-bold text-gray-800">{exp.description}</div>
@@ -1104,6 +1284,69 @@ export const POSView: React.FC = () => {
                                              </div>
                                          </div>
                                      ))}
+                                 </div>
+                             </div>
+                         </div>
+                    </div>
+                )}
+                
+                {/* VIEW: QR GENERATOR (Dedicated) */}
+                {activeTab === 'qr' && (
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100 flex flex-col items-center justify-center relative">
+                         <div className="bg-white rounded-2xl p-8 shadow-xl border border-purple-100 max-w-lg w-full text-center">
+                             <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                 <QrCode size={32}/>
+                             </div>
+                             <h2 className="text-2xl font-bold text-gray-900 mb-2">Table QR Generator</h2>
+                             <p className="text-gray-500 mb-8">Create specific ordering links for each table.</p>
+                             
+                             <div className="flex flex-col gap-4">
+                                 <div className="text-left">
+                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Table Number</label>
+                                     <div className="flex gap-2">
+                                         <input 
+                                            className="border-2 border-gray-200 rounded-xl p-3 text-xl font-bold text-center w-full focus:border-purple-500 outline-none transition" 
+                                            value={qrTableNum} 
+                                            onChange={e => setQrTableNum(e.target.value)}
+                                            placeholder="1"
+                                         />
+                                     </div>
+                                 </div>
+                                 
+                                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                     <img 
+                                         src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
+                                         className="w-48 h-48 mx-auto mix-blend-multiply"
+                                         alt="QR Code"
+                                     />
+                                 </div>
+                                 
+                                 <div className="grid grid-cols-2 gap-3">
+                                     <button 
+                                         onClick={handlePrintQrCard}
+                                         className="bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-black shadow-lg flex items-center justify-center gap-2 transition"
+                                     >
+                                         <Printer size={20}/> Print Card
+                                     </button>
+                                     
+                                     <a 
+                                         href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
+                                         target="_blank"
+                                         download={`table-${qrTableNum}.png`}
+                                         className="bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-lg flex items-center justify-center gap-2 transition"
+                                     >
+                                         <Download size={20}/> Save Image
+                                     </a>
+                                 </div>
+                                 <button 
+                                     onClick={() => setShowQrFullScreen(true)}
+                                     className="bg-white border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 flex items-center justify-center gap-2 transition"
+                                 >
+                                     <Maximize2 size={20}/> Show on Screen
+                                 </button>
+                                 
+                                 <div className="text-xs text-gray-400 break-all bg-gray-50 p-2 rounded border mt-2">
+                                     {getCleanQrUrl()}?table={qrTableNum}
                                  </div>
                              </div>
                          </div>
@@ -1138,26 +1381,6 @@ export const POSView: React.FC = () => {
                                          <input type="date" className="bg-white border rounded p-2 text-xs" value={storeSettings.holidayEnd || ''} onChange={e => updateStoreSettings({ holidayEnd: e.target.value })}/>
                                      </div>
                                  </div>
-                             </div>
-                         </div>
-
-                         {/* 2. QR Code Generator */}
-                         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-                             <h3 className="font-bold text-gray-500 text-xs uppercase mb-3 flex items-center gap-2"><QrCode size={14}/> Table QR Generator</h3>
-                             <div className="flex items-end gap-3 flex-wrap">
-                                 <div>
-                                     <label className="text-xs text-gray-400 mb-1 block">Table Number</label>
-                                     <input className="border rounded p-2 w-20 text-center font-bold" value={qrTableNum} onChange={e => setQrTableNum(e.target.value)}/>
-                                 </div>
-                                 <a 
-                                     href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
-                                     target="_blank"
-                                     download={`table-${qrTableNum}.png`}
-                                     className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-black"
-                                 >
-                                     <Download size={16}/> Download QR
-                                 </a>
-                                 <span className="text-xs text-gray-400">Link: {getCleanQrUrl()}?table={qrTableNum}</span>
                              </div>
                          </div>
 
@@ -1383,6 +1606,23 @@ export const POSView: React.FC = () => {
                                  {itemForm.id ? t('updateItem') : t('saveItem')}
                              </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Modal: Full Screen QR */}
+            {showQrFullScreen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
+                    <button onClick={() => setShowQrFullScreen(false)} className="absolute top-4 right-4 text-white p-2 hover:bg-white/20 rounded-full"><X size={32}/></button>
+                    <div className="bg-white p-8 rounded-3xl max-w-2xl w-full text-center">
+                        <h1 className="text-4xl font-bold mb-2">Table {qrTableNum}</h1>
+                        <p className="text-gray-500 text-lg mb-6">Scan to view menu & order</p>
+                        <img 
+                             src={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`}
+                             className="w-full max-w-[500px] h-auto mx-auto border-4 border-gray-100 rounded-xl"
+                             alt="QR Code"
+                        />
+                        <div className="mt-6 text-gray-400 text-sm">Pizza Damac Nonthaburi</div>
                     </div>
                 </div>
             )}
