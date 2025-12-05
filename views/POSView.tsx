@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils } from 'lucide-react';
 
 export const POSView: React.FC = () => {
     const { 
@@ -14,10 +14,10 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem, getAllCustomers
+        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder
     } = useStore();
     
-    // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage'
+    // Unified Tab State: 'order' | 'sales' | 'expenses' | 'manage' | 'tables'
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
@@ -34,7 +34,7 @@ export const POSView: React.FC = () => {
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
     const [itemForm, setItemForm] = useState<Partial<Pizza>>({
-        name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0
+        name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0
     });
     
     // Manage Toppings State
@@ -67,6 +67,7 @@ export const POSView: React.FC = () => {
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
     const [cashReceived, setCashReceived] = useState<string>('');
     const [change, setChange] = useState<number>(0);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null); // For handling existing table payments
 
     // --- LOCAL STATE FOR SETTINGS FORMS (Manual Save) ---
     const [mediaForm, setMediaForm] = useState({
@@ -82,6 +83,9 @@ export const POSView: React.FC = () => {
         lineUrl: '',
         contactPhone: ''
     });
+    
+    // Receipt Data for Printing
+    const [receiptData, setReceiptData] = useState<{table: string, items: any[], total: number, date: string} | null>(null);
 
     // Sync local forms when storeSettings loads/updates
     useEffect(() => {
@@ -102,15 +106,19 @@ export const POSView: React.FC = () => {
         }
     }, [storeSettings]);
 
+    // Active Tables Logic
+    const activeTables = orders.filter(o => o.tableNumber && o.status !== 'completed' && o.status !== 'cancelled');
+
     // Calculate Change
     useEffect(() => {
+        const total = selectedOrder ? selectedOrder.totalAmount : cartTotal;
         if (paymentMethod === 'cash' && cashReceived) {
             const received = parseFloat(cashReceived);
-            setChange(received - cartTotal);
+            setChange(received - total);
         } else {
             setChange(0);
         }
-    }, [cashReceived, cartTotal, paymentMethod]);
+    }, [cashReceived, cartTotal, paymentMethod, selectedOrder]);
 
     // Cart customization
     const handleCustomize = (pizza: Pizza) => {
@@ -171,15 +179,26 @@ export const POSView: React.FC = () => {
 
     const handleCheckBill = () => {
         if (cart.length === 0) return;
+        setSelectedOrder(null); // Clear selected order implies New Cart Payment
         setCashReceived(''); // Reset
         setPaymentMethod('cash');
         setShowPaymentModal(true);
     };
+    
+    // Open payment modal for EXISTING table order
+    const handleCheckTableBill = (order: Order) => {
+        setSelectedOrder(order);
+        setCashReceived('');
+        setPaymentMethod('cash');
+        setShowPaymentModal(true);
+    }
 
     const handleFinalizePayment = async () => {
+        const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        
         // Validation for Cash
         if (paymentMethod === 'cash') {
-            if (parseFloat(cashReceived || '0') < cartTotal) {
+            if (parseFloat(cashReceived || '0') < currentTotal) {
                 alert("Insufficient cash received!");
                 return;
             }
@@ -188,28 +207,48 @@ export const POSView: React.FC = () => {
         const note = paymentMethod === 'cash' 
             ? `Cash: ${cashReceived}, Change: ${change}` 
             : 'Paid via QR';
-    
-        const success = await placeOrder('dine-in', {
-            tableNumber: tableNumber || 'Walk-in',
-            source: 'store',
-            paymentMethod: paymentMethod,
-            note: note
-        });
-    
-        if (success) {
-            alert(paymentMethod === 'cash' ? `Order Paid! Change: ฿${change}` : "Order Paid via QR!");
-            setShowPaymentModal(false);
-            setTableNumber('');
-            setShowMobileCart(false);
+        
+        if (selectedOrder) {
+            // Updating EXISTING order
+            await completeOrder(selectedOrder.id, {
+                paymentMethod: paymentMethod,
+                note: note
+            });
+             alert(paymentMethod === 'cash' ? `Table ${selectedOrder.tableNumber || 'Unknown'} Paid! Change: ฿${change}` : "Order Paid via QR!");
+        } else {
+            // Creating NEW order (Walk-in)
+            const success = await placeOrder('dine-in', {
+                tableNumber: tableNumber || 'Walk-in',
+                source: 'store',
+                paymentMethod: paymentMethod,
+                note: note
+            });
+            if (success) {
+                 alert(paymentMethod === 'cash' ? `Order Paid! Change: ฿${change}` : "Order Paid via QR!");
+                 setTableNumber('');
+                 setShowMobileCart(false);
+            }
         }
+        setShowPaymentModal(false);
     };
 
     const handlePrintBill = () => {
-        alert("Printing Bill... (Simulation)\n\n" + 
-              `Table: ${tableNumber || 'Walk-in'}\n` +
-              `Total: ฿${cartTotal}\n` +
-              cart.map(i => `- ${i.name} x${i.quantity} (฿${i.totalPrice})`).join('\n')
-        );
+        // Set receipt data
+        const currentItems = selectedOrder ? selectedOrder.items : cart;
+        const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const currentTable = selectedOrder ? (selectedOrder.tableNumber || selectedOrder.customerName) : (tableNumber || 'Walk-in');
+        
+        setReceiptData({
+            table: currentTable,
+            items: currentItems,
+            total: currentTotal,
+            date: new Date().toLocaleString()
+        });
+        
+        // Allow state to update then print
+        setTimeout(() => {
+             window.print();
+        }, 100);
     };
 
     const handleDeleteOrder = async (orderId: string) => {
@@ -219,7 +258,7 @@ export const POSView: React.FC = () => {
     };
 
     const handleOpenAddModal = () => {
-        setItemForm({ name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0 });
+        setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0 });
         setShowItemModal(true);
     };
 
@@ -239,8 +278,14 @@ export const POSView: React.FC = () => {
                     image: itemForm.image || 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?auto=format&fit=crop&w=800&q=80'
                 });
             }
+            
+            // Fix: Switch view to the new item's category so user sees it
+            if (itemForm.category) {
+                setActiveCategory(itemForm.category);
+            }
+            
             setShowItemModal(false);
-            setItemForm({ name: '', description: '', basePrice: 0, image: '', available: true, category: 'pizza' });
+            setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza' });
         }
     };
 
@@ -441,8 +486,47 @@ export const POSView: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
+            {/* --- RECEIPT PRINTER (HIDDEN) --- */}
+            <div className="hidden print:block print:w-[80mm] print:font-mono print:text-xs p-2 bg-white text-black">
+                {receiptData && (
+                    <div className="text-center">
+                        <div className="font-bold text-lg mb-2">PIZZA DAMAC</div>
+                        <div className="mb-4">Nonthaburi<br/>Tel: 099-497-9199</div>
+                        <div className="border-b border-black border-dashed mb-2"></div>
+                        <div className="text-left mb-2">
+                            <div>Table: {receiptData.table}</div>
+                            <div>Date: {receiptData.date}</div>
+                        </div>
+                        <div className="border-b border-black border-dashed mb-2"></div>
+                        <table className="w-full text-left mb-2">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th className="text-right">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {receiptData.items.map((item: any, i: number) => (
+                                    <tr key={i}>
+                                        <td>{item.quantity}x {item.name}</td>
+                                        <td className="text-right">{item.totalPrice.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="border-b border-black border-dashed mb-2"></div>
+                        <div className="flex justify-between font-bold text-lg">
+                            <span>TOTAL</span>
+                            <span>{receiptData.total.toLocaleString()}</span>
+                        </div>
+                        <div className="border-b border-black border-dashed mt-2 mb-4"></div>
+                        <div className="text-center">Thank you!</div>
+                    </div>
+                )}
+            </div>
+
             {/* --- MOBILE LAYOUT HEADER --- */}
-            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14">
+            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14 print:hidden">
                 <div className="flex items-center gap-2">
                     {shopLogo ? (
                         <img src={shopLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover" />
@@ -468,7 +552,7 @@ export const POSView: React.FC = () => {
             </div>
 
             {/* --- DESKTOP SIDEBAR --- */}
-            <aside className="hidden md:flex w-20 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0">
+            <aside className="hidden md:flex w-20 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
                 <div className="flex flex-col items-center gap-6 w-full">
                     <div className="mb-2 relative group cursor-pointer">
                         {shopLogo ? (
@@ -484,6 +568,10 @@ export const POSView: React.FC = () => {
                     <nav className="flex flex-col gap-4 w-full px-2">
                         <button onClick={() => {setActiveTab('order'); setIsEditMode(false)}} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'order' ? 'bg-gray-800 text-brand-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <ShoppingBag size={24} />
+                        </button>
+                        <button onClick={() => setActiveTab('tables')} className={`relative group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'tables' ? 'bg-gray-800 text-green-500 shadow-inner' : 'hover:bg-gray-800'}`}>
+                            <Utensils size={24} />
+                            {activeTables.length > 0 && <span className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold">{activeTables.length}</span>}
                         </button>
                         <button onClick={() => setActiveTab('sales')} className={`group p-3 w-full flex justify-center rounded-xl transition-all ${activeTab === 'sales' ? 'bg-gray-800 text-blue-500 shadow-inner' : 'hover:bg-gray-800'}`}>
                             <PieChart size={24} />
@@ -512,7 +600,7 @@ export const POSView: React.FC = () => {
             </aside>
 
             {/* --- MAIN CONTENT --- */}
-            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0 h-full">
+            <main className="flex-1 flex overflow-hidden relative flex-col md:flex-row pb-16 md:pb-0 h-full print:hidden">
                 
                 {/* VIEW: ORDER */}
                 {activeTab === 'order' && (
@@ -653,6 +741,62 @@ export const POSView: React.FC = () => {
                              </div>
                         </div>
                     </>
+                )}
+                
+                {/* VIEW: ACTIVE TABLES (CHECK BILL) */}
+                {activeTab === 'tables' && (
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-100">
+                         <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                             <Utensils className="text-green-600"/> Active Tables (Dining In)
+                         </h2>
+                         
+                         {activeTables.length === 0 ? (
+                             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                                 <Store size={64} className="mb-4 opacity-20"/>
+                                 <p className="text-lg">No active dining tables.</p>
+                             </div>
+                         ) : (
+                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                 {activeTables.map(order => (
+                                     <div 
+                                        key={order.id} 
+                                        onClick={() => handleCheckTableBill(order)}
+                                        className="bg-white rounded-xl shadow-md p-6 border-l-8 border-green-500 cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition"
+                                     >
+                                         <div className="flex justify-between items-start mb-4">
+                                             <div>
+                                                 <div className="text-xs font-bold text-gray-500 uppercase mb-1">Table No.</div>
+                                                 <div className="text-4xl font-bold text-gray-900">{order.tableNumber || '?'}</div>
+                                             </div>
+                                             <div className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${order.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                 {order.status}
+                                             </div>
+                                         </div>
+                                         
+                                         <div className="space-y-1 mb-4 border-t border-b py-3 border-dashed">
+                                             <div className="flex justify-between text-sm">
+                                                 <span className="text-gray-500">Items</span>
+                                                 <span className="font-bold">{order.items.reduce((s,i)=>s+i.quantity,0)} pcs</span>
+                                             </div>
+                                             <div className="flex justify-between text-sm">
+                                                 <span className="text-gray-500">Time</span>
+                                                 <span className="font-bold">{new Date(order.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                             </div>
+                                         </div>
+                                         
+                                         <div className="flex justify-between items-center">
+                                             <span className="text-gray-400 text-sm">Total</span>
+                                             <span className="text-2xl font-bold text-brand-600">฿{order.totalAmount}</span>
+                                         </div>
+                                         
+                                         <div className="mt-4 bg-brand-50 text-brand-700 py-2 rounded-lg text-center font-bold text-sm flex items-center justify-center gap-2">
+                                             <DollarSign size={16}/> Check Bill
+                                         </div>
+                                     </div>
+                                 ))}
+                             </div>
+                         )}
+                    </div>
                 )}
 
                 {/* VIEW: SALES REPORT */}
@@ -1101,18 +1245,18 @@ export const POSView: React.FC = () => {
             </main>
 
             {/* --- MOBILE BOTTOM NAV --- */}
-            <div className="md:hidden bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="md:hidden bg-white border-t border-gray-200 fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] print:hidden">
                 <button onClick={() => setActiveTab('order')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'order' ? 'text-brand-600' : 'text-gray-400'}`}>
                     <ShoppingBag size={20}/>
                     <span className="text-[10px] font-bold">Order</span>
                 </button>
+                <button onClick={() => setActiveTab('tables')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'tables' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <Utensils size={20}/>
+                    <span className="text-[10px] font-bold">Tables</span>
+                </button>
                 <button onClick={() => setActiveTab('sales')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'sales' ? 'text-blue-600' : 'text-gray-400'}`}>
                     <PieChart size={20}/>
                     <span className="text-[10px] font-bold">Sales</span>
-                </button>
-                <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'expenses' ? 'text-yellow-600' : 'text-gray-400'}`}>
-                    <Calculator size={20}/>
-                    <span className="text-[10px] font-bold">Expenses</span>
                 </button>
                 <button onClick={() => setActiveTab('manage')} className={`relative flex flex-col items-center gap-1 p-2 ${activeTab === 'manage' ? 'text-red-600' : 'text-gray-400'}`}>
                     <Settings size={20}/>
@@ -1130,8 +1274,12 @@ export const POSView: React.FC = () => {
                         
                         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('name')}</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('name')} (English)</label>
                                 <input className="w-full border rounded p-2" value={itemForm.name} onChange={e => setItemForm({...itemForm, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('name')} (Thai)</label>
+                                <input className="w-full border rounded p-2" value={itemForm.nameTh || ''} onChange={e => setItemForm({...itemForm, nameTh: e.target.value})} />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1164,8 +1312,12 @@ export const POSView: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">{t('description')}</label>
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('description')} (English)</label>
                                 <textarea className="w-full border rounded p-2 h-20" value={itemForm.description} onChange={e => setItemForm({...itemForm, description: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase">{t('description')} (Thai)</label>
+                                <textarea className="w-full border rounded p-2 h-20" value={itemForm.descriptionTh || ''} onChange={e => setItemForm({...itemForm, descriptionTh: e.target.value})} />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('imageSource')}</label>
@@ -1251,8 +1403,16 @@ export const POSView: React.FC = () => {
                         <div className="p-6 space-y-6 overflow-y-auto">
                             {/* Total Display */}
                             <div className="text-center">
-                                <div className="text-sm text-gray-500 uppercase font-bold">Total Amount</div>
-                                <div className="text-5xl font-bold text-brand-600">฿{cartTotal.toLocaleString()}</div>
+                                {selectedOrder ? (
+                                    <div className="mb-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold inline-block">
+                                        Checking Table {selectedOrder.tableNumber}
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-gray-500 uppercase font-bold">New Order</div>
+                                )}
+                                <div className="text-5xl font-bold text-brand-600">
+                                    ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}
+                                </div>
                             </div>
 
                             {/* Method Selector */}
@@ -1295,7 +1455,7 @@ export const POSView: React.FC = () => {
                                                 ฿{amt}
                                              </button>
                                         ))}
-                                        <button onClick={() => setCashReceived(cartTotal.toString())} className="flex-1 bg-brand-100 border border-brand-200 rounded py-2 text-sm font-bold text-brand-700 shadow-sm">Exact</button>
+                                        <button onClick={() => setCashReceived((selectedOrder ? selectedOrder.totalAmount : cartTotal).toString())} className="flex-1 bg-brand-100 border border-brand-200 rounded py-2 text-sm font-bold text-brand-700 shadow-sm">Exact</button>
                                     </div>
 
                                     {/* Change Display */}
@@ -1329,7 +1489,7 @@ export const POSView: React.FC = () => {
                                 disabled={paymentMethod === 'cash' && change < 0}
                                 className="flex-[2] py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                <CheckCircle size={18}/> Confirm Payment
+                                <CheckCircle size={18}/> {selectedOrder ? 'Complete & Pay' : 'Confirm Payment'}
                             </button>
                         </div>
                     </div>

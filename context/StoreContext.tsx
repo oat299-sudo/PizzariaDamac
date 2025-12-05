@@ -55,6 +55,7 @@ interface StoreContextType {
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
+  completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
   expenses: Expense[];
@@ -856,6 +857,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
   
+  // NEW: Complete Order with Payment Update
+  const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
+      if (isSupabaseConfigured) {
+          try {
+             await supabase.from('orders').update({ 
+                 status: 'completed',
+                 payment_method: paymentDetails.paymentMethod,
+                 note: paymentDetails.note // Append or overwrite note
+             }).eq('id', orderId);
+          } catch(e) { console.error("Complete order error", e); }
+      }
+      // Update Local
+      setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          status: 'completed',
+          paymentMethod: paymentDetails.paymentMethod,
+          note: paymentDetails.note ? (o.note ? o.note + ' ' + paymentDetails.note : paymentDetails.note) : o.note
+      } : o));
+  };
+  
   const deleteOrder = async (orderId: string) => {
       if (isSupabaseConfigured) {
           try {
@@ -969,7 +990,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, deleteTopping,
       cart, addToCart, updateCartItemQuantity, updateCartItem, removeFromCart, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, getAllCustomers, customerLogin, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, deleteOrder, reorderItem, generateLuckyPizza,
+      orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, generateLuckyPizza,
       expenses, addExpense, deleteExpense, fetchOrders,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings,
       generateTimeSlots, canOrderForToday, seedDatabase,
