@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
@@ -811,7 +812,8 @@ export const CustomerView: React.FC = () => {
                                      <button onClick={() => setCurrentComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back to Bundle</button>
                                      <h3 className="font-bold text-lg mb-4">Choose Pizza #{currentComboSlot + 1}</h3>
                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                         {menu.filter(p => p.category === 'pizza').map(pizza => (
+                                         {/* Updated Filter: Exclude Promotions */}
+                                         {menu.filter(p => p.category !== 'promotion' && (p.comboCount || 0) === 0).map(pizza => (
                                              <button 
                                                  key={pizza.id} 
                                                  onClick={() => handleSelectComboPizza(pizza)}

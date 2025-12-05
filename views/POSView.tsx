@@ -290,8 +290,6 @@ export const POSView: React.FC = () => {
     // Force Cancel Table (Ghost Table Fix)
     const handleCancelTable = async (orderId: string) => {
         if(confirm("Force Cancel/Delete this table order? It will be removed from Active Tables.")) {
-            // If we have a 'cancelled' status in types, use it. Otherwise 'completed' or delete.
-            // Using updateOrderStatus from store context to set status to 'cancelled'
             await updateOrderStatus(orderId, 'cancelled');
         }
     }
@@ -737,17 +735,17 @@ export const POSView: React.FC = () => {
 
                             {/* Menu Grid */}
                             <div className="flex-1 overflow-y-auto p-2 md:p-6 pt-0 pb-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-3">
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
                                         return (
                                         <div 
                                             key={item.id} 
-                                            className={`relative bg-white p-3 rounded-xl shadow-sm border transition flex flex-row md:flex-col h-28 md:h-64 ${isEditMode ? 'border-dashed border-red-300 bg-red-50/20' : 'hover:shadow-md cursor-pointer'} ${!item.available ? 'opacity-75 bg-gray-50' : ''}`}
+                                            className={`relative bg-white p-2 md:p-3 rounded-xl shadow-sm border transition flex flex-col h-auto ${isEditMode ? 'border-dashed border-red-300 bg-red-50/20' : 'hover:shadow-md cursor-pointer'} ${!item.available ? 'opacity-75 bg-gray-50' : ''}`}
                                             onClick={() => !isEditMode && item.available && handleCustomize(item)}
                                         >
                                             {/* Image */}
-                                            <div className="w-24 md:w-full h-full md:h-32 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                            <div className="w-full aspect-square rounded-lg overflow-hidden flex-shrink-0 relative mb-2">
                                                 <img src={item.image} className="w-full h-full object-cover" />
                                                 {!item.available && (
                                                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -756,29 +754,27 @@ export const POSView: React.FC = () => {
                                                 )}
                                                 {item.isBestSeller && (
                                                     <div className="absolute top-1 right-1 bg-yellow-400 text-white p-1 rounded-full shadow-md">
-                                                        <Star size={12} fill="white" />
+                                                        <Star size={10} fill="white" />
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Content */}
-                                            <div className="flex-1 ml-3 md:ml-0 md:mt-3 flex flex-col justify-between">
+                                            <div className="flex-1 flex flex-col justify-between">
                                                 <div>
                                                     <div className="flex justify-between items-start">
-                                                        <h3 className="font-bold text-gray-800 leading-tight text-sm md:text-lg line-clamp-2">{localized.name}</h3>
+                                                        <h3 className="font-bold text-gray-800 leading-tight text-xs md:text-sm line-clamp-2 min-h-[2.5em]">{localized.name}</h3>
                                                         {isEditMode && (
-                                                            <div className="flex gap-1">
-                                                                <button onClick={(e)=>{e.stopPropagation(); handleEditMenuItem(item)}} className="bg-blue-100 text-blue-600 p-1.5 rounded"><Edit2 size={12}/></button>
-                                                                <button onClick={(e)=>{e.stopPropagation(); togglePizzaAvailability(item.id)}} className={`p-1.5 rounded ${item.available ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}><Power size={12}/></button>
-                                                                <button onClick={(e)=>{e.stopPropagation(); toggleBestSeller(item.id)}} className={`p-1.5 rounded ${item.isBestSeller ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-100 text-gray-400'}`}><Star size={12} fill={item.isBestSeller ? "currentColor" : "none"}/></button>
+                                                            <div className="flex gap-1 absolute top-2 left-2">
+                                                                <button onClick={(e)=>{e.stopPropagation(); handleEditMenuItem(item)}} className="bg-blue-100 text-blue-600 p-1 rounded"><Edit2 size={10}/></button>
+                                                                <button onClick={(e)=>{e.stopPropagation(); togglePizzaAvailability(item.id)}} className={`p-1 rounded ${item.available ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}><Power size={10}/></button>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-gray-500 line-clamp-2 mt-1 hidden md:block">{localized.description}</p>
                                                 </div>
-                                                <div className="flex justify-between items-center mt-2">
-                                                    <span className="font-bold text-brand-600 text-base md:text-xl">฿{item.basePrice}</span>
-                                                    {!isEditMode && item.available && <div className="bg-brand-50 text-brand-600 p-1.5 rounded-full"><Plus size={16}/></div>}
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <span className="font-bold text-brand-600 text-sm md:text-base">฿{item.basePrice}</span>
+                                                    {!isEditMode && item.available && <div className="bg-brand-50 text-brand-600 p-1 rounded-full"><Plus size={14}/></div>}
                                                 </div>
                                             </div>
                                         </div>
@@ -1172,7 +1168,7 @@ export const POSView: React.FC = () => {
             {/* Modal: Add/Edit Item */}
             {showItemModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl relative">
+                    <div className="bg-white w-[95%] max-w-lg rounded-2xl p-6 shadow-2xl relative">
                         <h2 className="text-xl font-bold mb-4">{itemForm.id ? 'Edit Item' : 'Add New Item'}</h2>
                         <button onClick={() => setShowItemModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={20}/></button>
                         
@@ -1253,7 +1249,7 @@ export const POSView: React.FC = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     {(selectedPizza.comboCount || 0) > 0 ? (
                         // COMBO BUILDER UI
-                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+                        <div className="bg-white w-[95%] max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
                             <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
                                 <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                     <Layers className="text-brand-600"/> Build {getLocalizedItem(selectedPizza).name}
@@ -1292,7 +1288,8 @@ export const POSView: React.FC = () => {
                                         <button onClick={() => setActiveComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back</button>
                                         <h3 className="font-bold text-lg mb-4">Choose Pizza #{activeComboSlot + 1}</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {menu.filter(p => p.category === 'pizza').map(pizza => (
+                                            {/* FILTER OUT PROMOTIONS to avoid recursion */}
+                                            {menu.filter(p => p.category !== 'promotion' && (p.comboCount || 0) === 0).map(pizza => (
                                                 <button 
                                                     key={pizza.id} 
                                                     onClick={() => handleComboPizzaSelect(pizza)}
@@ -1322,7 +1319,7 @@ export const POSView: React.FC = () => {
                         </div>
                     ) : (
                         // STANDARD UI
-                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
+                        <div className="bg-white w-[95%] max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[90vh]">
                             <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
@@ -1367,7 +1364,7 @@ export const POSView: React.FC = () => {
             {/* Modal: PAYMENT / CHECK BILL */}
             {showPaymentModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="bg-white w-[95%] max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
                             <h2 className="font-bold text-xl text-gray-800">Payment / Check Bill</h2>
                             <button onClick={() => setShowPaymentModal(false)}><X className="text-gray-500"/></button>
@@ -1482,7 +1479,7 @@ export const POSView: React.FC = () => {
             {/* Modal: Manage Toppings */}
              {showToppingsModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
+                    <div className="bg-white w-[95%] max-w-md rounded-2xl p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
                         <h2 className="text-xl font-bold mb-4">Manage Toppings</h2>
                         <button onClick={() => setShowToppingsModal(false)} className="absolute top-4 right-4 text-gray-400"><X size={20}/></button>
                         
