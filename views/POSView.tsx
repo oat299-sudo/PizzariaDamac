@@ -25,6 +25,8 @@ export const POSView: React.FC = () => {
     const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
     const [activeCategory, setActiveCategory] = useState<ProductCategory>('pizza');
     const [showMobileCart, setShowMobileCart] = useState(false);
+    const [specialInstructions, setSpecialInstructions] = useState('');
+    const [quantity, setQuantity] = useState(1);
     
     // Combo Builder State
     const [comboSelections, setComboSelections] = useState<SubItem[]>([]);
@@ -98,7 +100,7 @@ export const POSView: React.FC = () => {
     });
     
     // Receipt Data for Printing
-    const [receiptData, setReceiptData] = useState<{table: string, items: any[], total: number, date: string} | null>(null);
+    const [receiptData, setReceiptData] = useState<{table: string, items: any[], total: number, date: string, orderId: string} | null>(null);
 
     // Sync local forms when storeSettings loads/updates
     useEffect(() => {
@@ -252,19 +254,14 @@ export const POSView: React.FC = () => {
     const handleCustomize = (pizza: Pizza) => {
         if (isEditMode && activeTab === 'order') return;
         
-        // CRITICAL FIX: Aggressively reset ALL state to prevent "Wrong Pizza" issues
-        // Force a deep copy of the selected pizza object to avoid reference issues
+        // CRITICAL FIX: Aggressively reset ALL state
         setSelectedPizza({...pizza}); 
-        
-        // Reset Toppings
         setSelectedToppings([]);
-        
-        // Reset Edit Mode
         setEditingCartItem(null);
-        
-        // Reset Combo State (Vital for combo/non-combo switching)
         setComboSelections([]);
         setActiveComboSlot(null);
+        setSpecialInstructions('');
+        setQuantity(1);
 
         // Check if it's a combo and initialize properly
         if (pizza.category === 'promotion' && (pizza.comboCount || 0) > 0) {
@@ -275,9 +272,11 @@ export const POSView: React.FC = () => {
     const handleEditCartItem = (item: CartItem) => {
         const pizza = menu.find(p => p.id === item.pizzaId);
         if (pizza) {
-            setSelectedPizza({...pizza}); // Deep copy for safety
+            setSelectedPizza({...pizza});
             setSelectedToppings(item.selectedToppings);
             setEditingCartItem(item);
+            setSpecialInstructions(item.specialInstructions || '');
+            setQuantity(item.quantity);
             
             // If it's a combo, restore selections
             if (item.subItems) {
@@ -306,6 +305,9 @@ export const POSView: React.FC = () => {
             updateCartItem({
                 ...editingCartItem,
                 selectedToppings: selectedToppings,
+                specialInstructions: specialInstructions,
+                quantity: quantity,
+                totalPrice: (selectedPizza.basePrice + toppingsPrice) * quantity
             });
         } else {
             const item: CartItem = {
@@ -315,8 +317,9 @@ export const POSView: React.FC = () => {
                 nameTh: selectedPizza.nameTh,
                 basePrice: selectedPizza.basePrice,
                 selectedToppings: selectedToppings,
-                quantity: 1,
-                totalPrice: selectedPizza.basePrice + toppingsPrice
+                quantity: quantity,
+                totalPrice: (selectedPizza.basePrice + toppingsPrice) * quantity,
+                specialInstructions: specialInstructions
             };
             addToCart(item);
         }
@@ -324,6 +327,8 @@ export const POSView: React.FC = () => {
         setSelectedPizza(null);
         setSelectedToppings([]);
         setEditingCartItem(null);
+        setSpecialInstructions('');
+        setQuantity(1);
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
     
@@ -358,8 +363,9 @@ export const POSView: React.FC = () => {
             basePrice: selectedPizza.basePrice,
             selectedToppings: [], 
             subItems: comboSelections,
-            quantity: 1,
-            totalPrice: selectedPizza.basePrice // Assuming no extra toppings charge for basic combo selection in POS
+            quantity: quantity,
+            totalPrice: selectedPizza.basePrice * quantity,
+            specialInstructions: specialInstructions
         };
         addToCart(item);
         setSelectedPizza(null);
@@ -472,7 +478,8 @@ export const POSView: React.FC = () => {
             table: currentTable,
             items: currentItems,
             total: currentTotal,
-            date: new Date().toLocaleString()
+            date: new Date().toLocaleString(),
+            orderId: selectedOrder ? selectedOrder.id.slice(-4) : 'NEW'
         });
         
         // Allow state to update then print
@@ -746,40 +753,47 @@ export const POSView: React.FC = () => {
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
             {/* ... [Receipt Printer] ... */}
-            <div className="hidden print:block print:w-[80mm] print:font-mono print:text-xs p-2 bg-white text-black">
+            <div className="hidden print:block print:w-[80mm] print:font-mono print:text-xs p-0 m-0 bg-white text-black">
                 {receiptData && (
-                    <div className="text-center">
-                        <div className="font-bold text-lg mb-2">PIZZA DAMAC</div>
-                        <div className="mb-4">Nonthaburi<br/>Tel: 099-497-9199</div>
+                    <div className="text-center" style={{ width: '80mm' }}>
+                        <div className="font-bold text-xl mb-1">PIZZA DAMAC</div>
+                        <div className="text-sm mb-2">Nonthaburi<br/>Tel: 099-497-9199</div>
                         <div className="border-b border-black border-dashed mb-2"></div>
-                        <div className="text-left mb-2">
-                            <div>Table: {receiptData.table}</div>
-                            <div>Date: {receiptData.date}</div>
+                        <div className="text-left text-xs mb-2 flex justify-between">
+                            <span>#{receiptData.orderId}</span>
+                            <span>{receiptData.date}</span>
                         </div>
+                        <div className="text-left font-bold text-lg mb-2">Table: {receiptData.table}</div>
                         <div className="border-b border-black border-dashed mb-2"></div>
-                        <table className="w-full text-left mb-2">
+                        <table className="w-full text-left mb-2 text-xs">
                             <thead>
                                 <tr>
+                                    <th className="w-8">Qty</th>
                                     <th>Item</th>
-                                    <th className="text-right">Price</th>
+                                    <th className="text-right">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {receiptData.items.map((item: any, i: number) => (
-                                    <tr key={i}>
-                                        <td>{item.quantity}x {item.name}</td>
+                                    <tr key={i} className="align-top">
+                                        <td>{item.quantity}</td>
+                                        <td>
+                                            {item.name}
+                                            {item.specialInstructions && <div className="text-[10px] italic">({item.specialInstructions})</div>}
+                                            {(item.selectedToppings || []).length > 0 && <div className="text-[10px]">+ {item.selectedToppings.map((t:any) => t.name).join(',')}</div>}
+                                        </td>
                                         <td className="text-right">{item.totalPrice.toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                         <div className="border-b border-black border-dashed mb-2"></div>
-                        <div className="flex justify-between font-bold text-lg">
+                        <div className="flex justify-between font-bold text-xl">
                             <span>TOTAL</span>
                             <span>{receiptData.total.toLocaleString()}</span>
                         </div>
                         <div className="border-b border-black border-dashed mt-2 mb-4"></div>
-                        <div className="text-center">Thank you!</div>
+                        <div className="text-center text-sm font-bold">Thank you!</div>
                     </div>
                 )}
             </div>
@@ -811,63 +825,55 @@ export const POSView: React.FC = () => {
             </div>
 
             {/* --- DESKTOP SIDEBAR --- */}
-            <aside className="hidden md:flex w-20 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
+            <aside className="hidden md:flex w-24 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
                 <div className="flex flex-col items-center gap-6 w-full">
                     <div className="mb-2 relative group cursor-pointer">
                         {shopLogo ? (
-                            <img src={shopLogo} alt="Logo" className="w-12 h-12 rounded-full object-cover border-2 border-brand-500" />
+                            <img src={shopLogo} alt="Logo" className="w-14 h-14 rounded-full object-cover border-2 border-brand-500" />
                         ) : (
-                            <div className="bg-brand-600 p-2 rounded-xl text-white shadow-lg shadow-brand-500/50"><DollarSign size={24} /></div>
+                            <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg shadow-brand-500/50"><DollarSign size={28} /></div>
                         )}
                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleLogoUpload}/>
                     </div>
 
                     <button 
                         onClick={() => setActiveTab('order')} 
-                        className={`p-3 rounded-xl transition ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
+                        className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
                         title="New Order"
                     >
-                        <ShoppingBag size={24} />
+                        <ShoppingBag size={28} />
                     </button>
                     
                     <button 
                         onClick={() => setActiveTab('tables')} 
-                        className={`p-3 rounded-xl transition relative ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
+                        className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
                         title="Active Tables"
                     >
-                        <Layers size={24} />
+                        <Layers size={28} />
                         {activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}
                     </button>
                     
                     <button 
                         onClick={() => setActiveTab('sales')} 
-                        className={`p-3 rounded-xl transition ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
+                        className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
                         title="Reports"
                     >
-                        <PieChart size={24} />
+                        <PieChart size={28} />
                     </button>
 
                      <button 
                         onClick={() => setActiveTab('manage')} 
-                        className={`p-3 rounded-xl transition ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
+                        className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
                         title="Store Settings"
                     >
-                        <Settings size={24} />
-                    </button>
-                    
-                     <button 
-                        onClick={() => setActiveTab('qr_gen')} 
-                        className={`p-3 rounded-xl transition ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} 
-                        title="QR Table Codes"
-                    >
-                        <QrCode size={24} />
+                        <Settings size={28} />
                     </button>
                 </div>
 
                 <div className="flex flex-col items-center gap-4 w-full">
-                    <button onClick={toggleLanguage} className="text-xs font-bold bg-gray-800 text-gray-300 w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-700">{language.toUpperCase()}</button>
-                    <button onClick={adminLogout} className="p-3 text-red-400 hover:bg-gray-800 rounded-xl transition" title="Logout">
-                        <LogOut size={24} />
+                    <button onClick={toggleLanguage} className="text-xs font-bold bg-gray-800 text-gray-300 w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-700">{language.toUpperCase()}</button>
+                    <button onClick={adminLogout} className="p-4 text-red-400 hover:bg-gray-800 rounded-xl transition" title="Logout">
+                        <LogOut size={28} />
                     </button>
                 </div>
             </aside>
@@ -915,23 +921,23 @@ export const POSView: React.FC = () => {
                                 {/* Edit Mode Toggle */}
                                 <button 
                                     onClick={() => setIsEditMode(!isEditMode)} 
-                                    className={`hidden md:flex p-2 rounded-lg items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                    className={`hidden md:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                                 >
-                                    <Edit2 size={16}/> <span className="text-sm font-bold">{isEditMode ? 'Editing Mode' : 'Order Mode'}</span>
+                                    <Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? 'Editing' : 'Order'}</span>
                                 </button>
                                 
                                 {CATEGORIES.map(cat => (
                                     <button 
                                         key={cat.id} 
                                         onClick={() => setActiveCategory(cat.id)}
-                                        className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                        className={`whitespace-nowrap px-6 py-3 rounded-xl text-base font-bold transition ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-md scale-105' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
                                     >
                                         {language === 'th' ? cat.labelTh : cat.label}
                                     </button>
                                 ))}
                                 {isEditMode && (
-                                     <button onClick={handleOpenAddModal} className="whitespace-nowrap px-3 py-2 rounded-full text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto">
-                                         <Plus size={16}/> New Item
+                                     <button onClick={handleOpenAddModal} className="whitespace-nowrap px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto">
+                                         <Plus size={18}/> New Item
                                      </button>
                                 )}
                             </div>
@@ -942,27 +948,27 @@ export const POSView: React.FC = () => {
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
                                         return (
-                                            <div key={item.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col transition h-full group ${!item.available ? 'opacity-60 grayscale' : ''} ${isEditMode ? 'hover:border-blue-400' : 'hover:border-brand-400 cursor-pointer'}`}>
+                                            <div key={item.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col transition h-full group ${!item.available ? 'opacity-60 grayscale' : ''} ${isEditMode ? 'hover:border-blue-400' : 'hover:border-brand-400 cursor-pointer active:scale-95'}`}>
                                                 <div className="relative aspect-square overflow-hidden" onClick={() => !isEditMode && handleCustomize(item)}>
                                                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
-                                                    {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-sm">SOLD OUT</div>}
+                                                    {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-lg">SOLD OUT</div>}
                                                     {isEditMode && (
                                                         <div className="absolute top-2 right-2 flex gap-1">
-                                                            <button onClick={(e) => { e.stopPropagation(); handleEditMenuItem(item); }} className="bg-blue-500 text-white p-1.5 rounded-md shadow hover:bg-blue-600"><Edit2 size={12}/></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); togglePizzaAvailability(item.id); }} className={`p-1.5 rounded-md shadow text-white ${item.available ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-                                                                <Power size={12}/>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleEditMenuItem(item); }} className="bg-blue-500 text-white p-2 rounded-lg shadow hover:bg-blue-600"><Edit2 size={16}/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); togglePizzaAvailability(item.id); }} className={`p-2 rounded-lg shadow text-white ${item.available ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                                                                <Power size={16}/>
                                                             </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); toggleBestSeller(item.id); }} className={`p-1.5 rounded-md shadow text-white ${item.isBestSeller ? 'bg-yellow-400' : 'bg-gray-400'}`}>
-                                                                <Star size={12} fill="currentColor"/>
+                                                            <button onClick={(e) => { e.stopPropagation(); toggleBestSeller(item.id); }} className={`p-2 rounded-lg shadow text-white ${item.isBestSeller ? 'bg-yellow-400' : 'bg-gray-400'}`}>
+                                                                <Star size={16} fill="currentColor"/>
                                                             </button>
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="p-3 flex flex-col flex-1" onClick={() => !isEditMode && handleCustomize(item)}>
-                                                    <h3 className="font-bold text-gray-800 text-sm leading-tight mb-1">{localized.name}</h3>
+                                                <div className="p-4 flex flex-col flex-1" onClick={() => !isEditMode && handleCustomize(item)}>
+                                                    <h3 className="font-bold text-gray-800 text-base leading-tight mb-1">{localized.name}</h3>
                                                     <div className="mt-auto flex justify-between items-center pt-2">
-                                                        <span className="font-bold text-brand-600">฿{item.basePrice}</span>
-                                                        {!isEditMode && <div className="bg-brand-50 text-brand-600 p-1 rounded-md"><Plus size={14}/></div>}
+                                                        <span className="font-bold text-brand-600 text-lg">฿{item.basePrice}</span>
+                                                        {!isEditMode && <div className="bg-brand-50 text-brand-600 p-2 rounded-lg"><Plus size={20}/></div>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -973,7 +979,7 @@ export const POSView: React.FC = () => {
                         </div>
 
                         {/* --- CART SIDEBAR (Desktop) / Mobile Modal --- */}
-                        <div className={`w-full md:w-96 bg-white border-l shadow-xl flex flex-col z-40 fixed md:relative inset-0 md:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}`}>
+                        <div className={`w-full md:w-[420px] bg-white border-l shadow-xl flex flex-col z-40 fixed md:relative inset-0 md:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}`}>
                             {/* Mobile Header */}
                             <div className="md:hidden p-4 bg-gray-900 text-white flex justify-between items-center">
                                 <h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag/> Current Order</h2>
@@ -984,31 +990,32 @@ export const POSView: React.FC = () => {
                             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                                 {cart.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
-                                        <ShoppingBag size={48} className="mb-2"/>
-                                        <p className="font-medium">No items yet</p>
+                                        <ShoppingBag size={64} className="mb-4"/>
+                                        <p className="font-bold text-xl">No items yet</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
                                         {cart.map(item => (
-                                            <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 relative group">
-                                                <div className="flex justify-between items-start mb-1 cursor-pointer" onClick={() => handleEditCartItem(item)}>
+                                            <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50">
+                                                <div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}>
                                                     <div className="pr-6">
-                                                        <h4 className="font-bold text-gray-800 text-sm">{item.name}</h4>
-                                                        <p className="text-xs text-gray-500 leading-tight mt-0.5">
+                                                        <h4 className="font-bold text-gray-800 text-base">{item.name}</h4>
+                                                        {item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}
+                                                        <p className="text-xs text-gray-500 leading-tight mt-1">
                                                             {item.selectedToppings.map(t => t.name).join(', ')}
                                                             {item.subItems?.map(s => `+ ${s.name}`).join(', ')}
                                                         </p>
                                                     </div>
-                                                    <div className="font-bold text-gray-900 text-sm">฿{item.totalPrice}</div>
+                                                    <div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div>
                                                 </div>
                                                 
                                                 <div className="flex items-center justify-between mt-3">
-                                                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                                                        <button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={14}/></button>
-                                                        <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                                                        <button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={14}/></button>
+                                                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                                                        <button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button>
+                                                        <span className="w-10 text-center font-bold text-base">{item.quantity}</span>
+                                                        <button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button>
                                                     </div>
-                                                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={16}/></button>
+                                                    <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -1023,15 +1030,15 @@ export const POSView: React.FC = () => {
                                      <input 
                                         type="text" 
                                         placeholder="Table No. / Name" 
-                                        className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none w-full"
+                                        className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full"
                                         value={tableNumber}
                                         onChange={e => setTableNumber(e.target.value)}
                                      />
                                      <select 
-                                        className="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none w-full"
+                                        className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full"
                                         value={orderSource}
                                         onChange={e => setOrderSource(e.target.value as OrderSource)}
-                                     >
+                                    >
                                          <option value="store">In-Store</option>
                                          <option value="grab">Grab</option>
                                          <option value="lineman">Lineman</option>
@@ -1040,7 +1047,7 @@ export const POSView: React.FC = () => {
                                      </select>
                                 </div>
                                 
-                                <div className="flex justify-between items-center text-xl font-bold text-gray-900 mt-2">
+                                <div className="flex justify-between items-center text-2xl font-bold text-gray-900 mt-2">
                                     <span>Total</span>
                                     <span>฿{cartTotal}</span>
                                 </div>
@@ -1049,14 +1056,14 @@ export const POSView: React.FC = () => {
                                     <button 
                                         onClick={handleSendToKitchen}
                                         disabled={cart.length === 0}
-                                        className="py-3 rounded-xl font-bold bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow"
+                                        className="py-4 rounded-xl font-bold text-lg bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow"
                                     >
-                                        Send Kitchen
+                                        Kitchen
                                     </button>
                                     <button 
                                         onClick={handleCheckBill}
                                         disabled={cart.length === 0}
-                                        className="py-3 rounded-xl font-bold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow"
+                                        className="py-4 rounded-xl font-bold text-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow"
                                     >
                                         Pay Now
                                     </button>
@@ -1090,7 +1097,7 @@ export const POSView: React.FC = () => {
                                                     <div className="text-xs text-gray-500 font-bold uppercase mb-1">Order #{order.id.slice(-4)}</div>
                                                     <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                                         {order.tableNumber ? (
-                                                            <span className="bg-gray-800 text-white px-2 py-0.5 rounded text-sm">Table {order.tableNumber}</span>
+                                                            <span className="bg-gray-800 text-white px-3 py-1 rounded-lg text-lg">Table {order.tableNumber}</span>
                                                         ) : (
                                                             <span className="text-gray-600">{order.customerName}</span>
                                                         )}
@@ -1098,17 +1105,17 @@ export const POSView: React.FC = () => {
                                                     </h3>
                                                 </div>
                                                 <div className="text-right">
-                                                     <div className="text-xl font-bold text-brand-600">฿{order.totalAmount}</div>
+                                                     <div className="text-2xl font-bold text-brand-600">฿{order.totalAmount}</div>
                                                      <div className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded mt-1 inline-block">UNPAID</div>
                                                 </div>
                                             </div>
                                             
                                             {/* Item Summary (Short) */}
                                             <div className="p-4 flex-1">
-                                                <div className="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                                                <div className="text-sm text-gray-600 space-y-2 max-h-48 overflow-y-auto">
                                                     {order.items.map((item, i) => (
-                                                        <div key={i} className="flex justify-between">
-                                                            <span>{item.quantity}x {item.name}</span>
+                                                        <div key={i} className="flex justify-between border-b border-gray-100 pb-1">
+                                                            <span className="font-bold">{item.quantity}x {item.name}</span>
                                                             <span className="font-bold text-gray-800">฿{item.totalPrice}</span>
                                                         </div>
                                                     ))}
@@ -1119,15 +1126,15 @@ export const POSView: React.FC = () => {
                                             <div className="p-4 border-t bg-gray-50 grid grid-cols-2 gap-3">
                                                  <button 
                                                     onClick={() => handleCheckTableBill(order)} 
-                                                    className="bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition"
+                                                    className="bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-lg"
                                                  >
-                                                    <Receipt size={18}/> Check Bill
+                                                    <Receipt size={20}/> Check Bill
                                                  </button>
                                                  <div className="grid grid-cols-2 gap-2">
-                                                     <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-xs" title="Force Complete">
+                                                     <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs" title="Force Complete">
                                                          Clear
                                                      </button>
-                                                     <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-bold text-xs" title="Cancel Order">
+                                                     <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold text-xs" title="Cancel Order">
                                                          Cancel
                                                      </button>
                                                  </div>
@@ -1528,6 +1535,81 @@ export const POSView: React.FC = () => {
 
             {/* --- MODALS --- */}
             
+            {/* POS CUSTOMIZATION MODAL (NEW & CRITICAL) */}
+            {selectedPizza && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gray-900 text-white p-5 flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-2xl font-bold">{getLocalizedItem(selectedPizza).name}</h2>
+                                <p className="text-gray-300 text-sm">฿{selectedPizza.basePrice}</p>
+                            </div>
+                            <button onClick={() => setSelectedPizza(null)} className="bg-white/20 p-2 rounded-full hover:bg-white/40"><X size={24}/></button>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                            
+                            {/* Special Instructions (Notes) */}
+                            <div className="mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><MessageCircle size={18}/> Special Instructions / Comments</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. No Spicy, Extra Crispy, No Olive..." 
+                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-lg focus:border-brand-500 outline-none"
+                                    value={specialInstructions}
+                                    onChange={e => setSpecialInstructions(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Toppings Grid (Simplified for POS) */}
+                             {selectedPizza.category === 'pizza' && (
+                                <div className="mb-6">
+                                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><ChefHat size={20}/> Extras / Toppings</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {toppings.map(topping => {
+                                            const isSelected = selectedToppings.some(t => t.id === topping.id);
+                                            return (
+                                                <button
+                                                    key={topping.id}
+                                                    onClick={() => toggleTopping(topping)}
+                                                    className={`p-4 rounded-xl border text-left transition relative ${isSelected ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                                                >
+                                                    <div className="font-bold text-gray-800">{topping.name}</div>
+                                                    <div className="text-xs text-gray-500">+{topping.price}</div>
+                                                    {isSelected && <CheckCircle2 size={20} className="absolute top-2 right-2 text-brand-600"/>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                             )}
+                        </div>
+                        
+                        {/* Footer / Actions */}
+                        <div className="p-6 bg-white border-t border-gray-200 shrink-0">
+                             <div className="flex items-center justify-between gap-4">
+                                 {/* Quantity Stepper */}
+                                 <div className="flex items-center bg-gray-100 rounded-xl p-2">
+                                     <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-12 h-12 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 text-xl font-bold hover:bg-gray-50"><Minus/></button>
+                                     <span className="w-16 text-center text-2xl font-bold">{quantity}</span>
+                                     <button onClick={() => setQuantity(quantity + 1)} className="w-12 h-12 flex items-center justify-center bg-white rounded-lg shadow-sm text-gray-600 text-xl font-bold hover:bg-gray-50"><Plus/></button>
+                                 </div>
+                                 
+                                 <button 
+                                     onClick={confirmAddToCart}
+                                     className="flex-1 bg-brand-600 text-white h-16 rounded-xl font-bold text-xl shadow-xl hover:bg-brand-700 flex items-center justify-center gap-2"
+                                 >
+                                     <Plus size={24}/> 
+                                     Add ฿{((selectedPizza.basePrice + selectedToppings.reduce((s,t) => s+t.price, 0)) * quantity).toLocaleString()}
+                                 </button>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* FULL SCREEN QR MODAL */}
             {showQrFullScreen && (
                 <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-8 cursor-pointer" onClick={() => setShowQrFullScreen(false)}>

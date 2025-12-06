@@ -1,4 +1,5 @@
 
+
 export interface Topping {
   id: string;
   name: string;
@@ -41,6 +42,7 @@ export interface CartItem {
   quantity: number;
   totalPrice: number;
   subItems?: SubItem[]; // New: Stores choices for combos
+  specialInstructions?: string; // New: User comments (e.g. "No Spicy")
 }
 
 export interface DeliveryZone {

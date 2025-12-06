@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
@@ -106,6 +107,7 @@ export const CustomerView: React.FC = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showTracker, setShowTracker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [specialInstructions, setSpecialInstructions] = useState('');
   
   // Category State
   const [activeCategory, setActiveCategory] = useState<ProductCategory>('promotion');
@@ -215,6 +217,7 @@ export const CustomerView: React.FC = () => {
     setSelectedPizza(pizza);
     setSelectedToppings([]);
     setCustomName('');
+    setSpecialInstructions('');
     
     // Check if it's a combo
     if (pizza.category === 'promotion' && (pizza.comboCount || 0) > 0) {
@@ -270,11 +273,13 @@ export const CustomerView: React.FC = () => {
       basePrice: selectedPizza.basePrice,
       selectedToppings: selectedToppings,
       quantity: 1,
-      totalPrice: selectedPizza.basePrice + toppingsPrice
+      totalPrice: selectedPizza.basePrice + toppingsPrice,
+      specialInstructions: specialInstructions
     };
     addToCart(item);
     setSelectedPizza(null);
     setSelectedToppings([]);
+    setSpecialInstructions('');
   };
 
   // Combo Handlers
@@ -314,12 +319,14 @@ export const CustomerView: React.FC = () => {
           selectedToppings: [], // Combo itself has no toppings, the sub-items do
           subItems: comboSelections, // Store the choices
           quantity: 1,
-          totalPrice: selectedPizza.basePrice + extraToppingsPrice
+          totalPrice: selectedPizza.basePrice + extraToppingsPrice,
+          specialInstructions: specialInstructions
       };
       addToCart(item);
       setIsComboBuilderOpen(false);
       setSelectedPizza(null);
       setComboSelections([]);
+      setSpecialInstructions('');
   };
 
   const handleSaveFavorite = async () => {
@@ -915,6 +922,18 @@ export const CustomerView: React.FC = () => {
                                      />
                                 </div>
                             )}
+                            
+                            {/* Special Instructions */}
+                            <div className="mb-6">
+                                 <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><MessageCircle size={14}/> Special Instructions</label>
+                                 <textarea 
+                                     className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-brand-500 outline-none transition text-sm" 
+                                     placeholder="e.g. No spicy, Less salt, No olive..."
+                                     rows={2}
+                                     value={specialInstructions}
+                                     onChange={e => setSpecialInstructions(e.target.value)}
+                                 />
+                            </div>
 
                             {/* Toppings Section */}
                             {selectedPizza.category === 'pizza' && (
@@ -1035,6 +1054,7 @@ export const CustomerView: React.FC = () => {
                                             <div className="flex justify-between items-start mb-2">
                                                 <div>
                                                     <h4 className="font-bold text-gray-800">{item.name}</h4>
+                                                    {item.specialInstructions && <div className="text-xs text-red-500 italic mt-0.5">"{item.specialInstructions}"</div>}
                                                     <p className="text-xs text-gray-500">
                                                         {item.selectedToppings.map(t => language === 'th' ? t.nameTh : t.name).join(', ')}
                                                         {item.subItems?.map(s => `+ ${s.name}`).join(', ')}
