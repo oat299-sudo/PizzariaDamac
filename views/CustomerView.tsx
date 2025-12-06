@@ -150,6 +150,15 @@ export const CustomerView: React.FC = () => {
 
   const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
+  // Quick Tags for Instructions
+  const commonInstructions = ['No Spicy', 'Less Salt', 'Extra Crispy', 'No Onion', 'No Garlic', 'Cut 8 pcs', 'Cut 4 pcs', 'Sauce on Side', 'No Olive'];
+
+  const handleAddInstruction = (tag: string) => {
+      if (!specialInstructions.includes(tag)) {
+          setSpecialInstructions(prev => prev ? `${prev}, ${tag}` : tag);
+      }
+  };
+
   // Active Order Tracking (Enhanced for Guests using Local Storage ID)
   const [localOrderId, setLocalOrderId] = useState(() => {
       if (typeof window !== 'undefined') return localStorage.getItem('damac_last_order');
@@ -543,7 +552,7 @@ export const CustomerView: React.FC = () => {
                      <button onClick={() => setShowProfile(true)} className="flex items-center gap-2 bg-orange-100 rounded-full py-1.5 px-3 hover:bg-orange-200 transition">
                          <User size={16} className="text-brand-700"/>
                          <span className="text-sm font-bold hidden md:inline text-brand-900">{customer.name}</span>
-                         <div className="bg-brand-500 text-white text-[10px] px-1.5 rounded-full">{customer.loyaltyPoints}pts</div>
+                         <div className="bg-brand-50 text-white text-[10px] px-1.5 rounded-full">{customer.loyaltyPoints}pts</div>
                      </button>
                  ) : (
                      <button onClick={() => setShowAuthModal(true)} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:bg-black transition">{t('login')}</button>
@@ -899,6 +908,29 @@ export const CustomerView: React.FC = () => {
                                              </button>
                                          ))}
                                      </div>
+                                     
+                                     {/* NEW: Special Instructions for Combo */}
+                                     <div className="bg-white p-4 rounded-xl border border-gray-200 mt-4">
+                                         <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><MessageCircle size={14}/> Special Instructions</label>
+                                         <textarea 
+                                             className="w-full border-2 border-gray-200 rounded-xl p-3 focus:border-brand-500 outline-none transition text-sm" 
+                                             placeholder="e.g. No spicy, Less salt..."
+                                             rows={2}
+                                             value={specialInstructions}
+                                             onChange={e => setSpecialInstructions(e.target.value)}
+                                         />
+                                         <div className="flex flex-wrap gap-2 mt-2">
+                                             {commonInstructions.map(tag => (
+                                                 <button 
+                                                    key={tag}
+                                                    onClick={() => handleAddInstruction(tag)}
+                                                    className="text-[10px] font-bold px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full hover:bg-brand-50 hover:text-brand-600 transition"
+                                                 >
+                                                    + {tag}
+                                                 </button>
+                                             ))}
+                                         </div>
+                                     </div>
                                  </div>
                              ) : (
                                  // Pizza Selector for Slot
@@ -984,6 +1016,18 @@ export const CustomerView: React.FC = () => {
                                      value={specialInstructions}
                                      onChange={e => setSpecialInstructions(e.target.value)}
                                  />
+                                 {/* NEW: Quick Tags */}
+                                 <div className="flex flex-wrap gap-2 mt-2">
+                                     {commonInstructions.map(tag => (
+                                         <button 
+                                            key={tag}
+                                            onClick={() => handleAddInstruction(tag)}
+                                            className="text-[10px] font-bold px-3 py-1.5 bg-white border border-gray-200 rounded-full hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 transition shadow-sm"
+                                         >
+                                            + {tag}
+                                         </button>
+                                     ))}
+                                 </div>
                             </div>
 
                             {/* Toppings Section */}

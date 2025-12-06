@@ -366,6 +366,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   lineUrl: data.line_url || DEFAULT_STORE_SETTINGS.lineUrl,
                   mapUrl: data.map_url || DEFAULT_STORE_SETTINGS.mapUrl,
                   contactPhone: data.contact_phone || DEFAULT_STORE_SETTINGS.contactPhone,
+                  promptPayNumber: data.prompt_pay_number || DEFAULT_STORE_SETTINGS.promptPayNumber,
                   // JSON or Array columns
                   reviewLinks: data.review_links || [],
                   vibeLinks: data.vibe_links || [],
