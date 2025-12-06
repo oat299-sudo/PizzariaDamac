@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { 
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
@@ -624,6 +623,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       let existingHistory: string[] = [];
       let existingFavorites: SavedFavorite[] = [];
       let existingTier: 'Bronze' | 'Silver' | 'Gold' | undefined = undefined;
+      let existingSavedAddresses: string[] = [];
       let action: 'created' | 'updated' = 'created';
 
       if (isSupabaseConfigured) {
@@ -631,74 +631,58 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           try {
               const { data } = await supabase.from('customers').select('*').eq('phone', newProfile.phone).single();
               if (data) {
-                  // User exists! Preserve their valuable data
-                  action = 'updated';
-                  existingPoints = data.loyalty_points || 0;
+                  existingPoints = data.loyalty_points;
                   existingHistory = data.order_history || [];
                   existingFavorites = data.saved_favorites || [];
                   existingTier = data.tier;
+                  existingSavedAddresses = data.saved_addresses || [];
+                  action = 'updated';
               }
-          } catch (e) { console.warn("Error checking existing customer", e); }
+          } catch(e) {}
+      } else {
+           // Local Storage fallback for mock
+           const saved = localStorage.getItem('damac_mock_customers');
+           if (saved) {
+               const list = JSON.parse(saved);
+               const found = list.find((c: any) => c.phone === newProfile.phone);
+               if (found) {
+                   existingPoints = found.loyaltyPoints;
+                   existingHistory = found.orderHistory;
+                   existingFavorites = found.savedFavorites;
+                   existingTier = found.tier;
+                   existingSavedAddresses = found.savedAddresses;
+                   action = 'updated';
+               }
+           }
       }
 
-      // Merge new details with existing history
       const finalProfile: CustomerProfile = {
           ...newProfile,
           loyaltyPoints: existingPoints,
           orderHistory: existingHistory,
           savedFavorites: existingFavorites,
-          tier: existingTier
+          tier: existingTier,
+          savedAddresses: existingSavedAddresses.length > 0 ? existingSavedAddresses : (newProfile.address ? [newProfile.address] : [])
       };
-      
+
       await setCustomer(finalProfile);
+      
+      // Save to mock DB if offline
+      if (!isSupabaseConfigured) {
+          const saved = localStorage.getItem('damac_mock_customers');
+          let list = saved ? JSON.parse(saved) : [];
+          list = list.filter((c: any) => c.phone !== finalProfile.phone);
+          list.push(finalProfile);
+          localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+      }
+      
       return action;
   };
-  
-  const getAllCustomers = async () => {
-      if (!isSupabaseConfigured) return [];
-      try {
-          const { data, error } = await supabase.from('customers').select('name, phone, loyalty_points, tier, created_at, birthday, address, order_history');
-          if (error) throw error;
-          
-          // Format data for CSV
-          return data.map((c: any) => ({
-              Name: c.name,
-              Phone: c.phone,
-              Points: c.loyalty_points,
-              Tier: c.tier,
-              Joined: new Date(c.created_at).toLocaleDateString(),
-              Birthday: c.birthday,
-              Address: c.address ? c.address.replace(/[\n,]/g, ' ') : '', // Escape commas
-              OrdersCount: c.order_history ? c.order_history.length : 0
-          }));
-      } catch (e) {
-          console.error("Export failed", e);
-          return [];
-      }
-  };
-  
-  const customerLogin = async (phone: string, password: string): Promise<boolean> => {
-      if (!isSupabaseConfigured) {
-          // If DB is offline, check local storage or basic bypass for demo purposes
-          const saved = localStorage.getItem('damac_customer');
-          if (saved) {
-              const parsed = JSON.parse(saved);
-              if (parsed.phone === phone) { // Very basic "offline" check
-                  setCustState(parsed);
-                  return true;
-              }
-          }
-          alert("Database not connected and no local profile found.");
-          return false;
-      }
-      try {
-          const { data, error } = await supabase.from('customers')
-              .select('*')
-              .eq('phone', phone)
-              .eq('password', password)
-              .single();
-          
-          if (data && !error) {
+
+  const customerLogin = async (phone: string, pass: string): Promise<boolean> => {
+      if (isSupabaseConfigured) {
+          const { data } = await supabase.from('customers').select('*').eq('phone', phone).single();
+          if (data && data.password === pass) {
               const profile: CustomerProfile = {
                   name: data.name,
                   phone: data.phone,
@@ -716,322 +700,313 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               localStorage.setItem('damac_customer', JSON.stringify(profile));
               return true;
           }
-      } catch (e) {
-          console.error("Login failed", e);
+      } else {
+          // Mock login
+          const saved = localStorage.getItem('damac_mock_customers');
+          if (saved) {
+               const list = JSON.parse(saved);
+               const found = list.find((c: any) => c.phone === phone && c.password === pass);
+               if (found) {
+                   setCustState(found);
+                   localStorage.setItem('damac_customer', JSON.stringify(found));
+                   return true;
+               }
+          }
       }
       return false;
   };
 
+  const getAllCustomers = async () => {
+      if (isSupabaseConfigured) {
+          const { data } = await supabase.from('customers').select('*');
+          return data || [];
+      }
+      return [];
+  }
+
   const addToFavorites = async (name: string, pizzaId: string, toppings: Topping[]) => {
       if (!customer) return;
-      const newFav: SavedFavorite = {
-          id: Date.now().toString(),
-          name, pizzaId, toppings
-      };
-      const updated = { ...customer, savedFavorites: [...(customer.savedFavorites || []), newFav] };
-      await setCustomer(updated);
+      const newFav: SavedFavorite = { id: Date.now().toString(), name, pizzaId, toppings };
+      const updatedFavs = [...customer.savedFavorites, newFav];
+      const updatedCustomer = { ...customer, savedFavorites: updatedFavs };
+      await setCustomer(updatedCustomer);
   };
-  const reorderItem = (orderId: string) => {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-          order.items.forEach(item => {
-              addToCart({ ...item, id: Date.now().toString() + Math.random() }); // New ID for new cart item
-          });
-      }
-  };
+
   const claimReward = () => {
       if (!customer || customer.loyaltyPoints < 10) return false;
-      const pizza = menu.find(p => p.basePrice <= 380 && p.category === 'pizza') || menu[0];
-      addToCart({
-          id: 'reward-' + Date.now(),
-          pizzaId: pizza.id,
-          name: `🏆 FREE ${pizza.name}`,
-          nameTh: `🏆 ฟรี ${pizza.nameTh || pizza.name}`,
-          basePrice: 0,
-          selectedToppings: [],
-          quantity: 1,
-          totalPrice: 0
-      });
-      // Deduct points
-      const updated = { ...customer, loyaltyPoints: customer.loyaltyPoints - 10 };
-      setCustomer(updated);
+      const updatedCustomer = { ...customer, loyaltyPoints: customer.loyaltyPoints - 10 };
+      setCustomer(updatedCustomer);
       return true;
   };
 
   // Orders
-  const placeOrder = async (type: OrderType, details: any = {}): Promise<boolean> => {
-    // If DB is offline, we proceed with local state to allow the app to function as a demo/offline POS
-    try {
-        const { note, delivery, paymentMethod, pickupTime, tableNumber, source = 'store', status } = details;
-        
-        // Save address if new (only for store orders with a logged in customer)
-        if (source === 'store' && customer && type === 'delivery' && delivery?.address) {
-            const currentSaved = customer.savedAddresses || [];
-            if (!currentSaved.includes(delivery.address)) {
-                const newSavedAddresses = [...currentSaved, delivery.address];
-                // Note: setCustomer handles its own errors silently
-                try {
-                     await setCustomer({ ...customer, savedAddresses: newSavedAddresses, address: delivery.address });
-                } catch (e) { console.warn("Could not save address, continuing", e); }
-            }
-        }
-        
-        // Calculate Net Revenue (Deduct GP)
-        const gpRate = GP_RATES[source as OrderSource] || 0;
-        const netAmount = cartTotal * (1 - gpRate);
-
-        const newOrder: Order = {
-            id: Date.now().toString(),
-            customerName: customer?.name || 'Guest',
-            customerPhone: customer?.phone || 'Guest',
-            type,
-            source: source,
-            // Use status from details, else default: 'pending' for store/POS (unpaid), 'confirmed' for external
-            status: status || (source === 'store' ? 'pending' : 'confirmed'),
-            items: cart,
-            totalAmount: cartTotal,
-            netAmount: Math.round(netAmount || 0),
-            createdAt: new Date().toISOString(),
-            note: note || '',
-            deliveryAddress: delivery?.address,
-            deliveryZone: delivery?.zoneName,
-            deliveryFee: delivery?.fee,
-            paymentMethod,
-            pickupTime,
-            tableNumber
-        };
-        
-        // SAVE ORDER ID TO LOCAL STORAGE FOR GUEST TRACKING
-        localStorage.setItem('damac_last_order', newOrder.id);
-
-        // Always update local state first for responsiveness
-        setOrders(prev => [newOrder, ...prev]);
-        
-        // Loyalty Points (Only for Store Orders)
-        if (customer && source === 'store') {
-            const pizzasCount = cart.filter(i => menu.find(m => m.id === i.pizzaId)?.category === 'pizza').length;
-            if (pizzasCount > 0) {
-                const updated = { 
-                    ...customer, 
-                    loyaltyPoints: customer.loyaltyPoints + pizzasCount,
-                    orderHistory: [newOrder.id, ...(customer.orderHistory || [])]
-                };
-                // setCustomer handles its own errors
-                try {
-                     await setCustomer(updated);
-                } catch(e) { console.warn("Could not update points", e); }
-            }
-        }
-
-        // Attempt DB Sync
-        if (isSupabaseConfigured) {
-            try {
-                const { error } = await supabase.from('orders').insert([{
-                    id: newOrder.id,
-                    customer_name: newOrder.customerName,
-                    customer_phone: newOrder.customerPhone,
-                    type: newOrder.type,
-                    source: newOrder.source,
-                    status: newOrder.status,
-                    total_amount: newOrder.totalAmount,
-                    net_amount: newOrder.netAmount,
-                    note: newOrder.note,
-                    delivery_address: newOrder.deliveryAddress,
-                    delivery_zone: newOrder.deliveryZone,
-                    delivery_fee: newOrder.deliveryFee,
-                    payment_method: newOrder.paymentMethod,
-                    pickup_time: newOrder.pickupTime,
-                    table_number: newOrder.tableNumber,
-                    items: newOrder.items
-                }]);
-
-                if (error) {
-                    console.error("Supabase Order Insert Error:", error);
-                }
-            } catch (err) {
-                console.error("Supabase Connection Error (Swallowed):", err);
-                // Swallow "Failed to fetch" errors here so app continues offline
-            }
-        }
-
-        clearCart();
-        return true;
-    } catch (criticalError) {
-        console.error("Critical Error in placeOrder:", criticalError);
-        alert("An unexpected error occurred, but we are attempting to process your request locally.");
-        return true; // Return true to close UI even if critical error logic happens
+  const placeOrder = async (
+    type: OrderType, 
+    details?: {
+      note?: string;
+      delivery?: { address: string; zoneName: string; fee: number };
+      paymentMethod?: PaymentMethod;
+      pickupTime?: string;
+      tableNumber?: string;
+      source?: OrderSource;
+      status?: OrderStatus;
     }
-  };
+  ) => {
+      // Calculate Total
+      const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+      const deliveryFee = details?.delivery?.fee || 0;
+      const totalAmount = subtotal + deliveryFee;
+      
+      // Calculate Net (GP Deduction)
+      const source = details?.source || 'store';
+      const gpRate = GP_RATES[source] || 0;
+      const netAmount = totalAmount * (1 - gpRate);
 
-  // --- Missing Function implementations ---
+      const newOrder: Order = {
+          id: Date.now().toString(),
+          customerName: customer ? customer.name : (details?.tableNumber ? `Table ${details.tableNumber}` : 'Guest'),
+          customerPhone: customer ? customer.phone : '',
+          type,
+          source: source,
+          status: details?.status || 'pending',
+          items: [...cart],
+          totalAmount,
+          netAmount,
+          createdAt: new Date().toISOString(),
+          note: details?.note,
+          deliveryAddress: details?.delivery?.address,
+          deliveryZone: details?.delivery?.zoneName,
+          deliveryFee: details?.delivery?.fee,
+          paymentMethod: details?.paymentMethod,
+          pickupTime: details?.pickupTime,
+          tableNumber: details?.tableNumber
+      };
+
+      if (isSupabaseConfigured) {
+          try {
+             const payload: any = {
+                 id: newOrder.id,
+                 customer_name: newOrder.customerName,
+                 customer_phone: newOrder.customerPhone,
+                 type: newOrder.type,
+                 source: newOrder.source,
+                 status: newOrder.status,
+                 items: newOrder.items,
+                 total_amount: newOrder.totalAmount,
+                 net_amount: newOrder.netAmount,
+                 created_at: newOrder.createdAt,
+                 note: newOrder.note,
+                 delivery_address: newOrder.deliveryAddress,
+                 delivery_zone: newOrder.deliveryZone,
+                 delivery_fee: newOrder.deliveryFee,
+                 payment_method: newOrder.paymentMethod,
+                 pickup_time: newOrder.pickupTime,
+                 table_number: newOrder.tableNumber
+             };
+             await supabase.from('orders').insert([payload]);
+          } catch(e) { console.error("Order placement failed", e); return false; }
+      }
+
+      setOrders(prev => [newOrder, ...prev]);
+      
+      // Save ID for Guest Tracking
+      localStorage.setItem('damac_last_order', newOrder.id);
+      
+      // Update Customer (Loyalty + History + Saved Address)
+      if (customer) {
+          // Loyalty: 1 point per pizza item
+          const pizzaCount = cart.filter(i => {
+               const itemDef = menu.find(m => m.id === i.pizzaId);
+               return itemDef?.category === 'pizza' || itemDef?.category === 'promotion';
+          }).reduce((sum, i) => sum + i.quantity, 0);
+
+          let newPoints = customer.loyaltyPoints + pizzaCount;
+          const newHistory = [newOrder.id, ...customer.orderHistory];
+          
+          let newSavedAddresses = customer.savedAddresses || [];
+          if (type === 'delivery' && details?.delivery?.address) {
+              if (!newSavedAddresses.includes(details.delivery.address)) {
+                  newSavedAddresses = [details.delivery.address, ...newSavedAddresses].slice(0, 5); // Keep last 5
+              }
+          }
+
+          const updatedCustomer = { 
+              ...customer, 
+              loyaltyPoints: newPoints, 
+              orderHistory: newHistory,
+              savedAddresses: newSavedAddresses
+          };
+          await setCustomer(updatedCustomer);
+      }
+      
+      // Clear Cart if online/delivery or if specifically requested (Store orders might keep cart for next? No, clear it)
+      clearCart();
+      return true;
+  };
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('orders').update({ status }).eq('id', orderId);
-        } catch (e) { console.error(e); }
-    }
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').update({ status }).eq('id', orderId);
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
-
+  
   const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
-    // 1. Find Order locally
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    // 2. Prepare Updates
-    const updatedOrder = { 
-        ...order, 
-        status: 'completed' as OrderStatus, 
-        paymentMethod: paymentDetails.paymentMethod,
-        note: (order.note ? order.note + '. ' : '') + (paymentDetails.note || '')
-    };
-    
-    // 3. Update Local State Immediately
-    setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
-
-    // 4. Update Database
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('orders').update({ 
-                status: 'completed',
-                payment_method: paymentDetails.paymentMethod,
-                note: updatedOrder.note
-            }).eq('id', orderId);
-        } catch (e) { 
-            console.error("DB Update Failed for CompleteOrder", e); 
-            // Optional: Revert local state or show error if critical
-        }
-    }
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').update({ 
+              status: 'completed', 
+              payment_method: paymentDetails.paymentMethod,
+              note: paymentDetails.note // Append or overwrite? Overwrite for now or handle logic
+          }).eq('id', orderId);
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          status: 'completed', 
+          paymentMethod: paymentDetails.paymentMethod,
+          note: paymentDetails.note ? (o.note ? o.note + '. ' + paymentDetails.note : paymentDetails.note) : o.note
+      } : o));
   };
 
   const deleteOrder = async (orderId: string) => {
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('orders').delete().eq('id', orderId);
-        } catch (e) { console.error(e); }
-    }
-    setOrders(prev => prev.filter(o => o.id !== orderId));
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').delete().eq('id', orderId);
+      }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
   };
 
+  const reorderItem = (orderId: string) => {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+          order.items.forEach(item => {
+               addToCart({ ...item, id: Date.now() + Math.random().toString() });
+          });
+      }
+  };
+
+  // Expenses
   const addExpense = async (expense: Expense) => {
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('expenses').insert([{
-                id: expense.id, description: expense.description, amount: expense.amount, 
-                category: expense.category, date: expense.date, note: expense.note
-            }]);
-        } catch (e) { console.error(e); }
-    }
-    setExpenses(prev => [...prev, expense]);
+      if (isSupabaseConfigured) {
+          // Assuming 'expenses' table exists
+          await supabase.from('expenses').insert([{
+              id: expense.id, description: expense.description, amount: expense.amount, 
+              category: expense.category, date: expense.date, note: expense.note
+          }]);
+      }
+      setExpenses(prev => [...prev, expense]);
   };
-
   const deleteExpense = async (id: string) => {
-    if (isSupabaseConfigured) {
-         try { await supabase.from('expenses').delete().eq('id', id); } catch(e) {}
-    }
-    setExpenses(prev => prev.filter(e => e.id !== id));
+      if (isSupabaseConfigured) {
+           await supabase.from('expenses').delete().eq('id', id);
+      }
+      setExpenses(prev => prev.filter(e => e.id !== id));
   };
 
+  // Store Settings
   const toggleStoreStatus = async (isOpen: boolean, message?: string) => {
-    const newSettings = { ...storeSettings, isOpen, closedMessage: message || storeSettings.closedMessage };
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('store_settings').update({ 
-                is_open: isOpen, 
-                closed_message: message || storeSettings.closedMessage 
-            }).eq('id', 1); // Assuming single row
-        } catch (e) { console.error(e); }
-    }
-    setStoreSettings(newSettings);
+      const updates: any = { is_open: isOpen };
+      if (message !== undefined) updates.closed_message = message;
+      
+      if (isSupabaseConfigured) {
+          await supabase.from('store_settings').update(updates).eq('id', 1); // Assuming single row ID 1
+      }
+      setStoreSettings(prev => ({ ...prev, isOpen, closedMessage: message || prev.closedMessage }));
   };
 
   const updateStoreSettings = async (settings: Partial<StoreSettings>) => {
-    const newSettings = { ...storeSettings, ...settings };
-    if (isSupabaseConfigured) {
-         try {
-             const payload: any = {};
-             if (settings.promoBannerUrl !== undefined) payload.promo_banner_url = settings.promoBannerUrl;
-             if (settings.promoContentType !== undefined) payload.promo_content_type = settings.promoContentType;
-             if (settings.holidayStart !== undefined) payload.holiday_start = settings.holidayStart;
-             if (settings.holidayEnd !== undefined) payload.holiday_end = settings.holidayEnd;
-             if (settings.reviewUrl !== undefined) payload.review_url = settings.reviewUrl;
-             if (settings.facebookUrl !== undefined) payload.facebook_url = settings.facebookUrl;
-             if (settings.lineUrl !== undefined) payload.line_url = settings.lineUrl;
-             if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
-             if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
-             if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber; 
-             if (settings.reviewLinks !== undefined) payload.review_links = settings.reviewLinks;
-             if (settings.vibeLinks !== undefined) payload.vibe_links = settings.vibeLinks;
-             if (settings.eventGalleryUrls !== undefined) payload.event_gallery_urls = settings.eventGalleryUrls;
-             
-             await supabase.from('store_settings').update(payload).eq('id', 1);
-         } catch (e) { console.error(e); }
-    }
-    setStoreSettings(newSettings);
-  };
+      if (isSupabaseConfigured) {
+          // Map camelCase to snake_case for DB
+          const payload: any = {};
+          if (settings.promoBannerUrl !== undefined) payload.promo_banner_url = settings.promoBannerUrl;
+          if (settings.promoContentType !== undefined) payload.promo_content_type = settings.promoContentType;
+          if (settings.reviewLinks !== undefined) payload.review_links = settings.reviewLinks;
+          if (settings.vibeLinks !== undefined) payload.vibe_links = settings.vibeLinks;
+          if (settings.eventGalleryUrls !== undefined) payload.event_gallery_urls = settings.eventGalleryUrls;
+          if (settings.holidayStart !== undefined) payload.holiday_start = settings.holidayStart;
+          if (settings.holidayEnd !== undefined) payload.holiday_end = settings.holidayEnd;
+          if (settings.reviewUrl !== undefined) payload.review_url = settings.reviewUrl;
+          if (settings.facebookUrl !== undefined) payload.facebook_url = settings.facebookUrl;
+          if (settings.lineUrl !== undefined) payload.line_url = settings.lineUrl;
+          if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
+          if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
+          if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber; // Assuming DB column name
 
+          if (Object.keys(payload).length > 0) {
+             const { error } = await supabase.from('store_settings').update(payload).eq('id', 1);
+             if (error) {
+                 await supabase.from('store_settings').insert([{ id: 1, ...payload }]);
+             }
+          }
+      }
+      setStoreSettings(prev => ({ ...prev, ...settings }));
+  };
+  
   const generateTimeSlots = (dateOffset: number = 0) => {
-    const slots: string[] = [];
-    const startHour = OPERATING_HOURS.open;
-    const endHour = OPERATING_HOURS.close;
-    const now = new Date();
-    const currentHour = now.getHours() + now.getMinutes() / 60;
-
-    for (let h = startHour; h < endHour; h += 0.5) {
-        // If today (offset 0), only show future slots + buffer (e.g. 30 mins)
-        if (dateOffset === 0) {
-            if (h > currentHour + 0.5) {
-                const hour = Math.floor(h);
-                const minute = (h % 1) * 60;
-                slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-            }
-        } else {
-            const hour = Math.floor(h);
-            const minute = (h % 1) * 60;
-            slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-        }
-    }
-    return slots;
+      const slots: string[] = [];
+      const startHour = OPERATING_HOURS.open;
+      const endHour = OPERATING_HOURS.close;
+      const now = new Date();
+      
+      // If today, start from current time + 30 mins
+      let current = startHour;
+      
+      // Loop in 30 min increments
+      while (current < endHour) {
+          const hour = Math.floor(current);
+          const minute = (current % 1) * 60;
+          
+          if (dateOffset === 0) {
+              // For Today: Filter past times
+              const slotTime = new Date();
+              slotTime.setHours(hour, minute, 0, 0);
+              const bufferTime = new Date(now.getTime() + 30 * 60000); // +30 mins prep time
+              
+              if (slotTime > bufferTime) {
+                  slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+              }
+          } else {
+              // Future dates
+              slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+          }
+          current += 0.5;
+      }
+      return slots;
   };
-
+  
   const addNewsItem = async (item: NewsItem) => {
-    const newItems = [item, ...(storeSettings.newsItems || [])];
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('store_settings').update({ news_items: newItems }).eq('id', 1);
-        } catch (e) { console.error(e); }
-    }
-    setStoreSettings(prev => ({ ...prev, newsItems: newItems }));
+       const updatedNews = [item, ...(storeSettings.newsItems || [])];
+       if (isSupabaseConfigured) {
+           await supabase.from('store_settings').update({ news_items: updatedNews }).eq('id', 1);
+       }
+       setStoreSettings(prev => ({ ...prev, newsItems: updatedNews }));
+  };
+  
+  const deleteNewsItem = async (id: string) => {
+      const updatedNews = (storeSettings.newsItems || []).filter(n => n.id !== id);
+      if (isSupabaseConfigured) {
+          await supabase.from('store_settings').update({ news_items: updatedNews }).eq('id', 1);
+      }
+      setStoreSettings(prev => ({ ...prev, newsItems: updatedNews }));
   };
 
-  const deleteNewsItem = async (id: string) => {
-    const newItems = (storeSettings.newsItems || []).filter(i => i.id !== id);
-    if (isSupabaseConfigured) {
-        try {
-            await supabase.from('store_settings').update({ news_items: newItems }).eq('id', 1);
-        } catch (e) { console.error(e); }
-    }
-    setStoreSettings(prev => ({ ...prev, newsItems: newItems }));
+  const value = {
+      language, toggleLanguage, t, getLocalizedItem,
+      currentView, navigateTo,
+      isAdminLoggedIn, adminLogin, adminLogout,
+      shopLogo, updateShopLogo,
+      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase,
+      toppings, addTopping, updateTopping, deleteTopping,
+      cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
+      customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
+      orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, fetchOrders,
+      expenses, addExpense, deleteExpense,
+      isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
+      addNewsItem, deleteNewsItem,
+      tableSession
   };
 
   return (
-    <StoreContext.Provider value={{
-        language, toggleLanguage, t, getLocalizedItem,
-        currentView, navigateTo,
-        isAdminLoggedIn, adminLogin, adminLogout,
-        shopLogo, updateShopLogo,
-        menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase,
-        toppings, addTopping, updateTopping, deleteTopping,
-        cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
-        customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-        orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, fetchOrders,
-        expenses, addExpense, deleteExpense,
-        isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
-        addNewsItem, deleteNewsItem,
-        tableSession
-    }}>
-        {children}
+    <StoreContext.Provider value={value}>
+      {children}
     </StoreContext.Provider>
   );
 };

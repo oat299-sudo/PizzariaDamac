@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp } from 'lucide-react';
 
 // --- EMBED HELPER ---
 const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
@@ -493,7 +493,7 @@ export const CustomerView: React.FC = () => {
         : (DEFAULT_STORE_SETTINGS.eventGalleryUrls || []);
 
   return (
-    <div className="min-h-screen bg-orange-50 pb-24 md:pb-0 font-sans text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-orange-50 pb-32 md:pb-0 font-sans text-gray-900 flex flex-col">
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-orange-100">
            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -543,7 +543,7 @@ export const CustomerView: React.FC = () => {
                     <button 
                         key={cat.id} 
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all transform ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-lg scale-105' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all transform ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-lg scale-105 ring-2 ring-brand-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                     >
                         {language === 'th' ? cat.labelTh : cat.label}
                     </button>
@@ -551,14 +551,14 @@ export const CustomerView: React.FC = () => {
             </div>
         </div>
 
-        {/* Hero Section (Banner) */}
+        {/* Hero Section (Banner) - Reduced Height for Mobile */}
         {activeCategory === 'promotion' && (
-            <div className="relative w-full h-64 md:h-96 overflow-hidden bg-gray-900">
+            <div className="relative w-full h-56 md:h-96 overflow-hidden bg-gray-900">
                 {renderHeroMedia()}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col items-center justify-end pb-8">
-                     {shopLogo && <img src={shopLogo} className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl mb-4 object-cover animate-fade-in"/>}
-                     <h2 className="text-white font-bold text-3xl md:text-5xl text-center shadow-black drop-shadow-lg">Pizza Damac</h2>
-                     <p className="text-gray-200 text-sm md:text-lg mt-2 font-medium">Authentic Italian Taste in Nonthaburi</p>
+                     {shopLogo && <img src={shopLogo} className="w-20 h-20 md:w-32 md:h-32 rounded-full border-4 border-white shadow-xl mb-3 object-cover animate-fade-in"/>}
+                     <h2 className="text-white font-bold text-2xl md:text-5xl text-center shadow-black drop-shadow-lg">Pizza Damac</h2>
+                     <p className="text-gray-200 text-sm md:text-lg mt-1 font-medium">Authentic Italian Taste</p>
                 </div>
             </div>
         )}
@@ -566,8 +566,8 @@ export const CustomerView: React.FC = () => {
         {/* Guest Banner */}
         {!customer && activeCategory === 'promotion' && !tableSession && (
             <div className="bg-brand-600 text-white py-3 text-center cursor-pointer hover:bg-brand-700 transition" onClick={() => setShowAuthModal(true)}>
-                <span className="font-bold flex items-center justify-center gap-2">
-                    <User size={18}/> Please Login or Register to start ordering and earning points!
+                <span className="font-bold flex items-center justify-center gap-2 text-sm md:text-base">
+                    <User size={18}/> Please Login or Register to order!
                 </span>
             </div>
         )}
@@ -605,22 +605,22 @@ export const CustomerView: React.FC = () => {
                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-brand-800">
                     <Star className="text-yellow-500" fill="currentColor"/> Special Offers
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
                     {menu.filter(p => p.category === 'promotion').map(item => {
                         const localized = getLocalizedItem(item);
                         return (
-                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
-                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
+                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-2 md:p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-2 md:mb-3">
                                     <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
                                     {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
                                 <div className="px-1">
-                                    <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
-                                    <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
+                                    <h3 className="font-bold text-gray-900 text-sm md:text-lg leading-tight mb-1 line-clamp-2">{localized.name}</h3>
+                                    <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
-                                        <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
+                                        <span className="text-base md:text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                        <button className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={16}/></button>
                                     </div>
                                 </div>
                             </div>
@@ -681,22 +681,22 @@ export const CustomerView: React.FC = () => {
         {/* Regular Menu Grid */}
         {activeCategory !== 'promotion' && (
             <main className="max-w-7xl mx-auto px-4 py-8">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
                     {menu.filter(p => p.category === activeCategory).map(item => {
                         const localized = getLocalizedItem(item);
                         return (
-                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
-                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-3">
+                            <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-2 md:p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-2 md:mb-3">
                                     <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
                                     {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
                                 <div className="px-1">
-                                    <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1">{localized.name}</h3>
-                                    <p className="text-gray-500 text-sm line-clamp-2 mb-3 h-10">{localized.description}</p>
+                                    <h3 className="font-bold text-gray-900 text-sm md:text-lg leading-tight mb-1 line-clamp-2">{localized.name}</h3>
+                                    <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-lg font-bold text-brand-600">฿{item.basePrice}</span>
-                                        <button className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={18}/></button>
+                                        <span className="text-base md:text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                        <button className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={16}/></button>
                                     </div>
                                 </div>
                             </div>
@@ -771,7 +771,7 @@ export const CustomerView: React.FC = () => {
 
         {/* --- LIVE ORDER TRACKER --- */}
         {activeOrder && !showTracker && !isCartOpen && (
-             <div className="fixed bottom-4 right-4 z-40 animate-bounce-short">
+             <div className={`fixed right-4 z-40 animate-bounce-short ${cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}>
                  <button onClick={() => setShowTracker(true)} className="bg-brand-600 text-white p-3 rounded-full shadow-lg border-2 border-white flex items-center gap-2">
                      <Activity className="animate-pulse"/>
                      <span className="font-bold text-sm hidden md:inline">{t('trackOrder')}</span>
@@ -813,6 +813,27 @@ export const CustomerView: React.FC = () => {
                      </a>
                  </div>
              </div>
+        )}
+
+        {/* --- FLOATING BOTTOM CART BAR (MOBILE ONLY) --- */}
+        {cart.length > 0 && !isCartOpen && (
+            <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden animate-fade-in">
+                <button 
+                    onClick={() => setIsCartOpen(true)}
+                    className="w-full bg-brand-600 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center border-2 border-white/20 backdrop-blur-md"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white text-brand-600 font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-sm">
+                            {cart.reduce((s,i)=>s+i.quantity,0)}
+                        </div>
+                        <span className="font-bold text-lg tracking-tight">{t('yourOrder')}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-bold text-xl">
+                        <span>฿{cartTotal}</span>
+                        <ChevronRight size={24} className="animate-pulse"/>
+                    </div>
+                </button>
+            </div>
         )}
 
         {/* --- CUSTOMIZATION MODAL --- */}
@@ -1356,3 +1377,4 @@ export const CustomerView: React.FC = () => {
     </div>
   );
 };
+    
