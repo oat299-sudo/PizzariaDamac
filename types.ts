@@ -6,6 +6,8 @@ export interface Topping {
   nameTh?: string; // Thai Name
   price: number;
   category?: 'sauce' | 'cheese' | 'meat' | 'vegetable' | 'seasoning' | 'other';
+  image?: string; // New: Topping Image
+  available?: boolean; // New: Stock status
 }
 
 export type ProductCategory = 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'drink' | 'promotion' | 'cake';

@@ -953,7 +953,10 @@ export const CustomerView: React.FC = () => {
                                     
                                     {/* Categorized Toppings */}
                                     {Object.entries(groupedToppings).map(([key, group]) => {
-                                        if (group.length === 0) return null;
+                                        // Only show available toppings
+                                        const availableGroup = group.filter(t => t.available !== false);
+                                        if (availableGroup.length === 0) return null;
+                                        
                                         // Only show Sauce section for Custom Pizza
                                         if (key === 'sauce' && selectedPizza.id !== 'custom_base') return null;
 
@@ -961,19 +964,28 @@ export const CustomerView: React.FC = () => {
                                             <div key={key} className="mb-6">
                                                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 ml-1">{key}</h4>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    {group.map(topping => {
+                                                    {availableGroup.map(topping => {
                                                         const isSelected = selectedToppings.some(t => t.id === topping.id);
                                                         return (
                                                             <button
                                                                 key={topping.id}
                                                                 onClick={() => toggleTopping(topping)}
-                                                                className={`p-3 rounded-xl border text-left transition relative overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                                                className={`p-2 rounded-xl border text-left transition relative flex items-center gap-3 overflow-hidden ${isSelected ? 'border-brand-500 bg-brand-50 text-brand-900' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
                                                             >
-                                                                <div className="flex justify-between items-center relative z-10">
-                                                                    <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
-                                                                    {isSelected && <CheckCircle2 size={16} className="text-brand-600"/>}
+                                                                <div className="w-10 h-10 bg-gray-100 rounded-lg shrink-0 overflow-hidden">
+                                                                    {topping.image ? (
+                                                                        <img src={topping.image} className="w-full h-full object-cover"/>
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><ChefHat size={16}/></div>
+                                                                    )}
                                                                 </div>
-                                                                <div className="text-xs opacity-70 mt-1 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
+                                                                <div>
+                                                                    <div className="flex justify-between items-center relative z-10">
+                                                                        <span className="font-bold text-sm">{language === 'th' ? topping.nameTh : topping.name}</span>
+                                                                    </div>
+                                                                    <div className="text-xs opacity-70 mt-0.5 relative z-10">{topping.price > 0 ? `+฿${topping.price}` : 'Free'}</div>
+                                                                </div>
+                                                                {isSelected && <CheckCircle2 size={18} className="absolute top-2 right-2 text-brand-600"/>}
                                                             </button>
                                                         )
                                                     })}

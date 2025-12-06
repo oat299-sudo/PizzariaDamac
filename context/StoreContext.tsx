@@ -39,6 +39,7 @@ interface StoreContextType {
 
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
+  updateTopping: (topping: Topping) => Promise<void>;
   deleteTopping: (id: string) => Promise<void>;
   
   cart: CartItem[];
@@ -307,13 +308,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
           const { data, error } = await supabase.from('toppings').select('*');
           if (!error && data) {
-              // Vital Fix: If DB lacks 'category' column, fallback to INITIAL_TOPPINGS
               const mergedToppings = data.map(d => {
                   const local = INITIAL_TOPPINGS.find(t => t.id === d.id);
                   return {
                       ...d, 
                       nameTh: d.name_th,
-                      category: d.category || local?.category || 'other'
+                      category: d.category || local?.category || 'other',
+                      image: d.image || undefined,
+                      available: d.available !== false // Default true if null/undefined
                   };
               });
               setToppings(mergedToppings);
@@ -410,6 +412,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             fetchOrders(); // Reload orders when change happens
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'toppings' }, fetchToppings) // Subscribe to toppings
         .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, fetchSettings)
         .subscribe();
         
@@ -520,33 +523,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   category: p.category, available: p.available, 
                   is_best_seller: p.isBestSeller, combo_count: p.comboCount
               });
-              if (error) {
-                  if (error.code === '42703') {
-                      alert("Database Error: Column missing. Please run the SQL script provided in the Supabase SQL Editor to update your table structure.");
-                      return;
-                  }
-                  console.error("Menu Seed Error", error);
-              }
+              if (error) console.error("Menu Seed Error", error);
           }
           // Upload Toppings
           for (const t of INITIAL_TOPPINGS) {
-              // Try catch for category column specifically (in case user schema is old)
-              try {
-                  const { error } = await supabase.from('toppings').upsert({
-                      id: t.id, name: t.name, name_th: t.nameTh, price: t.price,
-                      category: t.category 
-                  });
-                  if (error) throw error;
-              } catch (e: any) {
-                  if (e.code === '42703') {
-                      alert("Database Error: Column missing. Please run the SQL script.");
-                      return;
-                  }
-                  // Fallback: Try without category if column missing
-                   await supabase.from('toppings').upsert({
-                      id: t.id, name: t.name, name_th: t.nameTh, price: t.price
-                  });
-              }
+              const { error } = await supabase.from('toppings').upsert({
+                  id: t.id, name: t.name, name_th: t.nameTh, price: t.price,
+                  category: t.category, image: t.image, available: t.available
+              });
+              if (error) console.error("Topping Seed Error", error);
           }
           alert("Menu uploaded to database successfully! Your app is now in sync.");
           fetchMenu(); // Refresh
@@ -561,12 +546,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (isSupabaseConfigured) {
           try {
             await supabase.from('toppings').insert([{
-                id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price, category: topping.category
+                id: topping.id, name: topping.name, name_th: topping.nameTh, price: topping.price, 
+                category: topping.category, image: topping.image, available: topping.available
             }]);
           } catch(e) { console.error(e); }
       }
       setToppings(prev => [...prev, topping]);
   };
+  
+  const updateTopping = async (topping: Topping) => {
+      if (isSupabaseConfigured) {
+          try {
+            await supabase.from('toppings').update({
+                name: topping.name, name_th: topping.nameTh, price: topping.price, 
+                category: topping.category, image: topping.image, available: topping.available
+            }).eq('id', topping.id);
+          } catch(e) { console.error(e); }
+      }
+      setToppings(prev => prev.map(t => t.id === topping.id ? topping : t));
+  };
+
   const deleteTopping = async (id: string) => {
       if (isSupabaseConfigured) {
           try { await supabase.from('toppings').delete().eq('id', id); } catch(e) { console.error(e); }
@@ -1023,7 +1022,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isAdminLoggedIn, adminLogin, adminLogout,
         shopLogo, updateShopLogo,
         menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase,
-        toppings, addTopping, deleteTopping,
+        toppings, addTopping, updateTopping, deleteTopping,
         cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
         customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
         orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, fetchOrders,
