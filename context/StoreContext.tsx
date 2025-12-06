@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { 
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
@@ -594,7 +595,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const setCustomer = async (profile: CustomerProfile) => {
       setCustState(profile);
       localStorage.setItem('damac_customer', JSON.stringify(profile));
-      // Sync to DB
+      
+      // Update Offline Backup
+      const saved = localStorage.getItem('damac_mock_customers');
+      let list = saved ? JSON.parse(saved) : [];
+      list = list.filter((c: any) => c.phone !== profile.phone);
+      list.push(profile);
+      localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+
+      // Sync to DB if connected
       if (isSupabaseConfigured) {
           try {
             const payload: any = {
@@ -666,20 +675,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
 
       await setCustomer(finalProfile);
-      
-      // Save to mock DB if offline
-      if (!isSupabaseConfigured) {
-          const saved = localStorage.getItem('damac_mock_customers');
-          let list = saved ? JSON.parse(saved) : [];
-          list = list.filter((c: any) => c.phone !== finalProfile.phone);
-          list.push(finalProfile);
-          localStorage.setItem('damac_mock_customers', JSON.stringify(list));
-      }
-      
       return action;
   };
 
   const customerLogin = async (phone: string, pass: string): Promise<boolean> => {
+      // First try DB if connected
       if (isSupabaseConfigured) {
           const { data } = await supabase.from('customers').select('*').eq('phone', phone).single();
           if (data && data.password === pass) {
@@ -700,28 +700,46 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               localStorage.setItem('damac_customer', JSON.stringify(profile));
               return true;
           }
-      } else {
-          // Mock login
-          const saved = localStorage.getItem('damac_mock_customers');
-          if (saved) {
-               const list = JSON.parse(saved);
-               const found = list.find((c: any) => c.phone === phone && c.password === pass);
-               if (found) {
-                   setCustState(found);
-                   localStorage.setItem('damac_customer', JSON.stringify(found));
-                   return true;
-               }
-          }
+      } 
+      
+      // Fallback to local mock data (for testing or offline)
+      const saved = localStorage.getItem('damac_mock_customers');
+      if (saved) {
+           const list = JSON.parse(saved);
+           const found = list.find((c: any) => c.phone === phone && c.password === pass);
+           if (found) {
+               setCustState(found);
+               localStorage.setItem('damac_customer', JSON.stringify(found));
+               return true;
+           }
       }
       return false;
   };
 
   const getAllCustomers = async () => {
+      let dbCustomers = [];
+      let localCustomers = [];
+
       if (isSupabaseConfigured) {
           const { data } = await supabase.from('customers').select('*');
-          return data || [];
+          if (data) dbCustomers = data;
       }
-      return [];
+      
+      // Merge with offline data
+      const saved = localStorage.getItem('damac_mock_customers');
+      if (saved) {
+          localCustomers = JSON.parse(saved);
+      }
+
+      // Combine arrays, removing duplicates based on phone
+      const combined = [...dbCustomers];
+      for (const local of localCustomers) {
+          if (!combined.find(c => c.phone === local.phone)) {
+              combined.push(local);
+          }
+      }
+      
+      return combined;
   }
 
   const addToFavorites = async (name: string, pizzaId: string, toppings: Topping[]) => {

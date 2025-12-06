@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus } from '../types';
+import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
 import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp } from 'lucide-react';
 
@@ -344,6 +344,36 @@ export const CustomerView: React.FC = () => {
           selectedToppings
       );
       alert(t('saveFavorite') + " Success!");
+  };
+  
+  // NEW: Handle adding a saved favorite to cart
+  const handleOrderFavorite = (fav: SavedFavorite) => {
+      const basePizza = menu.find(p => p.id === fav.pizzaId);
+      if (!basePizza) {
+          alert("This item is no longer available.");
+          return;
+      }
+      
+      // Calculate price based on current menu price + toppings
+      const toppingsPrice = fav.toppings.reduce((sum, t) => sum + t.price, 0);
+      const totalPrice = basePizza.basePrice + toppingsPrice;
+
+      const item: CartItem = {
+          id: Date.now().toString() + Math.random().toString(),
+          pizzaId: basePizza.id,
+          name: fav.name,
+          // If name in favorite is already custom, keep it. 
+          // Note: localization for custom names is tricky, we use the saved string.
+          basePrice: basePizza.basePrice,
+          selectedToppings: fav.toppings,
+          quantity: 1,
+          totalPrice: totalPrice,
+          specialInstructions: ''
+      };
+      
+      addToCart(item);
+      setShowProfile(false);
+      setIsCartOpen(true);
   };
 
   const handlePlaceOrderClick = async () => {
@@ -1333,7 +1363,13 @@ export const CustomerView: React.FC = () => {
                                                  <div className="font-bold text-sm">{fav.name}</div>
                                                  <div className="text-xs text-gray-500 line-clamp-1">{fav.toppings.map(t => t.name).join(', ')}</div>
                                              </div>
-                                             <button className="bg-brand-100 text-brand-600 p-2 rounded-full hover:bg-brand-200"><Plus size={16}/></button>
+                                             <button 
+                                                onClick={() => handleOrderFavorite(fav)}
+                                                className="bg-brand-100 text-brand-600 p-2 rounded-full hover:bg-brand-200"
+                                                title="Add to Cart"
+                                             >
+                                                <Plus size={16}/>
+                                             </button>
                                          </div>
                                      ))
                                  ) : <p className="text-xs text-gray-400 text-center py-4 bg-white rounded-xl border border-dashed">No favorites yet</p>}
@@ -1377,4 +1413,3 @@ export const CustomerView: React.FC = () => {
     </div>
   );
 };
-    
