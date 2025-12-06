@@ -140,8 +140,42 @@ export const POSView: React.FC = () => {
         }
     }, [storeSettings]);
 
+    // --- HELPER: IMAGE COMPRESSION ---
+    // Prevents app crash by resizing large images before saving to state/localStorage
+    const compressImage = (file: File, maxWidth: number = 800): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Resize logic
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    
+                    // Compress to JPEG at 0.7 quality
+                    // This typically reduces a 5MB png to ~100kb jpeg
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.onerror = (error) => reject(error);
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
     // Active Tables Logic - Show active or unpaid orders
-    // Includes ALL non-completed/cancelled orders to ensure Online/Pickup orders are visible.
     const activeTables = orders.filter(o => 
         o.status !== 'completed' && 
         o.status !== 'cancelled'
@@ -388,9 +422,18 @@ export const POSView: React.FC = () => {
             setShowItemModal(false);
         }
     };
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    
+    // UPDATED: Compress Image Handlers
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => setItemForm({ ...itemForm, image: reader.result as string }); reader.readAsDataURL(file); }
+        if (file) { 
+            try {
+                const compressed = await compressImage(file, 800); // 800px max width for menu
+                setItemForm({ ...itemForm, image: compressed }); 
+            } catch (error) {
+                alert("Failed to process image. Try a smaller file.");
+            }
+        }
     };
     
     // Topping Handlers
@@ -416,22 +459,48 @@ export const POSView: React.FC = () => {
             setShowToppingsModal(false);
         }
     };
-    const handleToppingImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleToppingImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => setToppingForm({ ...toppingForm, image: reader.result as string }); reader.readAsDataURL(file); }
+        if (file) { 
+            try {
+                const compressed = await compressImage(file, 400); // 400px max width for toppings
+                setToppingForm({ ...toppingForm, image: compressed }); 
+            } catch(e) {
+                alert("Image error");
+            }
+        }
     };
 
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => updateShopLogo(reader.result as string); reader.readAsDataURL(file); }
+        if (file) { 
+            try {
+                const compressed = await compressImage(file, 200); // 200px max width for logo
+                updateShopLogo(compressed);
+            } catch(e) { alert("Logo upload failed"); }
+        }
     };
-    const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    
+    const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => { setMediaForm(p => ({ ...p, promoBannerUrl: reader.result as string })); updateStoreSettings({ promoBannerUrl: reader.result as string, promoContentType: 'image' }); }; reader.readAsDataURL(file); }
+        if (file) { 
+            try {
+                const compressed = await compressImage(file, 1200); // 1200px max width for banner
+                setMediaForm(p => ({ ...p, promoBannerUrl: compressed })); 
+                updateStoreSettings({ promoBannerUrl: compressed, promoContentType: 'image' });
+            } catch(e) { alert("Banner upload failed. Try a smaller image."); }
+        }
     };
-    const handleEventImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    
+    const handleEventImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) { const reader = new FileReader(); reader.onloadend = () => { const res = reader.result as string; const newGallery = [...(mediaForm.eventGalleryUrls || []), res]; setMediaForm(p => ({ ...p, eventGalleryUrls: newGallery })); }; reader.readAsDataURL(file); }
+        if (file) { 
+            try {
+                const compressed = await compressImage(file, 800); // 800px max width for gallery
+                const newGallery = [...(mediaForm.eventGalleryUrls || []), compressed]; 
+                setMediaForm(p => ({ ...p, eventGalleryUrls: newGallery })); 
+            } catch(e) { alert("Gallery upload failed"); }
+        }
     };
 
     // Expenses & News

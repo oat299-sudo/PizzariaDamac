@@ -106,7 +106,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const toggleLanguage = () => {
       setLanguage(prev => {
           const newLang = prev === 'en' ? 'th' : 'en';
-          localStorage.setItem('damac_lang', newLang);
+          try {
+            localStorage.setItem('damac_lang', newLang);
+          } catch(e) { console.error("Storage Error", e); }
           return newLang;
       });
   };
@@ -197,7 +199,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [shopLogo, setShopLogo] = useState(() => localStorage.getItem('damac_logo') || '');
   const updateShopLogo = (base64: string) => {
     setShopLogo(base64);
-    localStorage.setItem('damac_logo', base64);
+    try {
+        localStorage.setItem('damac_logo', base64);
+    } catch(e) {
+        alert("Storage Full: Logo could not be saved locally. It may disappear on refresh.");
+        console.error("LocalStorage Quota Exceeded", e);
+    }
   };
 
   // --- Data States (From DB + Local Storage Backup) ---
@@ -213,7 +220,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   
   // Persist Menu to LocalStorage
   useEffect(() => {
-      localStorage.setItem('damac_menu', JSON.stringify(menu));
+      try {
+        localStorage.setItem('damac_menu', JSON.stringify(menu));
+      } catch(e) { console.error("Menu Storage Full", e); }
   }, [menu]);
 
   const [toppings, setToppings] = useState<Topping[]>(INITIAL_TOPPINGS);
@@ -239,7 +248,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Persist Settings to LocalStorage
   useEffect(() => {
-      localStorage.setItem('damac_store_settings', JSON.stringify(storeSettings));
+      try {
+        localStorage.setItem('damac_store_settings', JSON.stringify(storeSettings));
+      } catch(e) { console.error("Settings Storage Full", e); }
   }, [storeSettings]);
 
   const [isHoliday, setIsHoliday] = useState(false);
@@ -396,7 +407,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   savedAddresses: data.saved_addresses || []
               };
               setCustState(updatedProfile);
-              localStorage.setItem('damac_customer', JSON.stringify(updatedProfile));
+              try {
+                localStorage.setItem('damac_customer', JSON.stringify(updatedProfile));
+              } catch(e) { console.error("Customer Storage Full", e); }
           }
       } catch (err) { console.error("Profile fetch failed", err); }
   }
@@ -595,14 +608,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Customer
   const setCustomer = async (profile: CustomerProfile) => {
       setCustState(profile);
-      localStorage.setItem('damac_customer', JSON.stringify(profile));
+      try {
+        localStorage.setItem('damac_customer', JSON.stringify(profile));
+      } catch(e) { console.error("Customer Storage Full", e); }
       
       // Update Offline Backup
-      const saved = localStorage.getItem('damac_mock_customers');
-      let list = saved ? JSON.parse(saved) : [];
-      list = list.filter((c: any) => c.phone !== profile.phone);
-      list.push(profile);
-      localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+      try {
+        const saved = localStorage.getItem('damac_mock_customers');
+        let list = saved ? JSON.parse(saved) : [];
+        list = list.filter((c: any) => c.phone !== profile.phone);
+        list.push(profile);
+        localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+      } catch(e) { console.error("Mock Customer Storage Full", e); }
 
       // Sync to DB if connected
       if (isSupabaseConfigured) {
@@ -698,7 +715,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   savedAddresses: data.saved_addresses || []
               };
               setCustState(profile);
-              localStorage.setItem('damac_customer', JSON.stringify(profile));
+              try {
+                localStorage.setItem('damac_customer', JSON.stringify(profile));
+              } catch(e) { console.error("Login Storage Error", e); }
               return true;
           }
       } 
@@ -710,7 +729,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
            const found = list.find((c: any) => c.phone === phone && c.password === pass);
            if (found) {
                setCustState(found);
-               localStorage.setItem('damac_customer', JSON.stringify(found));
+               try {
+                localStorage.setItem('damac_customer', JSON.stringify(found));
+               } catch(e) { console.error("Login Storage Error", e); }
                return true;
            }
       }
@@ -829,7 +850,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setOrders(prev => [newOrder, ...prev]);
       
       // Save ID for Guest Tracking
-      localStorage.setItem('damac_last_order', newOrder.id);
+      try {
+        localStorage.setItem('damac_last_order', newOrder.id);
+      } catch(e) {}
       
       // Update Customer (Loyalty + History + Saved Address)
       if (customer) {
