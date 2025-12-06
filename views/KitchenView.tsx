@@ -163,9 +163,9 @@ export const KitchenView: React.FC = () => {
                     </button>
                 )}
                 {order.status === 'ready' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'completed')} className="flex-1 bg-gray-800 text-white px-4 py-3 rounded-lg shadow hover:bg-gray-900 font-bold text-lg">
-                        {t('completeOrder')}
-                    </button>
+                    <div className="flex-1 bg-green-100 text-green-800 px-4 py-3 rounded-lg font-bold text-center border border-green-200">
+                        {t('ready')} - Waiting for Server
+                    </div>
                 )}
                  {order.status === 'completed' && (
                     <span className="text-gray-400 text-sm font-medium w-full text-center py-2">{t('completed')}</span>

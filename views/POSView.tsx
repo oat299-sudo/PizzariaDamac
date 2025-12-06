@@ -123,12 +123,11 @@ export const POSView: React.FC = () => {
     }, [storeSettings]);
 
     // Active Tables Logic - Show active or unpaid orders
-    // UPDATE: Now includes orders without table numbers (Online/Pickup) so POS can process them
+    // UPDATE: Now includes ALL non-completed/cancelled orders. 
+    // This ensures Online Pickup orders (which have no table number) are visible here for payment.
     const activeTables = orders.filter(o => 
         o.status !== 'completed' && 
-        o.status !== 'cancelled' &&
-        // Include if it has a table number OR if it's an active online/delivery/pickup order
-        (o.tableNumber || o.type === 'online' || o.type === 'delivery')
+        o.status !== 'cancelled'
     );
 
     // Calculate Change
