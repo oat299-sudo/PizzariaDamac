@@ -313,42 +313,63 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       try {
         const { data, error } = await supabase.from('menu_items').select('*');
         if (!error && data) {
-           // Merge with local to ensure category/combo logic exists even if DB column missing
+           // PRESERVE LOCAL IMAGES: If DB image is missing but we have it locally, keep local.
+           let localMenu: Pizza[] = [];
+           try {
+               const saved = localStorage.getItem('damac_menu');
+               if (saved) localMenu = JSON.parse(saved);
+           } catch(e) {}
+
            const mergedMenu = data.map(d => {
                const local = INITIAL_MENU.find(m => m.id === d.id);
+               const savedLocal = localMenu.find(m => m.id === d.id);
                return {
                    ...d, 
                    basePrice: d.base_price, 
                    nameTh: d.name_th, 
                    descriptionTh: d.description_th, 
+                   // Prioritize DB image, fall back to Local saved image, then Default
+                   image: d.image || savedLocal?.image || local?.image || 'https://via.placeholder.com/150',
                    isBestSeller: d.is_best_seller,
                    comboCount: d.combo_count !== undefined ? d.combo_count : (local?.comboCount || 0),
-                   category: d.category || local?.category || 'pizza'
+                   category: d.category || local?.category || 'pizza',
+                   available: d.available
                };
            });
            setMenu(mergedMenu);
         }
       } catch (err) { console.error("Menu fetch failed", err); }
   };
+
   const fetchToppings = async () => {
       if (!isSupabaseConfigured) return;
       try {
           const { data, error } = await supabase.from('toppings').select('*');
           if (!error && data) {
+              // PRESERVE LOCAL IMAGES for Toppings
+              let localToppings: Topping[] = [];
+              try {
+                  const saved = localStorage.getItem('damac_toppings');
+                  if (saved) localToppings = JSON.parse(saved);
+              } catch(e) {}
+
               const mergedToppings = data.map(d => {
                   const local = INITIAL_TOPPINGS.find(t => t.id === d.id);
+                  const savedLocal = localToppings.find(t => t.id === d.id);
                   return {
                       ...d, 
                       nameTh: d.name_th,
                       category: d.category || local?.category || 'other',
-                      image: d.image || undefined,
-                      available: d.available !== false // Default true if null/undefined
+                      // Prioritize DB image, fall back to Local saved image
+                      image: d.image || savedLocal?.image || undefined,
+                      available: d.available !== false 
                   };
               });
               setToppings(mergedToppings);
           }
       } catch (err) { console.error("Toppings fetch failed", err); }
   };
+
   const fetchOrders = async () => {
       if (!isSupabaseConfigured) return;
       try {
@@ -375,15 +396,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           })));
       } catch (err) { console.error("Orders fetch failed", err); }
   };
+
   const fetchSettings = async () => {
       if (!isSupabaseConfigured) return;
       try {
           const { data } = await supabase.from('store_settings').select('*').single();
           if (data) {
+              // Preserve Local Banner if DB is empty/null
+              let localSettings: Partial<StoreSettings> = {};
+              try {
+                  const saved = localStorage.getItem('damac_store_settings');
+                  if (saved) localSettings = JSON.parse(saved);
+              } catch(e) {}
+
               setStoreSettings({
                   isOpen: data.is_open,
                   closedMessage: data.closed_message,
-                  promoBannerUrl: data.promo_banner_url,
+                  promoBannerUrl: data.promo_banner_url || localSettings.promoBannerUrl, // Preserve local banner
                   promoContentType: data.promo_content_type,
                   holidayStart: data.holiday_start,
                   holidayEnd: data.holiday_end,
