@@ -224,7 +224,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) { console.warn("Menu Storage Full", e); }
   }, [menu]);
 
-  const [toppings, setToppings] = useState<Topping[]>(INITIAL_TOPPINGS);
+  // Initialized Toppings from LocalStorage
+  const [toppings, setToppings] = useState<Topping[]>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_toppings');
+          if (saved) {
+              try { return JSON.parse(saved); } catch(e) {}
+          }
+      }
+      return INITIAL_TOPPINGS;
+  });
+
+  // Persist Toppings to LocalStorage
+  useEffect(() => {
+      try {
+        localStorage.setItem('damac_toppings', JSON.stringify(toppings));
+      } catch(e) { console.warn("Toppings Storage Full", e); }
+  }, [toppings]);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
