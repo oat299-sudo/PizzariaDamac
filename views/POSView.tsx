@@ -418,6 +418,46 @@ export const POSView: React.FC = () => {
         setTimeout(() => { window.print(); }, 200);
     };
 
+    // --- REPRINT FOR LOG BOOK ---
+    const handleReprintOrder = (order: Order) => {
+        // Calculate VAT (7% included)
+        const vatAmount = (order.totalAmount * 7) / 107;
+        const subtotal = order.totalAmount - vatAmount;
+
+        // Queue/Table Logic
+        let queueNo = '';
+        if (order.tableNumber) {
+            queueNo = `Table ${order.tableNumber}`;
+        } else {
+            queueNo = `Q-${order.id.slice(-3)}`;
+        }
+
+        setReceiptData({
+            storeName: "Pizza Damac Nonthaburi",
+            address: "Nonthaburi, Thailand",
+            taxId: storeSettings.promptPayNumber || "0-9949-7919-9",
+            phone: storeSettings.contactPhone || "099-497-9199",
+            orderId: order.id.slice(-4),
+            date: new Date(order.createdAt).toLocaleString('th-TH'),
+            tableOrType: order.tableNumber ? `Table ${order.tableNumber}` : order.type.toUpperCase(),
+            source: order.source.toUpperCase(),
+            customerName: order.customerName,
+            customerPhone: order.customerPhone,
+            deliveryAddress: order.deliveryAddress,
+            note: order.note,
+            queueNo: queueNo,
+            items: order.items,
+            subtotal: subtotal,
+            vat: vatAmount,
+            total: order.totalAmount,
+            paymentMethod: order.paymentMethod === 'cash' ? 'CASH' : 'QR / TRANSFER',
+            received: order.totalAmount, // Assumed exact for history
+            change: 0,
+        });
+
+        setTimeout(() => { window.print(); }, 200);
+    };
+
     const handleDeleteOrder = async (orderId: string) => {
         if (window.confirm("Delete record?")) await deleteOrder(orderId);
     };
@@ -880,7 +920,7 @@ export const POSView: React.FC = () => {
                              </div>
                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                  <div className="p-4 border-b flex justify-between items-center bg-gray-50"><h3 className="font-bold flex items-center gap-2"><List size={18}/> Transaction History</h3><div className="flex gap-2"><div className="flex bg-white rounded-lg border p-1">{['day','month','year','all'].map(f => (<button key={f} onClick={() => setSalesFilter(f as any)} className={`px-3 py-1 rounded text-xs font-bold capitalize ${salesFilter === f ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>{f}</button>))}</div><button onClick={handleExportSales} className="p-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 border border-green-200"><FileSpreadsheet size={18}/></button></div></div>
-                                 <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs"><tr><th className="p-3">Time</th><th className="p-3">Source</th><th className="p-3">Items</th><th className="p-3">Total</th><th className="p-3">Pay</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y">{filteredOrders.map(order => (<tr key={order.id} className="hover:bg-gray-50"><td className="p-3 whitespace-nowrap"><div className="font-bold">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div><div className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</div></td><td className="p-3"><span className="uppercase text-xs font-bold bg-gray-100 px-2 py-1 rounded">{order.source}</span>{order.tableNumber && <div className="text-xs mt-1 text-gray-500">T-{order.tableNumber}</div>}</td><td className="p-3 max-w-xs truncate text-gray-600">{order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</td><td className="p-3 font-bold text-gray-900">฿{order.totalAmount}</td><td className="p-3"><span className={`text-xs font-bold px-2 py-1 rounded uppercase ${order.paymentMethod === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{order.paymentMethod || '-'}</span></td><td className="p-3 text-center"><button onClick={() => handleDeleteOrder(order.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button></td></tr>))}</tbody></table></div>
+                                 <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs"><tr><th className="p-3">Time</th><th className="p-3">Source</th><th className="p-3">Items</th><th className="p-3">Total</th><th className="p-3">Pay</th><th className="p-3 text-center">Action</th></tr></thead><tbody className="divide-y">{filteredOrders.map(order => (<tr key={order.id} className="hover:bg-gray-50"><td className="p-3 whitespace-nowrap"><div className="font-bold">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div><div className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</div></td><td className="p-3"><span className="uppercase text-xs font-bold bg-gray-100 px-2 py-1 rounded">{order.source}</span>{order.tableNumber && <div className="text-xs mt-1 text-gray-500">T-{order.tableNumber}</div>}</td><td className="p-3 max-w-xs truncate text-gray-600">{order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</td><td className="p-3 font-bold text-gray-900">฿{order.totalAmount}</td><td className="p-3"><span className={`text-xs font-bold px-2 py-1 rounded uppercase ${order.paymentMethod === 'cash' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{order.paymentMethod || '-'}</span></td><td className="p-3 text-center"><button onClick={() => handleReprintOrder(order)} className="text-gray-400 hover:text-blue-500 mr-2" title="Reprint Receipt"><Printer size={16}/></button><button onClick={() => handleDeleteOrder(order.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button></td></tr>))}</tbody></table></div>
                              </div>
                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 h-full"><h3 className="font-bold mb-4 flex items-center gap-2"><Calculator size={18}/> Record Expense</h3><div className="mb-4 flex flex-wrap gap-2">{PRESET_EXPENSES.map((preset, idx) => (<button key={idx} onClick={() => setExpenseForm({...expenseForm, description: preset.label, category: preset.category as ExpenseCategory})} className="text-xs border border-gray-200 bg-gray-50 px-2 py-1 rounded hover:bg-gray-100 transition">{preset.label}</button>))}</div><form onSubmit={handleAddExpense} className="space-y-3"><input type="text" placeholder="Description (e.g. Ice)" className="w-full border rounded-lg p-2 text-sm" value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} required/><div className="flex gap-2"><input type="number" placeholder="Amount" className="w-1/2 border rounded-lg p-2 text-sm" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} required/><select className="w-1/2 border rounded-lg p-2 text-sm bg-white" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value as ExpenseCategory})}>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div><input type="text" placeholder="Note (Optional)" className="w-full border rounded-lg p-2 text-sm" value={expenseForm.note} onChange={e => setExpenseForm({...expenseForm, note: e.target.value})}/><button type="submit" className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-lg transition">Add Expense</button></form></div>
