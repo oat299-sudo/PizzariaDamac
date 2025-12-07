@@ -109,6 +109,8 @@ export const POSView: React.FC = () => {
         tableOrType: string;
         source: string;
         customerName: string;
+        customerPhone?: string;
+        deliveryAddress?: string;
         items: CartItem[];
         subtotal: number;
         vat: number; // 7%
@@ -116,6 +118,8 @@ export const POSView: React.FC = () => {
         paymentMethod: string;
         received: number;
         change: number;
+        note?: string;
+        queueNo?: string;
     }
     const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
@@ -379,6 +383,15 @@ export const POSView: React.FC = () => {
         const received = parseFloat(cashReceived) || currentTotal; // Default to exact if not specified
         const changeAmt = change || 0;
 
+        // Queue/Table Logic for Header
+        let queueNo = '';
+        if (selectedOrder?.tableNumber || tableNumber) {
+            queueNo = `Table ${selectedOrder?.tableNumber || tableNumber}`;
+        } else {
+            const id = selectedOrder ? selectedOrder.id : Date.now().toString();
+            queueNo = `Q-${id.slice(-3)}`;
+        }
+
         setReceiptData({
             storeName: "Pizza Damac Nonthaburi",
             address: "Nonthaburi, Thailand",
@@ -389,6 +402,10 @@ export const POSView: React.FC = () => {
             tableOrType: tableOrType,
             source: selectedOrder ? selectedOrder.source.toUpperCase() : orderSource.toUpperCase(),
             customerName: selectedOrder?.customerName || 'Guest',
+            customerPhone: selectedOrder?.customerPhone || '',
+            deliveryAddress: selectedOrder?.deliveryAddress || '',
+            note: selectedOrder?.note || '',
+            queueNo: queueNo,
             items: currentItems,
             subtotal: subtotal,
             vat: vatAmount,
@@ -589,64 +606,72 @@ export const POSView: React.FC = () => {
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
             {/* --- ROBUST THAI RECEIPT PRINTER (Hidden) --- */}
-            <div className="hidden print:block print:w-[80mm] print:font-mono p-0 m-0 bg-white text-black">
+            <div className="hidden print:block print:w-[80mm] print:font-mono p-0 m-0 bg-white text-black leading-tight">
                 {receiptData && (
-                    <div className="text-center" style={{ width: '80mm', fontSize: '12px', lineHeight: '1.2' }}>
-                        <div className="font-bold text-lg mb-1">{receiptData.storeName}</div>
-                        <div className="text-xs mb-1">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</div>
-                        <div className="text-xs mb-1">(TAX INVOICE (ABB) / RECEIPT)</div>
-                        <div className="text-xs mb-1">{receiptData.address}</div>
-                        <div className="text-xs mb-1">TAX ID: {receiptData.taxId}</div>
-                        <div className="text-xs mb-2">Tel: {receiptData.phone}</div>
-                        
-                        <div className="border-b border-black border-dashed mb-2"></div>
-                        
-                        <div className="flex justify-between text-xs px-1">
-                            <span className="text-left">Date: {receiptData.date}</span>
+                    <div className="text-center" style={{ width: '80mm', fontSize: '12px' }}>
+                        {/* Header: Delivery Source / Table / Queue Highlighting */}
+                        <div className="border-b-2 border-black pb-2 mb-2">
+                            <div className="text-3xl font-extrabold uppercase">{receiptData.source !== 'store' ? receiptData.source : receiptData.queueNo}</div>
+                            {receiptData.source !== 'store' && <div className="text-xl font-bold mt-1">{receiptData.queueNo}</div>}
                         </div>
-                        <div className="flex justify-between text-xs px-1 mb-1">
+
+                        {/* Store Info */}
+                        <div className="font-bold text-lg">{receiptData.storeName}</div>
+                        <div className="text-[10px] mb-1">{receiptData.address}</div>
+                        <div className="text-[10px] mb-1">TAX ID: {receiptData.taxId} | Tel: {receiptData.phone}</div>
+                        <div className="text-[10px] font-bold">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ (ABB)</div>
+
+                        <div className="border-b border-black border-dashed my-1"></div>
+
+                        {/* Meta Data */}
+                        <div className="flex justify-between text-[10px]">
                             <span>Bill #: {receiptData.orderId}</span>
-                            <span>Cashier: Admin</span>
-                        </div>
-                        <div className="flex justify-between text-xs px-1 font-bold">
-                            <span>Source: {receiptData.source}</span>
-                            <span>{receiptData.tableOrType}</span>
+                            <span>{receiptData.date}</span>
                         </div>
                         {receiptData.customerName && receiptData.customerName !== 'Guest' && (
-                            <div className="text-left text-xs px-1 font-bold mt-1">Cust: {receiptData.customerName}</div>
+                            <div className="text-left text-[10px] font-bold mt-1">Cust: {receiptData.customerName} {receiptData.customerPhone ? `(${receiptData.customerPhone})` : ''}</div>
+                        )}
+                        {receiptData.deliveryAddress && (
+                            <div className="text-left text-[10px] mt-1 border border-black p-1 rounded">
+                                <span className="font-bold">Deliver To:</span> {receiptData.deliveryAddress}
+                            </div>
                         )}
 
-                        <div className="border-b border-black border-dashed my-2"></div>
-                        
-                        <table className="w-full text-left text-xs mb-2">
+                        <div className="border-b border-black border-dashed my-1"></div>
+
+                        {/* Items */}
+                        <table className="w-full text-left text-[11px] mb-1">
                             <thead>
-                                <tr>
-                                    <th className="w-8">Qty</th>
-                                    <th>Item</th>
-                                    <th className="text-right">Amt</th>
+                                <tr className="border-b border-black border-dashed">
+                                    <th className="w-6 py-1">Qty</th>
+                                    <th className="py-1">Item</th>
+                                    <th className="text-right py-1">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {receiptData.items.map((item, i) => (
                                     <React.Fragment key={i}>
-                                        <tr className="align-top">
-                                            <td className="align-top pt-1">{item.quantity}</td>
-                                            <td className="align-top pt-1 pr-1">{item.name}</td>
-                                            <td className="text-right align-top pt-1">{item.totalPrice.toFixed(2)}</td>
+                                        <tr className="align-top font-bold">
+                                            <td className="pt-1">{item.quantity}</td>
+                                            <td className="pt-1 pr-1">{item.name}</td>
+                                            <td className="text-right pt-1">{item.totalPrice.toFixed(2)}</td>
                                         </tr>
-                                        {item.selectedToppings.length > 0 && (
+                                        {/* Toppings & Details */}
+                                        {(item.selectedToppings.length > 0 || item.specialInstructions || item.subItems) && (
                                             <tr>
                                                 <td></td>
-                                                <td colSpan={2} className="text-[10px] text-gray-600">
-                                                    + {item.selectedToppings.map(t => t.name).join(', ')}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {item.subItems && item.subItems.length > 0 && (
-                                            <tr>
-                                                <td></td>
-                                                <td colSpan={2} className="text-[10px] text-gray-600">
-                                                    (Combo: {item.subItems.map(s => s.name).join(', ')})
+                                                <td colSpan={2} className="text-[10px] pb-1">
+                                                    {item.subItems && item.subItems.length > 0 && (
+                                                        <div className="text-gray-700">- Combo: {item.subItems.map(s => s.name).join(', ')}</div>
+                                                    )}
+                                                    {item.selectedToppings.length > 0 && (
+                                                        <div className="text-gray-600">- {item.selectedToppings.map(t => t.name).join(', ')}</div>
+                                                    )}
+                                                    {item.specialInstructions && (
+                                                        <div className="font-bold text-black border border-black inline-block px-1 mt-0.5">
+                                                            ** {item.specialInstructions} **
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         )}
@@ -655,40 +680,49 @@ export const POSView: React.FC = () => {
                             </tbody>
                         </table>
 
-                        <div className="border-b border-black border-dashed my-2"></div>
+                        <div className="border-b border-black border-dashed my-1"></div>
 
-                        <div className="flex justify-between text-xs px-1 mb-1">
-                            <span>Total Items:</span>
-                            <span>{receiptData.items.reduce((s,i) => s + i.quantity, 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs px-1 mb-1">
-                            <span>Subtotal (ก่อน VAT):</span>
+                        {/* Summary */}
+                        <div className="flex justify-between text-[10px]">
+                            <span>Subtotal (ก่อน VAT)</span>
                             <span>{receiptData.subtotal.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-xs px-1 mb-1">
-                            <span>VAT 7% (Included):</span>
+                        <div className="flex justify-between text-[10px]">
+                            <span>VAT 7%</span>
                             <span>{receiptData.vat.toFixed(2)}</span>
                         </div>
                         
-                        <div className="flex justify-between font-bold text-xl px-1 mt-2 mb-1">
+                        <div className="flex justify-between font-bold text-xl mt-1">
                             <span>TOTAL</span>
                             <span>{receiptData.total.toFixed(2)}</span>
                         </div>
 
-                        <div className="border-b border-black border-dashed my-2"></div>
+                        <div className="border-b border-black border-dashed my-1"></div>
 
-                        <div className="flex justify-between text-xs px-1 mb-1">
-                            <span>Pay By ({receiptData.paymentMethod}):</span>
+                        {/* Payment */}
+                        <div className="flex justify-between text-[11px] font-bold">
+                            <span>{receiptData.paymentMethod.toUpperCase()}</span>
                             <span>{receiptData.received.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-xs px-1 font-bold">
-                            <span>Change:</span>
+                        <div className="flex justify-between text-[11px]">
+                            <span>Change</span>
                             <span>{receiptData.change.toFixed(2)}</span>
                         </div>
 
-                        <div className="border-b border-black border-dashed my-2"></div>
-                        <div className="text-center text-xs font-bold">Thank you / ขอบคุณครับ</div>
-                        <div className="text-center text-[10px] mt-1">Power by Pizza Damac System</div>
+                        {/* Order Note */}
+                        {receiptData.note && (
+                            <div className="mt-2 border-2 border-black p-1 text-left">
+                                <div className="text-[10px] font-bold uppercase">Note:</div>
+                                <div className="text-[12px] font-bold">{receiptData.note}</div>
+                            </div>
+                        )}
+
+                        <div className="mt-4 text-center text-[10px] font-bold">
+                            *** Thank You / ขอบคุณครับ ***
+                        </div>
+                        <div className="text-[9px] mt-1 text-gray-500">
+                            Powered by Pizza Damac System
+                        </div>
                     </div>
                 )}
             </div>
