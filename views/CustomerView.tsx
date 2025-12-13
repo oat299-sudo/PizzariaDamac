@@ -3,9 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw } from 'lucide-react';
 
-// --- EMBED HELPER ---
+// ... (VideoCard Component remains unchanged) ...
 const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
     if (!url) return null;
     
@@ -99,6 +99,8 @@ export const CustomerView: React.FC = () => {
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
     toppings, fetchOrders, tableSession
   } = useStore();
+  
+  // ... (State declarations remain same) ...
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -108,53 +110,34 @@ export const CustomerView: React.FC = () => {
   const [showTracker, setShowTracker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
-  
-  // Category State
   const [activeCategory, setActiveCategory] = useState<ProductCategory>('promotion');
-  
-  // Registration State
   const [regName, setRegName] = useState(customer?.name || '');
   const [regPhone, setRegPhone] = useState(customer?.phone || '');
   const [regPassword, setRegPassword] = useState('');
   const [regAddress, setRegAddress] = useState(customer?.address || '');
   const [regBirthday, setRegBirthday] = useState(customer?.birthday || '');
   const [regPdpa, setRegPdpa] = useState(customer?.pdpaAccepted || false);
-
-  // Login State
   const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-
-  // Delivery / Checkout State
   const [orderType, setOrderType] = useState<'online' | 'delivery' | 'dine-in'>('online');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
-  
-  // Logic: Initialize order date based on store status and time
   const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(() => {
-      // If store is open OR if it's closed but morning (can order for lunch)
       if (isStoreOpen || canOrderForToday()) return 'today';
       return 'tomorrow';
   });
-
-  // Location / Distance
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Custom Pizza Name State
   const [customName, setCustomName] = useState('');
-  
-  // Combo Builder State
   const [isComboBuilderOpen, setIsComboBuilderOpen] = useState(false);
   const [comboSelections, setComboSelections] = useState<SubItem[]>([]);
-  const [currentComboSlot, setCurrentComboSlot] = useState<number | null>(null); // Which slot are we filling?
-
-  const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
-
-  // Active Order Tracking (Enhanced for Guests using Local Storage ID)
+  const [currentComboSlot, setCurrentComboSlot] = useState<number | null>(null);
   const [localOrderId, setLocalOrderId] = useState(() => {
       if (typeof window !== 'undefined') return localStorage.getItem('damac_last_order');
       return null;
   });
+
+  const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
   const activeOrder = useMemo(() => {
     return orders.find(o => 
@@ -169,14 +152,11 @@ export const CustomerView: React.FC = () => {
     const myOrders = orders.filter(o => o.customerPhone === customer.phone);
     const uniqueItems = new Map<string, Pizza>();
     
-    // Sort orders descending
     myOrders.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     for (const order of myOrders) {
         for (const item of order.items) {
-            // Use pizzaId as key to avoid duplicates of same item
             if (!uniqueItems.has(item.pizzaId)) {
-                // Find original menu item to ensure we have current price/image
                 const original = menu.find(m => m.id === item.pizzaId);
                 if (original) {
                    uniqueItems.set(item.pizzaId, original);
@@ -189,25 +169,19 @@ export const CustomerView: React.FC = () => {
     return Array.from(uniqueItems.values());
   }, [orders, customer, menu]);
 
+  // ... (Effects and Handlers remain same until render) ...
   useEffect(() => {
-    if (customer?.address) {
-      setDeliveryAddress(customer.address);
-    }
+    if (customer?.address) setDeliveryAddress(customer.address);
   }, [customer]);
   
-  // Effect: Force Dine-in mode if Table Session (QR) is active
   useEffect(() => {
-      if (tableSession) {
-          setOrderType('dine-in');
-      }
+      if (tableSession) setOrderType('dine-in');
   }, [tableSession]);
   
-  // Reset date if store opens
   useEffect(() => {
       if (isStoreOpen && orderDate === 'tomorrow' && !pickupTime) {
           setOrderDate('today');
       } else if (!isStoreOpen && !canOrderForToday()) {
-          // Only force tomorrow if we strictly can't order for today (night time)
           setOrderDate('tomorrow');
       }
   }, [isStoreOpen]);
@@ -218,17 +192,13 @@ export const CustomerView: React.FC = () => {
     setSelectedToppings([]);
     setCustomName('');
     setSpecialInstructions('');
-    
-    // Check if it's a combo
     if (pizza.category === 'promotion' && (pizza.comboCount || 0) > 0) {
         setIsComboBuilderOpen(true);
-        // Initialize empty slots
         setComboSelections(new Array(pizza.comboCount).fill(null));
     }
   };
 
   const toggleTopping = (topping: Topping) => {
-    // If it's a sauce, ensure single selection for custom pizza
     if (selectedPizza?.id === 'custom_base' && topping.category === 'sauce') {
         setSelectedToppings(prev => {
             const others = prev.filter(t => t.category !== 'sauce');
@@ -236,7 +206,6 @@ export const CustomerView: React.FC = () => {
         });
         return;
     }
-
     if (selectedToppings.find(t => t.id === topping.id)) {
       setSelectedToppings(prev => prev.filter(t => t.id !== topping.id));
     } else {
@@ -246,8 +215,6 @@ export const CustomerView: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!selectedPizza) return;
-    
-    // Validation for Custom Pizza: Must have a sauce
     if (selectedPizza.id === 'custom_base') {
         const hasSauce = selectedToppings.some(t => t.category === 'sauce');
         if (!hasSauce) {
@@ -255,21 +222,17 @@ export const CustomerView: React.FC = () => {
             return;
         }
     }
-
     const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
-    
-    // Ensure custom pizzas have a name
     const localizedPizza = getLocalizedItem(selectedPizza);
     let finalName = localizedPizza.name;
     if (selectedPizza.name === "Create Your Own Pizza") {
         finalName = customName ? `${t('nameCreation')}: ${customName}` : localizedPizza.name;
     }
-
     const item: CartItem = {
       id: Date.now().toString() + Math.random().toString(),
       pizzaId: selectedPizza.id,
       name: finalName,
-      nameTh: language === 'th' ? finalName : undefined, // Keep current lang as name
+      nameTh: language === 'th' ? finalName : undefined, 
       basePrice: selectedPizza.basePrice,
       selectedToppings: selectedToppings,
       quantity: 1,
@@ -282,42 +245,34 @@ export const CustomerView: React.FC = () => {
     setSpecialInstructions('');
   };
 
-  // Combo Handlers
-  const handleOpenComboSlot = (index: number) => {
-      setCurrentComboSlot(index);
-  };
-
+  const handleOpenComboSlot = (index: number) => setCurrentComboSlot(index);
   const handleSelectComboPizza = (pizza: Pizza) => {
       if (currentComboSlot === null) return;
-      
       const newSelections = [...comboSelections];
       newSelections[currentComboSlot] = {
           pizzaId: pizza.id,
           name: pizza.name,
           nameTh: pizza.nameTh,
-          toppings: [] // Start with no toppings
+          toppings: [] 
       };
       setComboSelections(newSelections);
-      setCurrentComboSlot(null); // Go back to builder
+      setCurrentComboSlot(null); 
   };
 
   const handleAddComboToCart = () => {
       if (!selectedPizza) return;
-      // Calculate total price: Base Combo Price + Sum of all extra toppings on sub-items
       const extraToppingsPrice = comboSelections.reduce((sum, item) => {
           return sum + (item?.toppings.reduce((tSum, t) => tSum + t.price, 0) || 0);
       }, 0);
-      
       const localized = getLocalizedItem(selectedPizza);
-
       const item: CartItem = {
           id: Date.now().toString() + Math.random(),
           pizzaId: selectedPizza.id,
           name: localized.name,
           nameTh: selectedPizza.nameTh,
           basePrice: selectedPizza.basePrice,
-          selectedToppings: [], // Combo itself has no toppings, the sub-items do
-          subItems: comboSelections, // Store the choices
+          selectedToppings: [],
+          subItems: comboSelections, 
           quantity: 1,
           totalPrice: selectedPizza.basePrice + extraToppingsPrice,
           specialInstructions: specialInstructions
@@ -331,13 +286,11 @@ export const CustomerView: React.FC = () => {
 
   const handleSaveFavorite = async () => {
       if (!selectedPizza) return;
-      
       if (!customer) {
           alert(t('mustRegister'));
           setShowAuthModal(true);
           return;
       }
-      
       await addToFavorites(
           selectedPizza.name === "Create Your Own Pizza" && customName ? `${t('nameCreation')}: ${customName}` : selectedPizza.name,
           selectedPizza.id,
@@ -346,38 +299,30 @@ export const CustomerView: React.FC = () => {
       alert(t('saveFavorite') + " Success!");
   };
   
-  // NEW: Handle adding a saved favorite to cart
   const handleOrderFavorite = (fav: SavedFavorite) => {
       const basePizza = menu.find(p => p.id === fav.pizzaId);
       if (!basePizza) {
           alert("This item is no longer available.");
           return;
       }
-      
-      // Calculate price based on current menu price + toppings
       const toppingsPrice = fav.toppings.reduce((sum, t) => sum + t.price, 0);
       const totalPrice = basePizza.basePrice + toppingsPrice;
-
       const item: CartItem = {
           id: Date.now().toString() + Math.random().toString(),
           pizzaId: basePizza.id,
           name: fav.name,
-          // If name in favorite is already custom, keep it. 
-          // Note: localization for custom names is tricky, we use the saved string.
           basePrice: basePizza.basePrice,
           selectedToppings: fav.toppings,
           quantity: 1,
           totalPrice: totalPrice,
           specialInstructions: ''
       };
-      
       addToCart(item);
       setShowProfile(false);
       setIsCartOpen(true);
   };
 
   const handlePlaceOrderClick = async () => {
-     // Guest ordering allowed for Table Session
      if (!customer && !tableSession) {
         setShowAuthModal(true);
         return;
@@ -392,17 +337,16 @@ export const CustomerView: React.FC = () => {
         delivery: orderType === 'delivery' ? {
             address: deliveryAddress,
             zoneName: 'TBD',
-            fee: 0 // Will be calculated by staff
+            fee: 0 
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: orderType === 'online' && pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP',
-        tableNumber: tableSession || undefined, // PASS TABLE NUMBER
+        tableNumber: tableSession || undefined, 
         source: 'store'
      });
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
-        // Refresh local order ID from storage to ensure tracker picks it up
         setLocalOrderId(localStorage.getItem('damac_last_order'));
         setShowTracker(true);
      }
@@ -418,8 +362,6 @@ export const CustomerView: React.FC = () => {
         alert("Password is required");
         return;
     }
-    
-    // Call new smart register function
     const result = await registerCustomer({
         name: regName,
         phone: regPhone,
@@ -431,13 +373,11 @@ export const CustomerView: React.FC = () => {
         savedFavorites: [],
         orderHistory: []
     });
-
     if (result === 'updated') {
         alert("Account exists! Password has been reset and details updated. Welcome back!");
     } else {
         alert("Account created successfully! Welcome to Pizza Damac!");
     }
-    
     setShowAuthModal(false);
   };
 
@@ -470,11 +410,8 @@ export const CustomerView: React.FC = () => {
       }
   };
 
-  // Helper for Hero Video
   const renderHeroMedia = () => {
       if (!storeSettings.promoBannerUrl) return null;
-      
-      // Check if YouTube
       if (storeSettings.promoBannerUrl.includes('youtube.com') || storeSettings.promoBannerUrl.includes('youtu.be')) {
           let videoId = '';
           if (storeSettings.promoBannerUrl.includes('v=')) {
@@ -493,8 +430,6 @@ export const CustomerView: React.FC = () => {
               );
           }
       }
-      
-      // Video File
       if (storeSettings.promoContentType === 'video') {
           return (
              <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline>
@@ -502,12 +437,9 @@ export const CustomerView: React.FC = () => {
              </video>
           );
       }
-      
-      // Image
       return <img src={storeSettings.promoBannerUrl} className="absolute inset-0 w-full h-full object-cover" />;
   };
   
-  // Group toppings by category helper
   const groupedToppings = {
       sauce: toppings.filter(t => t.category === 'sauce'),
       cheese: toppings.filter(t => t.category === 'cheese'),
@@ -517,7 +449,6 @@ export const CustomerView: React.FC = () => {
       other: toppings.filter(t => !t.category || t.category === 'other'),
   };
 
-  // Resolve Catering Images - Add safe fallback
   const cateringImages = (storeSettings.eventGalleryUrls && storeSettings.eventGalleryUrls.length > 0)
         ? storeSettings.eventGalleryUrls
         : (DEFAULT_STORE_SETTINGS.eventGalleryUrls || []);
@@ -581,7 +512,7 @@ export const CustomerView: React.FC = () => {
             </div>
         </div>
 
-        {/* Hero Section (Banner) - Reduced Height for Mobile */}
+        {/* Hero Section (Banner) */}
         {activeCategory === 'promotion' && (
             <div className="relative w-full h-56 md:h-96 overflow-hidden bg-gray-900">
                 {renderHeroMedia()}
@@ -602,25 +533,30 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* --- QUICK ACCESS / BUY AGAIN (Logged In Users) --- */}
+        {/* --- IMPROVED BUY AGAIN SECTION (Logged In) --- */}
         {customer && recentItems.length > 0 && activeCategory === 'promotion' && (
             <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-orange-50/50">
-                <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-brand-800">
-                     <History size={20} className="text-brand-600"/> {t('buyAgain')}
-                </h2>
+                <div className="flex justify-between items-end mb-4">
+                    <h2 className="text-lg font-bold flex items-center gap-2 text-brand-800">
+                         <History size={20} className="text-brand-600"/> {t('buyAgain')}
+                    </h2>
+                    <button onClick={() => setShowProfile(true)} className="text-xs text-brand-600 font-bold hover:underline">View History</button>
+                </div>
                 <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                     {recentItems.map(item => {
                          const localized = getLocalizedItem(item);
                          return (
-                            <div key={'recent-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[140px] w-[140px] bg-white rounded-xl shadow-sm p-2 border border-orange-100 cursor-pointer hover:shadow-md transition group">
+                            <div key={'recent-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[150px] w-[150px] bg-white rounded-xl shadow-sm p-3 border border-orange-100 cursor-pointer hover:shadow-md transition group hover:border-brand-300">
                                 <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
-                                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition"/>
+                                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">{t('soldOut')}</div>}
+                                    <div className="absolute bottom-1 right-1 bg-white/90 p-1.5 rounded-full shadow-sm text-brand-600">
+                                        <Plus size={14}/>
+                                    </div>
                                 </div>
                                 <h3 className="font-bold text-sm text-gray-800 truncate">{localized.name}</h3>
                                 <div className="flex justify-between items-center mt-1">
                                     <span className="text-brand-600 font-bold text-xs">฿{item.basePrice}</span>
-                                    <div className="w-5 h-5 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center"><Plus size={12}/></div>
                                 </div>
                             </div>
                         );
@@ -660,6 +596,7 @@ export const CustomerView: React.FC = () => {
             </main>
         )}
 
+        {/* ... (Review Video, News, Regular Menu, Events, Footer remain same) ... */}
         {/* --- REVIEW VIDEO SECTION --- */}
         {activeCategory === 'promotion' && storeSettings.reviewLinks && storeSettings.reviewLinks.filter(l => l).length > 0 && (
             <section className="bg-white py-8 border-b">
@@ -866,7 +803,7 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* --- CUSTOMIZATION MODAL --- */}
+        {/* --- CUSTOMIZATION MODAL (Remains unchanged) --- */}
         {selectedPizza && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                 {isComboBuilderOpen ? (
@@ -1080,7 +1017,7 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* --- CHECKOUT / CART MODAL --- */}
+        {/* ... (Cart Modal remains same) ... */}
         {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm animate-fade-in">
                 <div className="bg-white w-full md:w-[450px] h-full shadow-2xl flex flex-col animate-slide-in">
@@ -1232,7 +1169,7 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
 
-        {/* --- AUTH MODAL --- */}
+        {/* ... (Auth Modal) ... */}
         {showAuthModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                 <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1299,7 +1236,7 @@ export const CustomerView: React.FC = () => {
             </div>
         )}
         
-        {/* PROFILE MODAL */}
+        {/* PROFILE MODAL (Improved) */}
         {showProfile && customer && (
              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                  <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col">
@@ -1388,26 +1325,38 @@ export const CustomerView: React.FC = () => {
                              </div>
                          </div>
                          
-                         {/* Order History */}
+                         {/* IMPROVED Order History */}
                          <div>
                              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><History size={16}/> {t('recentOrders')}</h3>
-                             <div className="space-y-3">
+                             <div className="space-y-4">
                                  {orders.filter(o => o.customerPhone === customer.phone).slice(0, 5).map(order => (
-                                     <div key={order.id} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                                         <div className="flex justify-between items-center mb-2">
-                                              <span className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</span>
-                                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${getStatusColor(order.status)}`}>{order.status}</span>
-                                         </div>
-                                         <div className="flex justify-between items-center">
+                                     <div key={order.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                                         {/* Card Header */}
+                                         <div className="bg-gray-50 p-3 border-b border-gray-100 flex justify-between items-center">
                                               <div>
+                                                  <div className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString()} • {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                                  <div className={`text-[10px] font-bold uppercase mt-1 inline-block ${order.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>{order.status}</div>
+                                              </div>
+                                              <div className="font-bold text-gray-900 text-lg">฿{order.totalAmount}</div>
+                                         </div>
+                                         
+                                         {/* Card Body */}
+                                         <div className="p-3">
+                                              <div className="space-y-1 mb-3">
                                                   {order.items.map((item, idx) => (
-                                                      <div key={idx} className="text-sm font-bold text-gray-800">{item.name} <span className="text-gray-400 font-normal">x{item.quantity}</span></div>
+                                                      <div key={idx} className="flex justify-between text-sm">
+                                                          <span className="text-gray-800 font-medium">{item.quantity}x {item.name}</span>
+                                                          <span className="text-gray-400 text-xs">฿{item.totalPrice}</span>
+                                                      </div>
                                                   ))}
                                               </div>
-                                              <div className="text-right">
-                                                  <div className="font-bold text-gray-900">฿{order.totalAmount}</div>
-                                                  <button onClick={() => { reorderItem(order.id); setShowProfile(false); setIsCartOpen(true); }} className="text-xs text-brand-600 font-bold hover:underline mt-1">{t('reorder')}</button>
-                                              </div>
+                                              
+                                              <button 
+                                                  onClick={() => { reorderItem(order.id); setShowProfile(false); setIsCartOpen(true); }} 
+                                                  className="w-full bg-brand-50 text-brand-600 py-2 rounded-lg font-bold text-sm hover:bg-brand-100 transition flex items-center justify-center gap-2"
+                                              >
+                                                  <RefreshCw size={14}/> {t('reorder')} All Items
+                                              </button>
                                          </div>
                                      </div>
                                  ))}

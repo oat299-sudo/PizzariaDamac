@@ -2,7 +2,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus } from '../types';
-import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike } from 'lucide-react';
+import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
@@ -114,8 +114,33 @@ export const KitchenView: React.FC = () => {
                           <li key={idx} className="flex flex-col border-b border-dashed border-gray-100 pb-3 last:border-0 last:pb-0">
                               <div className="flex items-start gap-3">
                                   <span className="bg-gray-900 text-white w-8 h-8 flex items-center justify-center rounded-lg text-lg font-bold flex-shrink-0">{item.quantity}</span> 
-                                  <div>
+                                  <div className="flex-1">
                                       <span className="font-bold text-gray-800 text-lg leading-tight block">{name}</span>
+                                      
+                                      {/* Sub Items (Combo Choices) */}
+                                      {item.subItems && item.subItems.length > 0 && (
+                                          <div className="mt-2 pl-3 border-l-4 border-brand-200 space-y-1">
+                                              {item.subItems.map((sub, sIdx) => (
+                                                  <div key={sIdx} className="text-gray-700 text-sm font-semibold flex items-start gap-1">
+                                                      <span className="text-brand-500">•</span>
+                                                      <div>
+                                                          {language === 'th' && sub.nameTh ? sub.nameTh : sub.name}
+                                                          {sub.toppings && sub.toppings.length > 0 && (
+                                                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                                                  {sub.toppings.map(t => (
+                                                                      <span key={t.id} className="text-xs text-brand-700 bg-brand-50 px-1 rounded border border-brand-100">
+                                                                          + {language === 'th' && t.nameTh ? t.nameTh : t.name}
+                                                                      </span>
+                                                                  ))}
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      )}
+
+                                      {/* Standard Toppings */}
                                       {item.selectedToppings.length > 0 && (
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {item.selectedToppings.map(t => (
@@ -124,6 +149,13 @@ export const KitchenView: React.FC = () => {
                                                 </span>
                                             ))}
                                         </div>
+                                      )}
+                                      
+                                      {/* Special Instructions */}
+                                      {item.specialInstructions && (
+                                          <div className="mt-1 text-red-600 font-bold text-sm bg-red-50 p-1 rounded inline-block">
+                                              ** {item.specialInstructions}
+                                          </div>
                                       )}
                                   </div>
                               </div>
