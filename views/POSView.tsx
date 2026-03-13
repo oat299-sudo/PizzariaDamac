@@ -15,7 +15,7 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus
+        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee
     } = useStore();
     
     // Unified Tab State
@@ -111,6 +111,7 @@ export const POSView: React.FC = () => {
         customerName: string;
         customerPhone?: string;
         deliveryAddress?: string;
+        deliveryFee?: number | 'pending';
         items: CartItem[];
         subtotal: number;
         vat: number; // 7%
@@ -352,7 +353,23 @@ export const POSView: React.FC = () => {
         if(confirm("Force Cancel/Delete this table order?")) await updateOrderStatus(orderId, 'cancelled');
     }
 
+    const handleUpdateDeliveryFee = async (order: Order) => {
+        const feeStr = prompt(`Enter delivery fee for Order #${order.id.slice(-4)}:`, order.deliveryFee === 'pending' ? '' : String(order.deliveryFee));
+        if (feeStr !== null) {
+            const fee = parseFloat(feeStr);
+            if (!isNaN(fee) && fee >= 0) {
+                await updateOrderDeliveryFee(order.id, fee);
+            } else {
+                alert("Invalid fee amount.");
+            }
+        }
+    };
+
     const handleFinalizePayment = async () => {
+        if (selectedOrder && selectedOrder.deliveryFee === 'pending') {
+            alert("Please update the delivery fee before finalizing payment.");
+            return;
+        }
         const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
         if (paymentMethod === 'cash' && parseFloat(cashReceived || '0') < currentTotal) { alert("Insufficient cash!"); return; }
         const note = paymentMethod === 'cash' ? `Cash: ${cashReceived}, Change: ${change}` : 'Paid via QR';
@@ -404,6 +421,7 @@ export const POSView: React.FC = () => {
             customerName: selectedOrder?.customerName || 'Guest',
             customerPhone: selectedOrder?.customerPhone || '',
             deliveryAddress: selectedOrder?.deliveryAddress || '',
+            deliveryFee: selectedOrder?.deliveryFee,
             note: selectedOrder?.note || '',
             queueNo: queueNo,
             items: currentItems,
@@ -444,6 +462,7 @@ export const POSView: React.FC = () => {
             customerName: order.customerName,
             customerPhone: order.customerPhone,
             deliveryAddress: order.deliveryAddress,
+            deliveryFee: order.deliveryFee,
             note: order.note,
             queueNo: queueNo,
             items: order.items,
@@ -731,6 +750,12 @@ export const POSView: React.FC = () => {
                             <span>VAT 7%</span>
                             <span>{receiptData.vat.toFixed(2)}</span>
                         </div>
+                        {receiptData.deliveryFee !== undefined && receiptData.deliveryFee !== null && (
+                            <div className="flex justify-between text-[10px]">
+                                <span>Delivery Fee</span>
+                                <span>{receiptData.deliveryFee === 'pending' ? 'TBD' : receiptData.deliveryFee.toFixed(2)}</span>
+                            </div>
+                        )}
                         
                         <div className="flex justify-between font-bold text-xl mt-1">
                             <span>TOTAL</span>
@@ -894,6 +919,12 @@ export const POSView: React.FC = () => {
                                                 ))}
                                             </div>
                                             {order.note && <div className="mt-2 text-xs italic text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-100">Note: {order.note}</div>}
+                                            {order.type === 'delivery' && (
+                                                <div className="mt-3 flex justify-between items-center bg-blue-50 p-2 rounded border border-blue-100">
+                                                    <span className="text-sm font-bold text-blue-800">Delivery Fee: {order.deliveryFee === 'pending' ? 'TBD' : `฿${order.deliveryFee}`}</span>
+                                                    <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="p-4 border-t bg-gray-50 grid grid-cols-2 gap-3">
                                             <button onClick={() => handleCheckTableBill(order)} className="bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-lg"><Receipt size={20}/> Check Bill</button>
@@ -936,11 +967,22 @@ export const POSView: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                            {selectedOrder && selectedOrder.type === 'delivery' && (
+                                <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center text-sm font-bold text-gray-700">
+                                    <span>Delivery Fee</span>
+                                    <span>{selectedOrder.deliveryFee === 'pending' ? 'TBD' : `฿${selectedOrder.deliveryFee}`}</span>
+                                </div>
+                            )}
                             <div className="mt-4 pt-4 border-t border-gray-200">
                                 <div className="flex justify-between items-center text-2xl font-bold text-gray-900">
                                     <span>Total Amount</span>
                                     <span>฿{selectedOrder ? selectedOrder.totalAmount : cartTotal}</span>
                                 </div>
+                                {selectedOrder && selectedOrder.deliveryFee === 'pending' && (
+                                    <div className="text-xs text-red-500 font-bold mt-1 text-right">
+                                        * Please update delivery fee before payment
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -950,6 +992,9 @@ export const POSView: React.FC = () => {
                                 <div className="md:hidden">
                                     <h3 className="font-bold text-lg text-gray-900">{selectedOrder ? `Table ${selectedOrder.tableNumber}` : 'Payment'}</h3>
                                     <p className="text-sm text-brand-600 font-bold">Total: ฿{selectedOrder ? selectedOrder.totalAmount : cartTotal}</p>
+                                    {selectedOrder && selectedOrder.deliveryFee === 'pending' && (
+                                        <p className="text-xs text-red-500 font-bold mt-1">* Update delivery fee first</p>
+                                    )}
                                 </div>
                                 <h3 className="hidden md:block font-bold text-lg text-gray-500 uppercase">Payment Method</h3>
                                 <button onClick={() => setShowPaymentModal(false)} className="bg-gray-100 p-3 rounded-full hover:bg-gray-200"><X size={24}/></button>
@@ -1005,7 +1050,7 @@ export const POSView: React.FC = () => {
                                 <button onClick={handlePrintBill} className="px-6 py-4 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex flex-col items-center justify-center">
                                     <Printer size={24}/>
                                 </button>
-                                <button onClick={handleFinalizePayment} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold text-xl shadow-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
+                                <button onClick={handleFinalizePayment} disabled={selectedOrder?.deliveryFee === 'pending'} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold text-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
                                     {paymentMethod === 'cash' ? 'PAID' : 'CONFIRM'} <CheckCircle size={24}/>
                                 </button>
                             </div>

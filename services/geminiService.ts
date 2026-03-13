@@ -5,18 +5,8 @@ import { Pizza } from '../types';
 let genAI: GoogleGenAI | null = null;
 
 try {
-  // Safe check for process.env to avoid "ReferenceError: process is not defined" in some browsers
-  // We prioritize process.env.API_KEY as per guidelines, but safely.
-  let apiKey = '';
-  
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    apiKey = process.env.API_KEY;
-  } else {
-    // Fallback for Vite environments if process is missing
-    try {
-       apiKey = (import.meta as any).env.VITE_GOOGLE_API_KEY || '';
-    } catch (e) {}
-  }
+  // Always use process.env.GEMINI_API_KEY for the Gemini API.
+  const apiKey = process.env.GEMINI_API_KEY || '';
 
   if (apiKey) {
     genAI = new GoogleGenAI({ apiKey: apiKey });
@@ -35,7 +25,7 @@ export const getPizzaRecommendation = async (
 
   try {
     const response = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `
         You are an expert Italian Pizza Chef at "Pizza Damac".
         The customer asks: "${userPreference}".
@@ -47,7 +37,7 @@ export const getPizzaRecommendation = async (
       `,
     });
 
-    return response.text.trim();
+    return response.text || "I couldn't come up with a recommendation right now. Try the Pizza Damac Special!";
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "I couldn't come up with a recommendation right now. Try the Pizza Damac Special!";

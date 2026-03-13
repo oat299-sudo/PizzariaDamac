@@ -99,7 +99,7 @@ export interface Order {
   // Delivery Specific
   deliveryAddress?: string;
   deliveryZone?: string;
-  deliveryFee?: number;
+  deliveryFee?: number | 'pending';
 
   // New Features
   tableNumber?: string;

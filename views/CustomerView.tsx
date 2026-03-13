@@ -337,7 +337,7 @@ export const CustomerView: React.FC = () => {
         delivery: orderType === 'delivery' ? {
             address: deliveryAddress,
             zoneName: 'TBD',
-            fee: 0 
+            fee: 'pending' 
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: orderType === 'online' && pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP',
@@ -1050,10 +1050,10 @@ export const CustomerView: React.FC = () => {
                                                 Pickup
                                             </button>
                                             <button 
-                                                disabled
-                                                className="flex-1 py-2 text-sm font-bold rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center gap-1"
+                                                onClick={() => setOrderType('delivery')} 
+                                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${orderType === 'delivery' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
-                                                Delivery <span className="text-[9px] bg-gray-200 px-1 rounded">OFF</span>
+                                                Delivery
                                             </button>
                                         </>
                                     )}
@@ -1152,10 +1152,16 @@ export const CustomerView: React.FC = () => {
                     
                     {/* Footer */}
                     <div className="p-6 bg-white border-t shrink-0 pb-safe">
-                        <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                        <div className={`flex justify-between items-center ${orderType === 'delivery' ? 'mb-1' : 'mb-4'} text-xl font-bold text-gray-900`}>
                             <span>Total</span>
                             <span>฿{cartTotal}</span>
                         </div>
+                        {orderType === 'delivery' && (
+                            <div className="flex justify-between items-center mb-4 text-sm text-orange-600 font-medium">
+                                <span>+ Delivery Fee</span>
+                                <span>{t('deliveryTBD')}</span>
+                            </div>
+                        )}
                         <button 
                             onClick={handlePlaceOrderClick}
                             disabled={cart.length === 0 || isSubmitting}
@@ -1337,7 +1343,11 @@ export const CustomerView: React.FC = () => {
                                                   <div className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString()} • {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                                                   <div className={`text-[10px] font-bold uppercase mt-1 inline-block ${order.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>{order.status}</div>
                                               </div>
-                                              <div className="font-bold text-gray-900 text-lg">฿{order.totalAmount}</div>
+                                              <div className="font-bold text-gray-900 text-lg">
+                                                  ฿{order.totalAmount}
+                                                  {order.deliveryFee === 'pending' && <span className="text-[10px] text-orange-500 block text-right">+ {t('deliveryTBD')}</span>}
+                                                  {typeof order.deliveryFee === 'number' && order.deliveryFee > 0 && <span className="text-[10px] text-gray-500 block text-right">(Incl. ฿{order.deliveryFee} delivery)</span>}
+                                              </div>
                                          </div>
                                          
                                          {/* Card Body */}

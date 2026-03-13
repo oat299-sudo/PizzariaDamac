@@ -72,6 +72,7 @@ interface StoreContextType {
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderDeliveryFee: (orderId: string, fee: number) => Promise<void>;
   completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
@@ -389,7 +390,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               createdAt: d.created_at,
               deliveryAddress: d.delivery_address,
               deliveryZone: d.delivery_zone,
-              deliveryFee: d.delivery_fee,
+              deliveryFee: d.type === 'delivery' && d.delivery_fee === null ? 'pending' : d.delivery_fee,
               paymentMethod: d.payment_method,
               pickupTime: d.pickup_time,
               tableNumber: d.table_number
@@ -829,7 +830,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     type: OrderType, 
     details?: {
       note?: string;
-      delivery?: { address: string; zoneName: string; fee: number };
+      delivery?: { address: string; zoneName: string; fee: number | 'pending' };
       paymentMethod?: PaymentMethod;
       pickupTime?: string;
       tableNumber?: string;
@@ -839,7 +840,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   ) => {
       // Calculate Total
       const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-      const deliveryFee = details?.delivery?.fee || 0;
+      const deliveryFee = details?.delivery?.fee === 'pending' ? 0 : (details?.delivery?.fee || 0);
       const totalAmount = subtotal + deliveryFee;
       
       // Calculate Net (GP Deduction)
@@ -883,7 +884,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                  note: newOrder.note,
                  delivery_address: newOrder.deliveryAddress,
                  delivery_zone: newOrder.deliveryZone,
-                 delivery_fee: newOrder.deliveryFee,
+                 delivery_fee: newOrder.deliveryFee === 'pending' ? null : newOrder.deliveryFee,
                  payment_method: newOrder.paymentMethod,
                  pickup_time: newOrder.pickupTime,
                  table_number: newOrder.tableNumber
@@ -936,6 +937,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           await supabase.from('orders').update({ status }).eq('id', orderId);
       }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+  };
+  
+  const updateOrderDeliveryFee = async (orderId: string, fee: number) => {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      
+      const currentDeliveryFee = order.deliveryFee === 'pending' ? 0 : (order.deliveryFee || 0);
+      const subtotal = order.totalAmount - currentDeliveryFee;
+      const newTotal = subtotal + fee;
+      const newNet = newTotal * (1 - (GP_RATES[order.source] || 0));
+      
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').update({ 
+              delivery_fee: fee,
+              total_amount: newTotal,
+              net_amount: newNet
+          }).eq('id', orderId);
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          deliveryFee: fee,
+          totalAmount: newTotal,
+          netAmount: newNet
+      } : o));
   };
   
   const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
@@ -1084,7 +1109,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, completeOrder, deleteOrder, reorderItem, fetchOrders,
+      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, completeOrder, deleteOrder, reorderItem, fetchOrders,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,
