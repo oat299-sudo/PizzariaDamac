@@ -179,9 +179,8 @@ export const POSView: React.FC = () => {
                     const ctx = canvas.getContext('2d');
                     ctx?.drawImage(img, 0, 0, width, height);
                     
-                    // Compress to JPEG at 0.7 quality
-                    // This typically reduces a 5MB png to ~100kb jpeg
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    // Compress to JPEG at 0.5 quality to save space
+                    resolve(canvas.toDataURL('image/jpeg', 0.5));
                 };
                 img.onerror = (error) => reject(error);
             };

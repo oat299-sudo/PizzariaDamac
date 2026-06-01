@@ -268,7 +268,16 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
       try {
         localStorage.setItem('damac_store_settings', JSON.stringify(storeSettings));
-      } catch(e) { console.warn("Settings Storage Full", e); }
+      } catch(e) { 
+          console.warn("Settings Storage Full, retrying without large images", e); 
+          try {
+              const lighterSettings = { ...storeSettings, eventGalleryUrls: [], promoBannerUrl: '' };
+              localStorage.setItem('damac_store_settings', JSON.stringify(lighterSettings));
+              alert("Storage limits exceeded. Large images were not saved locally.");
+          } catch (e2) {
+              console.error("Critical Storage Error", e2);
+          }
+      }
   }, [storeSettings]);
 
   const [isHoliday, setIsHoliday] = useState(false);
