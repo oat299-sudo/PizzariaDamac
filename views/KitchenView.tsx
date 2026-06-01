@@ -108,7 +108,7 @@ export const KitchenView: React.FC = () => {
               {/* Items */}
               <div className="p-4 bg-white flex-1 min-h-[150px]">
                   <ul className="space-y-4">
-                      {order.items.map((item, idx) => {
+                      {(order.items || []).map((item, idx) => {
                           const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
                           return (
                           <li key={idx} className="flex flex-col border-b border-dashed border-gray-100 pb-3 last:border-0 last:pb-0">
@@ -141,9 +141,9 @@ export const KitchenView: React.FC = () => {
                                       )}
 
                                       {/* Standard Toppings */}
-                                      {item.selectedToppings.length > 0 && (
+                                      {(item.selectedToppings || []).length > 0 && (
                                         <div className="mt-1 flex flex-wrap gap-1">
-                                            {item.selectedToppings.map(t => (
+                                            {(item.selectedToppings || []).map(t => (
                                                 <span key={t.id} className="text-sm font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
                                                     + {language === 'th' && t.nameTh ? t.nameTh : t.name}
                                                 </span>

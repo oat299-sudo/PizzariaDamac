@@ -630,7 +630,7 @@ export const POSView: React.FC = () => {
             Status: o.status,
             Total: o.totalAmount,
             Payment: o.paymentMethod || '-',
-            Items: o.items.map(i => `${i.quantity}x ${i.name}`).join('; ')
+            Items: (o.items || []).map(i => `${i.quantity}x ${i.name}`).join('; ')
         }));
         downloadCSV(data, `sales_report_${salesFilter}.csv`);
     };
@@ -708,7 +708,7 @@ export const POSView: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {receiptData.items.map((item, i) => (
+                                {(receiptData.items || []).map((item, i) => (
                                     <React.Fragment key={i}>
                                         <tr className="align-top font-bold">
                                             <td className="pt-1">{item.quantity}</td>
@@ -716,15 +716,15 @@ export const POSView: React.FC = () => {
                                             <td className="text-right pt-1">{item.totalPrice.toFixed(2)}</td>
                                         </tr>
                                         {/* Toppings & Details */}
-                                        {(item.selectedToppings.length > 0 || item.specialInstructions || item.subItems) && (
+                                        {((item.selectedToppings || []).length > 0 || item.specialInstructions || item.subItems) && (
                                             <tr>
                                                 <td></td>
                                                 <td colSpan={2} className="text-[10px] pb-1">
                                                     {item.subItems && item.subItems.length > 0 && (
-                                                        <div className="text-gray-700">- Combo: {item.subItems.map(s => s.name).join(', ')}</div>
+                                                        <div className="text-gray-700">- Combo: {(item.subItems || []).filter(Boolean).map(s => s.name).join(', ')}</div>
                                                     )}
-                                                    {item.selectedToppings.length > 0 && (
-                                                        <div className="text-gray-600">- {item.selectedToppings.map(t => t.name).join(', ')}</div>
+                                                    {(item.selectedToppings || []).length > 0 && (
+                                                        <div className="text-gray-600">- {(item.selectedToppings || []).map(t => t.name).join(', ')}</div>
                                                     )}
                                                     {item.specialInstructions && (
                                                         <div className="font-bold text-black border border-black inline-block px-1 mt-0.5">
@@ -866,7 +866,7 @@ export const POSView: React.FC = () => {
                         <div className={`w-full md:w-80 lg:w-96 bg-white border-l shadow-xl flex flex-col z-40 fixed md:relative inset-0 md:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}`}>
                             <div className="md:hidden p-4 bg-gray-900 text-white flex justify-between items-center"><h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag/> Current Order</h2><button onClick={() => setShowMobileCart(false)} className="bg-white/20 p-2 rounded-full"><X size={20}/></button></div>
                             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                                {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{item.selectedToppings.map(t => t.name).join(', ')}{item.subItems?.map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
+                                {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{(item.selectedToppings || []).map(t => t.name).join(', ')}{(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
                             </div>
                             <div className="p-4 bg-white border-t space-y-3">
                                 <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option></select></div>
@@ -911,7 +911,7 @@ export const POSView: React.FC = () => {
                                         </div>
                                         <div className="p-4 flex-1">
                                             <div className="text-sm text-gray-600 space-y-2 max-h-48 overflow-y-auto">
-                                                {order.items.map((item, i) => (
+                                                {(order.items || []).map((item, i) => (
                                                     <div key={i} className="flex justify-between border-b border-gray-100 pb-1">
                                                         <span className="font-bold">{item.quantity}x {item.name}</span>
                                                         <span className="font-bold text-gray-800">฿{item.totalPrice}</span>
@@ -959,8 +959,8 @@ export const POSView: React.FC = () => {
                                         <div>
                                             <div className="font-bold text-gray-800">{item.quantity}x {item.name}</div>
                                             <div className="text-xs text-gray-500">
-                                                {item.selectedToppings.map(t => t.name).join(', ')}
-                                                {item.subItems?.map(s => `+ ${s.name}`).join(', ')}
+                                                {(item.selectedToppings || []).map(t => t.name).join(', ')}
+                                                {(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}
                                             </div>
                                         </div>
                                         <div className="font-bold text-gray-700">฿{item.totalPrice}</div>

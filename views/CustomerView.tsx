@@ -337,7 +337,7 @@ export const CustomerView: React.FC = () => {
         delivery: orderType === 'delivery' ? {
             address: deliveryAddress,
             zoneName: 'TBD',
-            fee: 'pending' 
+            fee: 0 
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: orderType === 'online' && pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP',
@@ -1068,8 +1068,8 @@ export const CustomerView: React.FC = () => {
                                                     <h4 className="font-bold text-gray-800">{item.name}</h4>
                                                     {item.specialInstructions && <div className="text-xs text-red-500 italic mt-0.5">"{item.specialInstructions}"</div>}
                                                     <p className="text-xs text-gray-500">
-                                                        {item.selectedToppings.map(t => language === 'th' ? t.nameTh : t.name).join(', ')}
-                                                        {item.subItems?.map(s => `+ ${s.name}`).join(', ')}
+                                                        {(item.selectedToppings || []).map(t => language === 'th' ? t.nameTh : t.name).join(', ')}
+                                                        {(item.subItems || []).filter(s => s).map(s => `+ ${s.name}`).join(', ')}
                                                     </p>
                                                 </div>
                                                 <div className="font-bold text-gray-900">฿{item.totalPrice}</div>

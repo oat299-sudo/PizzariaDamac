@@ -321,7 +321,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                if (saved) localMenu = JSON.parse(saved);
            } catch(e) {}
 
-           const mergedMenu = data.map(d => {
+           const mergedMenu = data.map((d: any) => {
                const local = INITIAL_MENU.find(m => m.id === d.id);
                const savedLocal = localMenu.find(m => m.id === d.id);
                return {
@@ -354,7 +354,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   if (saved) localToppings = JSON.parse(saved);
               } catch(e) {}
 
-              const mergedToppings = data.map(d => {
+              const mergedToppings = data.map((d: any) => {
                   const local = INITIAL_TOPPINGS.find(t => t.id === d.id);
                   const savedLocal = localToppings.find(t => t.id === d.id);
                   return {
@@ -381,7 +381,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   return;
               }
           }
-          if (data) setOrders(data.map(d => ({
+          if (data) setOrders(data.map((d: any) => ({
               ...d, 
               customerName: d.customer_name, 
               customerPhone: d.customer_phone, 
@@ -468,7 +468,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         fetchSettings();
         
         const subscription = supabase.channel('realtime_updates')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload: any) => {
             fetchOrders(); // Reload orders when change happens
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
