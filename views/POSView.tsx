@@ -231,7 +231,7 @@ export const POSView: React.FC = () => {
         document.body.removeChild(link);
     };
     
-    const getCleanQrUrl = () => qrBaseUrl.replace(/\/$/, "");
+    const getCleanQrUrl = () => (qrBaseUrl || '').replace(/\/$/, "");
     
     // Print Table Card
     const handlePrintQrCard = () => {
@@ -983,7 +983,7 @@ export const POSView: React.FC = () => {
                                             <tbody className="divide-y divide-gray-100">
                                                 {filteredOrders.reverse().map(order => (
                                                     <tr key={order.id} className="hover:bg-gray-50">
-                                                        <td className="p-4 text-gray-600">{new Date(parseInt(order.id)).toLocaleTimeString()}</td>
+                                                        <td className="p-4 text-gray-600">{new Date(order.createdAt).toLocaleTimeString()}</td>
                                                         <td className="p-4 font-bold text-gray-800">#{order.id.slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
                                                         <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
                                                         <td className="p-4">
