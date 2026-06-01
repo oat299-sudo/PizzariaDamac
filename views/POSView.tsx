@@ -119,7 +119,7 @@ export const POSView: React.FC = () => {
         vat: number; // 7%
         total: number;
         paymentMethod: string;
-        receive?: number;
+        received?: number;
         change: number;
         note?: string;
         queueNo?: string;
@@ -675,7 +675,7 @@ export const POSView: React.FC = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
+        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans print:h-auto print:overflow-visible print:bg-white print:block">
             
             {/* --- ROBUST THAI RECEIPT PRINTER (Hidden, 58mm Format) --- */}
             <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
@@ -1061,10 +1061,185 @@ export const POSView: React.FC = () => {
                 )}
             </main>
 
-            {/* ... (Existing Modals) ... */}
+            
+{/* 1. Item Customization Modal / Add to Cart Modal */}
+{selectedPizza && (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 print:hidden">
+        <div className="bg-white max-w-xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full">
+            <div className="relative h-48 bg-gray-100 flex-shrink-0">
+                <img src={selectedPizza.image} alt={selectedPizza.name} className="w-full h-full object-cover" />
+                <button onClick={() => { setSelectedPizza(null); setComboSelections([]); }} className="absolute top-4 right-4 bg-white/50 backdrop-blur p-2 rounded-full hover:bg-white transition"><X size={24} /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+                <h2 className="text-2xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
+                <div className="text-xl font-bold text-brand-600 mt-1 mb-4">฿{selectedPizza.basePrice}</div>
+                <p className="text-sm text-gray-500 mb-6">{getLocalizedItem(selectedPizza).description}</p>
+                
+                {/* Combo Selector */}
+                {selectedPizza.comboCount ? (
+                    <div className="mb-6">
+                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Utensils size={18}/> Select Your Items</h3>
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            {Array.from({ length: selectedPizza.comboCount }).map((_, idx) => (
+                                <button key={idx} onClick={() => handleComboSlotClick(idx)} className={`p-4 border-2 rounded-xl text-left transition ${activeComboSlot === idx ? 'border-brand-500 bg-brand-50' : comboSelections[idx] ? 'border-green-500 bg-green-50' : 'border-dashed border-gray-300 hover:border-gray-400'}`}>
+                                    <div className="text-sm font-bold text-gray-500 mb-1">Item {idx + 1}</div>
+                                    <div className="font-bold text-gray-900">{comboSelections[idx]?.name || 'Tap to select'}</div>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {activeComboSlot !== null && (
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in">
+                                <div className="text-sm font-bold text-gray-800 mb-2">Options for Item {activeComboSlot + 1}:</div>
+                                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                    {menu.filter(m => !m.comboCount).map(m => ( // Exclude combos from combo
+                                        <button key={m.id} onClick={() => handleComboPizzaSelect(m)} className="text-left p-2 border rounded-lg bg-white hover:border-brand-300">
+                                            <div className="text-sm font-bold truncate">{m.name}</div>
+                                            <div className="text-xs text-brand-600">฿{m.basePrice}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : null}
+
+                {/* Toppings (Only for non-combo items, though you can adapt logic as needed) */}
+                {!selectedPizza.comboCount && (
+                    <div className="mb-6">
+                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Layers size={18}/> Extra Options</h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            {toppings.filter(t => t.available).map(t => {
+                                const isSelected = selectedToppings.some(st => st.id === t.id);
+                                return (
+                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`w-full flex items-center justify-between p-3 border rounded-xl transition ${isSelected ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${isSelected ? 'bg-brand-500 border-brand-500 text-white' : 'border-gray-300'}`}>
+                                                {isSelected && <Check size={14}/>}
+                                            </div>
+                                            <span className="font-bold text-sm text-gray-700">{language === 'en' ? t.name : (t.nameTh || t.name)}</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-500">+฿{t.price}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                
+                {/* Note */}
+                <div className="mb-6">
+                    <h3 className="font-bold text-gray-800 mb-2">Special Instructions</h3>
+                    <input type="text" placeholder="e.g., No onions, extra spicy" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 outline-none" value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)} />
+                </div>
+            </div>
+            
+            <div className="p-4 bg-gray-50 border-t flex items-center gap-4">
+                <div className="flex items-center bg-white rounded-xl border border-gray-200 p-1">
+                    <button onClick={() => quantity > 1 && setQuantity(q => q - 1)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition"><Minus size={18}/></button>
+                    <span className="w-12 text-center font-bold text-lg">{quantity}</span>
+                    <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition"><Plus size={18}/></button>
+                </div>
+                <button 
+                    onClick={selectedPizza.comboCount ? confirmAddComboToCart : confirmAddToCart} 
+                    disabled={selectedPizza.comboCount ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
+                    className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    {editingCartItem ? 'Update Order' : 'Add to Order'} • ฿{((selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)) * quantity)}
+                </button>
+            </div>
+        </div>
+    </div>
+)}
+
+{/* 2. Menu Item Editor Modal */}
+{showItemModal && (
+    <div className="fixed inset-0 z-50 bg-black/50 flex flex-col items-center justify-center p-4 print:hidden">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">{itemForm.id ? 'Edit Menu Item' : 'New Menu Item'}</h2>
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Name (EN)</label>
+                        <input className="w-full border rounded-lg px-3 py-2" value={itemForm.name || ''} onChange={e => setItemForm({...itemForm, name: e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Name (TH)</label>
+                        <input className="w-full border rounded-lg px-3 py-2" value={itemForm.nameTh || ''} onChange={e => setItemForm({...itemForm, nameTh: e.target.value})}/>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Category</label>
+                        <select className="w-full border rounded-lg px-3 py-2" value={itemForm.category || 'pizza'} onChange={e => setItemForm({...itemForm, category: e.target.value as ProductCategory})}>
+                            <option value="pizza">Pizza</option>
+                            <option value="pasta">Pasta</option>
+                            <option value="appetizer">Appetizer / Side</option>
+                            <option value="salad">Salad</option>
+                            <option value="drink">Drink</option>
+                            <option value="cake">Cake</option>
+                            <option value="promotion">Combo / Promotion</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Base Price (฿)</label>
+                        <input type="number" className="w-full border rounded-lg px-3 py-2" value={itemForm.basePrice || 0} onChange={e => setItemForm({...itemForm, basePrice: Number(e.target.value)})}/>
+                    </div>
+                </div>
+                
+                {itemForm.category === 'promotion' && (
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Items allowed in Combo</label>
+                        <input type="number" className="w-full border rounded-lg px-3 py-2" value={itemForm.comboCount || 2} onChange={e => setItemForm({...itemForm, comboCount: Number(e.target.value)})}/>
+                    </div>
+                )}
+                
+                <div>
+                     <label className="block text-xs font-bold text-gray-500 mb-1">Image URL</label>
+                     <input className="w-full border rounded-lg px-3 py-2 mb-2" value={itemForm.image || ''} onChange={e => setItemForm({...itemForm, image: e.target.value})}/>
+                     {itemForm.image && <img src={itemForm.image} className="w-32 h-32 object-cover rounded-lg border"/>}
+                </div>
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+                <button onClick={() => setShowItemModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200">Cancel</button>
+                <button onClick={handleSaveItem} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700">Save Item</button>
+            </div>
+        </div>
+    </div>
+)}
+
+{/* 3. Add Topping Modal */}
+{showToppingsModal && (
+    <div className="fixed inset-0 z-50 bg-black/50 flex flex-col items-center justify-center p-4 print:hidden">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-xl font-bold mb-4">{toppingForm.id ? 'Edit Topping Option' : 'New Topping Option'}</h2>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Name (EN)</label>
+                    <input className="w-full border rounded-lg px-3 py-2" value={toppingForm.name || ''} onChange={e => setToppingForm({...toppingForm, name: e.target.value})}/>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Name (TH)</label>
+                    <input className="w-full border rounded-lg px-3 py-2" value={toppingForm.nameTh || ''} onChange={e => setToppingForm({...toppingForm, nameTh: e.target.value})}/>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Price Add-on (฿)</label>
+                    <input type="number" className="w-full border rounded-lg px-3 py-2" value={toppingForm.price || 0} onChange={e => setToppingForm({...toppingForm, price: Number(e.target.value)})}/>
+                </div>
+            </div>
+            <div className="mt-6 flex gap-3">
+                <button onClick={() => setShowToppingsModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200">Cancel</button>
+                <button onClick={handleSaveTopping} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700">Save Topping</button>
+            </div>
+        </div>
+    </div>
+)}
+
 
             {showPaymentModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 print:hidden">
                     {/* Updated Modal Container: Full Screen on Mobile, Centered on Desktop */}
                     <div className="bg-white w-full h-full md:h-[85vh] md:max-w-4xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-fade-in">
                         

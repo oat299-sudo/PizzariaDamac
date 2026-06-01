@@ -63,12 +63,13 @@ interface StoreContextType {
     type: OrderType, 
     details?: {
       note?: string;
-      delivery?: { address: string; zoneName: string; fee: number };
+      delivery?: { address: string; zoneName: string; fee: number | 'pending' };
       paymentMethod?: PaymentMethod;
       pickupTime?: string;
       tableNumber?: string;
       source?: OrderSource;
       status?: OrderStatus;
+      deliveryPlatformRef?: string;
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
