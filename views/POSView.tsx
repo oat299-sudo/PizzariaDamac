@@ -35,6 +35,7 @@ export const POSView: React.FC = () => {
     // Admin / Edit features
     const [isEditMode, setIsEditMode] = useState(false);
     const [tableNumber, setTableNumber] = useState('');
+    const [deliveryPlatformRef, setDeliveryPlatformRef] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
     
@@ -118,10 +119,11 @@ export const POSView: React.FC = () => {
         vat: number; // 7%
         total: number;
         paymentMethod: string;
-        received: number;
+        receive?: number;
         change: number;
         note?: string;
         queueNo?: string;
+        deliveryPlatformRef?: string;
         taxInvoice?: {
             isRequested: boolean;
             companyName: string;
@@ -338,9 +340,10 @@ export const POSView: React.FC = () => {
         const success = await placeOrder('dine-in', {
             tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : 'Walk-in'),
             source: orderSource, paymentMethod: undefined, status: 'confirmed', 
-            note: orderSource === 'store' ? 'Pay Later' : `${orderSource.toUpperCase()} Order`
+            note: orderSource === 'store' ? 'Pay Later' : `${orderSource.toUpperCase()} Order`,
+            deliveryPlatformRef: deliveryPlatformRef
         });
-        if (success) { setTableNumber(''); setShowMobileCart(false); setOrderSource('store'); setActiveTab('tables'); }
+        if (success) { setTableNumber(''); setDeliveryPlatformRef(''); setShowMobileCart(false); setOrderSource('store'); setActiveTab('tables'); }
     };
 
     const handleCheckBill = () => {
@@ -386,9 +389,9 @@ export const POSView: React.FC = () => {
              alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Order Paid via QR!");
         } else {
             const success = await placeOrder('dine-in', {
-                tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note
+                tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef
             });
-            if (success) { alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Paid via QR!"); setTableNumber(''); setOrderSource('store'); setShowMobileCart(false); }
+            if (success) { alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Paid via QR!"); setTableNumber(''); setDeliveryPlatformRef(''); setOrderSource('store'); setShowMobileCart(false); }
         }
         setShowPaymentModal(false);
     };
@@ -431,6 +434,7 @@ export const POSView: React.FC = () => {
             deliveryFee: selectedOrder?.deliveryFee,
             note: selectedOrder?.note || '',
             queueNo: queueNo,
+            deliveryPlatformRef: selectedOrder ? selectedOrder.deliveryPlatformRef : deliveryPlatformRef,
             items: currentItems,
             subtotal: subtotal,
             vat: vatAmount,
@@ -473,6 +477,7 @@ export const POSView: React.FC = () => {
             deliveryFee: order.deliveryFee,
             note: order.note,
             queueNo: queueNo,
+            deliveryPlatformRef: order.deliveryPlatformRef,
             items: order.items,
             subtotal: subtotal,
             vat: vatAmount,
@@ -672,140 +677,102 @@ export const POSView: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans">
             
-            {/* --- ROBUST THAI RECEIPT PRINTER (Hidden) --- */}
-            <div className="hidden print:block print:w-[80mm] print:font-mono p-0 m-0 bg-white text-black leading-tight">
+            {/* --- ROBUST THAI RECEIPT PRINTER (Hidden, 58mm Format) --- */}
+            <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
                 {receiptData && (
-                    <div className="text-center" style={{ width: '80mm', fontSize: '12px' }}>
-                        {/* Header: Delivery Source / Table / Queue Highlighting */}
-                        <div className="border-b-2 border-black pb-2 mb-2">
-                            <div className="text-3xl font-extrabold uppercase">{receiptData.source !== 'store' ? receiptData.source : receiptData.queueNo}</div>
-                            {receiptData.source !== 'store' && <div className="text-xl font-bold mt-1">{receiptData.queueNo}</div>}
+                    <div className="w-[58mm] text-[11px] overflow-hidden">
+                        <div className="text-center font-bold">
+                            <div>=============================</div>
+                            <div className="mt-1 mb-1 text-[13px]">{receiptData.storeName}</div>
+                            <div className="mb-1">โทร: {receiptData.phone}</div>
+                            {receiptData.deliveryPlatformRef && receiptData.source !== 'STORE' && (
+                                <div className="mt-2 mb-1">
+                                    {receiptData.source.toUpperCase() === 'GRAB' ? (
+                                        <div className="whitespace-pre-wrap">Order Grab เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                    ) : receiptData.source.toUpperCase() === 'LINEMAN' ? (
+                                        <div className="whitespace-pre-wrap">Order Lineman เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap">Order {receiptData.source} เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                    )}
+                                </div>
+                            )}
+                            <div>=============================</div>
+                            <div className="mt-1">ใบเสร็จรับเงิน / ใบสั่งอาหาร</div>
+                            <div>(Receipt/Order)</div>
+                            <div>-----------------------------</div>
                         </div>
 
-                        {/* Store Info */}
-                        <div className="font-bold text-lg">{receiptData.storeName}</div>
-                        <div className="text-[10px] mb-1">{receiptData.address}</div>
-                        <div className="text-[10px] mb-1">TAX ID: {receiptData.taxId} | Tel: {receiptData.phone}</div>
-                        <div className="text-[10px] font-bold">
-                            {receiptData.taxInvoice?.isRequested ? 'ใบเสร็จรับเงิน / ใบกำกับภาษี' : 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ (ABB)'}
-                        </div>
-
-                        <div className="border-b border-black border-dashed my-1"></div>
-
-                        {/* Meta Data */}
-                        <div className="flex justify-between text-[10px]">
-                            <span>Bill #: {receiptData.orderId}</span>
-                            <span>{receiptData.date}</span>
-                        </div>
-                        {receiptData.taxInvoice?.isRequested && (
-                            <div className="text-left text-[10px] mt-1 border border-black p-1 rounded">
-                                <div className="font-bold border-b border-black border-dashed pb-1 mb-1">ข้อมูลผู้ซื้อ / Customer</div>
-                                <div><span className="font-bold">นาม:</span> {receiptData.taxInvoice.companyName}</div>
-                                <div><span className="font-bold">เลขผู้เสียภาษี:</span> {receiptData.taxInvoice.taxId}</div>
-                                <div><span className="font-bold">ที่อยู่:</span> {receiptData.taxInvoice.address}</div>
+                        <div className="mt-1 mb-1 px-1">
+                            <div className="flex justify-between">
+                                <span>เลขที่บิล: {receiptData.orderId}</span>
+                                <span>วันที่: {receiptData.date.split(' ')[0]}</span>
                             </div>
-                        )}
-                        {receiptData.customerName && receiptData.customerName !== 'Guest' && (
-                            <div className="text-left text-[10px] font-bold mt-1">Cust: {receiptData.customerName} {receiptData.customerPhone ? `(${receiptData.customerPhone})` : ''}</div>
-                        )}
-                        {receiptData.deliveryAddress && (
-                            <div className="text-left text-[10px] mt-1 border border-black p-1 rounded">
-                                <span className="font-bold">Deliver To:</span> {receiptData.deliveryAddress}
+                            <div className="flex justify-between">
+                                <span>โต๊ะ: {receiptData.tableOrType.replace('Table ', '')}</span>
+                                <span>เวลา: {receiptData.date.split(' ')[1] || '00:00'} น.</span>
                             </div>
-                        )}
+                            <div className="flex justify-between">
+                                <span>พนักงาน: Cashier</span>
+                                <span>จำนวนลูกค้า: 1 ท่าน</span>
+                            </div>
+                        </div>
 
-                        <div className="border-b border-black border-dashed my-1"></div>
-
-                        {/* Items */}
-                        <table className="w-full text-left text-[11px] mb-1">
+                        <div className="text-center font-bold">-----------------------------</div>
+                        <table className="w-full text-left text-[10px]">
                             <thead>
-                                <tr className="border-b border-black border-dashed">
-                                    <th className="w-6 py-1">Qty</th>
-                                    <th className="py-1">Item</th>
-                                    <th className="text-right py-1">Total</th>
+                                <tr>
+                                    <th className="font-normal w-1/2">รายการ</th>
+                                    <th className="font-normal text-right">จำนวน</th>
+                                    <th className="font-normal text-right">ราคา</th>
+                                    <th className="font-normal text-right">รวม</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                <tr>
+                                    <td colSpan={4} className="text-center font-bold">-----------------------------</td>
+                                </tr>
                                 {(receiptData.items || []).map((item, i) => (
                                     <React.Fragment key={i}>
-                                        <tr className="align-top font-bold">
-                                            <td className="pt-1">{item.quantity}</td>
-                                            <td className="pt-1 pr-1">{item.name}</td>
-                                            <td className="text-right pt-1">{item.totalPrice.toFixed(2)}</td>
+                                        <tr className="align-top">
+                                            <td className="pr-1 whitespace-pre-wrap">
+                                                {i + 1}. {item.name}
+                                                {item.specialInstructions && ` [**${item.specialInstructions}**]`}
+                                            </td>
+                                            <td className="text-center">{item.quantity}</td>
+                                            <td className="text-right">{(item.totalPrice/item.quantity).toFixed(0)}.-</td>
+                                            <td className="text-right">{item.totalPrice.toFixed(0)}.-</td>
                                         </tr>
-                                        {/* Toppings & Details */}
-                                        {((item.selectedToppings || []).length > 0 || item.specialInstructions || item.subItems) && (
-                                            <tr>
-                                                <td></td>
-                                                <td colSpan={2} className="text-[10px] pb-1">
-                                                    {item.subItems && item.subItems.length > 0 && (
-                                                        <div className="text-gray-700">- Combo: {(item.subItems || []).filter(Boolean).map(s => s.name).join(', ')}</div>
-                                                    )}
-                                                    {(item.selectedToppings || []).length > 0 && (
-                                                        <div className="text-gray-600">- {(item.selectedToppings || []).map(t => t.name).join(', ')}</div>
-                                                    )}
-                                                    {item.specialInstructions && (
-                                                        <div className="font-bold text-black border border-black inline-block px-1 mt-0.5">
-                                                            ** {item.specialInstructions} **
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )}
                                     </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
-
-                        <div className="border-b border-black border-dashed my-1"></div>
-
-                        {/* Summary */}
-                        <div className="flex justify-between text-[10px]">
-                            <span>Subtotal (ก่อน VAT)</span>
-                            <span>{receiptData.subtotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px]">
-                            <span>VAT 7%</span>
-                            <span>{receiptData.vat.toFixed(2)}</span>
-                        </div>
-                        {receiptData.deliveryFee !== undefined && receiptData.deliveryFee !== null && (
-                            <div className="flex justify-between text-[10px]">
-                                <span>Delivery Fee</span>
-                                <span>{receiptData.deliveryFee === 'pending' ? 'TBD' : receiptData.deliveryFee.toFixed(2)}</span>
-                            </div>
-                        )}
                         
-                        <div className="flex justify-between font-bold text-xl mt-1">
-                            <span>TOTAL</span>
-                            <span>{receiptData.total.toFixed(2)}</span>
-                        </div>
+                        <div className="text-center font-bold">-----------------------------</div>
 
-                        <div className="border-b border-black border-dashed my-1"></div>
-
-                        {/* Payment */}
-                        <div className="flex justify-between text-[11px] font-bold">
-                            <span>{receiptData.paymentMethod.toUpperCase()}</span>
-                            <span>{receiptData.received.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px]">
-                            <span>Change</span>
-                            <span>{receiptData.change.toFixed(2)}</span>
-                        </div>
-
-                        {/* Order Note */}
-                        {receiptData.note && (
-                            <div className="mt-2 border-2 border-black p-1 text-left">
-                                <div className="text-[10px] font-bold uppercase">Note:</div>
-                                <div className="text-[12px] font-bold">{receiptData.note}</div>
+                        <div className="px-1 mt-1 font-bold">
+                            <div className="flex justify-between">
+                                <span>รวมเงินทั้งสิ้น (Subtotal)</span>
+                                <span>{receiptData.subtotal.toFixed(0)}.-</span>
                             </div>
-                        )}
+                            {receiptData.deliveryFee && receiptData.deliveryFee !== 'pending' && (
+                                <div className="flex justify-between mt-1 text-[10px]">
+                                    <span>ค่าจัดส่ง (Delivery)</span>
+                                    <span>{Number(receiptData.deliveryFee).toFixed(0)}.-</span>
+                                </div>
+                            )}
+                            {/* Assuming no explicit discount data currently */}
+                            <div className="flex justify-between text-[13px] mt-1">
+                                <span>ยอดสุทธิ (Total)</span>
+                                <span>{receiptData.total.toFixed(0)}.-</span>
+                            </div>
+                        </div>
 
-                        <div className="mt-4 text-center text-[10px] font-bold">
-                            *** Thank You / ขอบคุณครับ ***
+                        <div className="text-center font-bold mt-1">-----------------------------</div>
+                        <div className="text-center mt-2 mb-2 font-bold px-1">
+                            <div className="mb-2 text-[10px]">({receiptData.total} บาทถ้วน)</div>
+                            <div>ขอบคุณที่ใช้บริการ / Thank You</div>
                         </div>
-                        <div className="text-[9px] mt-1 text-gray-500">
-                            Powered by Pizza Damac System
-                        </div>
+                        <div className="text-center font-bold">=============================</div>
                     </div>
                 )}
             </div>
@@ -888,6 +855,9 @@ export const POSView: React.FC = () => {
                             </div>
                             <div className="p-4 bg-white border-t space-y-3">
                                 <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option></select></div>
+                                {orderSource !== 'store' && (
+                                    <div className="w-full"><input type="text" placeholder={`${orderSource.toUpperCase()} Order No.`} className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" value={deliveryPlatformRef} onChange={e => setDeliveryPlatformRef(e.target.value)}/></div>
+                                )}
                                 <div className="flex justify-between items-center text-2xl font-bold text-gray-900 mt-2"><span>Total</span><span>฿{cartTotal}</span></div>
                                 <div className="grid grid-cols-2 gap-3"><button onClick={handleSendToKitchen} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Kitchen</button><button onClick={handleCheckBill} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Pay Now</button></div>
                             </div>
@@ -1084,7 +1054,7 @@ export const POSView: React.FC = () => {
                                         <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.lineUrl} onChange={e => setContactForm({...contactForm, lineUrl: e.target.value})} />
                                      </div>
                                 </div>
-                                <button onClick={() => updateStoreSettings(contactForm)} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full md:w-auto">Save Contact Settings</button>
+                                <button onClick={() => { updateStoreSettings(contactForm); alert("Contact Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full md:w-auto">Save Contact Settings</button>
                             </div>
                         </div>
                     </div>

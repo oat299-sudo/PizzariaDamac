@@ -836,6 +836,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       tableNumber?: string;
       source?: OrderSource;
       status?: OrderStatus;
+      deliveryPlatformRef?: string;
     }
   ) => {
       // Calculate Total
@@ -848,6 +849,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const gpRate = GP_RATES[source] || 0;
       const netAmount = totalAmount * (1 - gpRate);
 
+      let computedNote = details?.note || '';
+      if (details?.deliveryPlatformRef) {
+          computedNote = `Ref: ${details.deliveryPlatformRef}${computedNote ? ' | ' + computedNote : ''}`;
+      }
+
       const newOrder: Order = {
           id: Date.now().toString(),
           customerName: customer ? customer.name : (details?.tableNumber ? `Table ${details.tableNumber}` : 'Guest'),
@@ -859,13 +865,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           totalAmount,
           netAmount,
           createdAt: new Date().toISOString(),
-          note: details?.note,
+          note: computedNote,
           deliveryAddress: details?.delivery?.address,
           deliveryZone: details?.delivery?.zoneName,
           deliveryFee: details?.delivery?.fee,
           paymentMethod: details?.paymentMethod,
           pickupTime: details?.pickupTime,
-          tableNumber: details?.tableNumber
+          tableNumber: details?.tableNumber,
+          deliveryPlatformRef: details?.deliveryPlatformRef
       };
 
       if (isSupabaseConfigured) {
@@ -889,8 +896,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                  pickup_time: newOrder.pickupTime,
                  table_number: newOrder.tableNumber
              };
-             await supabase.from('orders').insert([payload]);
-          } catch(e) { console.error("Order placement failed", e); return false; }
+             const {error} = await supabase.from('orders').insert([payload]); if (error) { console.error('Supabase order insert error:', error); throw error; }
+          } catch(e: any) { console.error("Order placement failed", e); alert("Order placement failed: " + (e?.message || String(e))); return false; }
       }
 
       setOrders(prev => [newOrder, ...prev]);
@@ -1040,7 +1047,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           if (settings.lineUrl !== undefined) payload.line_url = settings.lineUrl;
           if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
           if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
-          if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber; // Assuming DB column name
+          if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber;
 
           if (Object.keys(payload).length > 0) {
              const { error } = await supabase.from('store_settings').update(payload).eq('id', 1);

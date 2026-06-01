@@ -105,6 +105,7 @@ export interface Order {
   tableNumber?: string;
   paymentMethod?: PaymentMethod;
   pickupTime?: string;
+  deliveryPlatformRef?: string;
 }
 
 // Accounting
