@@ -940,7 +940,137 @@ export const POSView: React.FC = () => {
                     </div>
                 )}
 
-                {/* ... (Existing Sales and Manage Tabs - No Changes) ... */}
+                {activeTab === 'sales' && (() => {
+                    const filteredOrders = orders.filter(o => filterByDate(o.createdAt, salesFilter));
+                    const filteredExpenses = expenses.filter(e => filterByDate(e.date, salesFilter));
+                    const totalSales = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+                    const netSales = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0);
+                    const totalExpensesValue = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+                    
+                    return (
+                        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                            <div className="max-w-7xl mx-auto space-y-6">
+                                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><PieChart className="text-brand-600"/> Reports & History</h2>
+                                
+                                {/* Filters */}
+                                <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                    <div className="flex gap-2">
+                                        {(['day', 'month', 'year', 'all'] as const).map(f => (
+                                            <button key={f} onClick={() => setSalesFilter(f)} className={`px-4 py-2 rounded-lg font-bold transition capitalize ${salesFilter === f ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                                {f === 'day' ? 'Today' : f}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: o.items.length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2"><Download size={18}/> Export CSV</button>
+                                </div>
+
+                                {/* KPIs */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Sales</p><p className="text-3xl font-bold text-gray-900">฿{totalSales.toLocaleString()}</p></div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Orders</p><p className="text-3xl font-bold text-gray-900">{filteredOrders.length}</p></div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Net Sales (After GP)</p><p className="text-3xl font-bold text-brand-600">฿{netSales.toLocaleString()}</p></div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Expenses</p><p className="text-3xl font-bold text-orange-500">฿{totalExpensesValue.toLocaleString()}</p></div>
+                                </div>
+
+                                {/* Order History Table */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-800 text-lg">Order History</h3></div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs border-b border-gray-100">
+                                                <tr><th className="p-4">Time</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount</th><th className="p-4 text-right">Actions</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {filteredOrders.reverse().map(order => (
+                                                    <tr key={order.id} className="hover:bg-gray-50">
+                                                        <td className="p-4 text-gray-600">{new Date(parseInt(order.id)).toLocaleTimeString()}</td>
+                                                        <td className="p-4 font-bold text-gray-800">#{order.id.slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
+                                                        <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
+                                                        <td className="p-4">
+                                                            <span className={`uppercase text-[10px] font-bold px-2 py-1 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                {order.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 font-bold text-brand-600">฿{order.totalAmount}</td>
+                                                        <td className="p-4 text-right">
+                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 px-3 py-1 rounded">View Receipt</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filteredOrders.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400 font-bold">No orders found for this period.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {activeTab === 'qr_gen' && (
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><QrCode className="text-brand-600"/> QR Generator</h2>
+                            <div className="flex flex-col md:flex-row gap-8">
+                                <div className="flex-1 space-y-4">
+                                    <div>
+                                        <label className="text-sm font-bold text-gray-500 uppercase">Base URL</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-gray-700 focus:border-brand-500 outline-none mt-1" value={qrBaseUrl} onChange={e => setQrBaseUrl(e.target.value)} />
+                                    </div>
+                                    <div>
+                                         <label className="text-sm font-bold text-gray-500 uppercase">Table Number</label>
+                                         <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-gray-700 focus:border-brand-500 outline-none mt-1" value={qrTableNum} onChange={e => setQrTableNum(e.target.value)} placeholder="e.g. 5" />
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-2 p-3 bg-gray-50 rounded-xl leading-relaxed">
+                                         This tool generates a QR code pre-filled with the table number. Customers scanning this QR will automatically be assigned this table number during order placement.
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 min-w-[250px]">
+                                     {qrBaseUrl && qrTableNum ? (
+                                         <>
+                                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(getCleanQrUrl() + '?table=' + qrTableNum)}`} alt="QR Code" className="w-48 h-48 mix-blend-multiply border border-gray-200 p-2 bg-white rounded-xl shadow-sm" />
+                                             <div className="mt-4 font-bold text-lg text-brand-600 text-center uppercase">Table {qrTableNum}</div>
+                                             <button className="mt-6 bg-brand-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-brand-700 w-full shadow flex items-center justify-center gap-2" onClick={handlePrintQrCard}><Printer size={18}/> Print QR Card</button>
+                                         </>
+                                     ) : (
+                                         <div className="text-gray-400 font-bold text-center">Enter Base URL & Table Number</div>
+                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'manage' && (
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                        <div className="max-w-4xl mx-auto space-y-6">
+                            <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><Settings className="text-brand-600"/> Store Settings & Management</h2>
+                            {/* Contact Info Settings */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Phone size={20} className="text-brand-500"/> Connect & Links (Footer)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Contact Phone</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.contactPhone} onChange={e => setContactForm({...contactForm, contactPhone: e.target.value})} />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">PromptPay Number</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.promptPayNumber} onChange={e => setContactForm({...contactForm, promptPayNumber: e.target.value})} />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Facebook URL</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.facebookUrl} onChange={e => setContactForm({...contactForm, facebookUrl: e.target.value})} />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Line URL</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.lineUrl} onChange={e => setContactForm({...contactForm, lineUrl: e.target.value})} />
+                                     </div>
+                                </div>
+                                <button onClick={() => updateStoreSettings(contactForm)} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full md:w-auto">Save Contact Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
 
             {/* ... (Existing Modals) ... */}
