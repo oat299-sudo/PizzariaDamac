@@ -78,6 +78,7 @@ export const POSView: React.FC = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
     const [cashReceived, setCashReceived] = useState<string>('');
+    const [taxInvoice, setTaxInvoice] = useState({ isRequested: false, companyName: '', taxId: '', address: '' });
     const [change, setChange] = useState<number>(0);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -121,6 +122,12 @@ export const POSView: React.FC = () => {
         change: number;
         note?: string;
         queueNo?: string;
+        taxInvoice?: {
+            isRequested: boolean;
+            companyName: string;
+            taxId: string;
+            address: string;
+        };
     }
     const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
@@ -430,7 +437,8 @@ export const POSView: React.FC = () => {
             total: currentTotal,
             paymentMethod: payMethod === 'cash' ? 'CASH' : 'QR / TRANSFER',
             received: received,
-            change: changeAmt
+            change: changeAmt,
+            taxInvoice: taxInvoice
         });
 
         setTimeout(() => { window.print(); }, 200);
@@ -678,7 +686,9 @@ export const POSView: React.FC = () => {
                         <div className="font-bold text-lg">{receiptData.storeName}</div>
                         <div className="text-[10px] mb-1">{receiptData.address}</div>
                         <div className="text-[10px] mb-1">TAX ID: {receiptData.taxId} | Tel: {receiptData.phone}</div>
-                        <div className="text-[10px] font-bold">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ (ABB)</div>
+                        <div className="text-[10px] font-bold">
+                            {receiptData.taxInvoice?.isRequested ? 'ใบเสร็จรับเงิน / ใบกำกับภาษี' : 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ (ABB)'}
+                        </div>
 
                         <div className="border-b border-black border-dashed my-1"></div>
 
@@ -687,6 +697,14 @@ export const POSView: React.FC = () => {
                             <span>Bill #: {receiptData.orderId}</span>
                             <span>{receiptData.date}</span>
                         </div>
+                        {receiptData.taxInvoice?.isRequested && (
+                            <div className="text-left text-[10px] mt-1 border border-black p-1 rounded">
+                                <div className="font-bold border-b border-black border-dashed pb-1 mb-1">ข้อมูลผู้ซื้อ / Customer</div>
+                                <div><span className="font-bold">นาม:</span> {receiptData.taxInvoice.companyName}</div>
+                                <div><span className="font-bold">เลขผู้เสียภาษี:</span> {receiptData.taxInvoice.taxId}</div>
+                                <div><span className="font-bold">ที่อยู่:</span> {receiptData.taxInvoice.address}</div>
+                            </div>
+                        )}
                         {receiptData.customerName && receiptData.customerName !== 'Guest' && (
                             <div className="text-left text-[10px] font-bold mt-1">Cust: {receiptData.customerName} {receiptData.customerPhone ? `(${receiptData.customerPhone})` : ''}</div>
                         )}
@@ -1171,6 +1189,27 @@ export const POSView: React.FC = () => {
                                         </div>
                                         <p className="text-center text-gray-500 text-sm font-bold">Scan with any Banking App</p>
                                         <div className="mt-2 text-3xl font-bold text-brand-600">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Tax Invoice Toggle */}
+                            <div className="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                    <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked={taxInvoice.isRequested} onChange={(e) => setTaxInvoice({...taxInvoice, isRequested: e.target.checked})} />
+                                    <span className="font-bold text-gray-700 text-sm">ขอใบกำกับภาษีเต็มรูป (Tax Invoice)</span>
+                                </label>
+                                {taxInvoice.isRequested && (
+                                    <div className="space-y-3 mt-3 border-t border-gray-200 pt-3 animate-fade-in">
+                                         <div>
+                                            <input type="text" placeholder="ชื่อบริษัท / Company Name" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.companyName} onChange={e => setTaxInvoice({...taxInvoice, companyName: e.target.value})} />
+                                         </div>
+                                         <div>
+                                            <input type="text" placeholder="เลขประจำตัวผู้เสียภาษี / Tax ID" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.taxId} onChange={e => setTaxInvoice({...taxInvoice, taxId: e.target.value})} />
+                                         </div>
+                                         <div>
+                                            <input type="text" placeholder="ที่อยู่ / Address" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.address} onChange={e => setTaxInvoice({...taxInvoice, address: e.target.value})} />
+                                         </div>
                                     </div>
                                 )}
                             </div>

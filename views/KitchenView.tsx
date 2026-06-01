@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus } from '../types';
-import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers } from 'lucide-react';
+import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
+  const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
 
   const getStatusColor = (status: OrderStatus) => {
       switch(status) {
@@ -25,9 +26,21 @@ export const KitchenView: React.FC = () => {
       return <Utensils size={16} className="text-blue-600" />;
   };
 
-  // Filter out completed for the main board to keep it clean, or keep them at bottom
-  const activeOrders = orders.filter(o => o.status !== 'cancelled').sort((a,b) => {
-       // Sort by status priority then time
+  const displayOrders = orders.filter(o => o.status !== 'cancelled').filter(o => {
+      if (filterType === 'active') return o.status !== 'completed';
+      
+      const d = new Date(o.createdAt);
+      const now = new Date();
+      if (filterType === 'today') {
+           return d.toDateString() === now.toDateString();
+      }
+      if (filterType === 'yesterday') {
+           const yesterday = new Date(now);
+           yesterday.setDate(yesterday.getDate() - 1);
+           return d.toDateString() === yesterday.toDateString();
+      }
+      return true;
+  }).sort((a,b) => {
        const priority = { pending: 0, confirmed: 1, acknowledged: 2, cooking: 3, ready: 4, completed: 5, cancelled: 6 };
        if (priority[a.status] !== priority[b.status]) return priority[a.status] - priority[b.status];
        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -42,10 +55,24 @@ export const KitchenView: React.FC = () => {
             </h1>
             <p className="text-gray-400 text-sm mt-1">{t('realtimeTracking')}</p>
         </div>
-        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+            
+            {/* Filter Buttons */}
+            <div className="flex gap-2 bg-gray-700 p-1 rounded-lg">
+                <button onClick={() => setFilterType('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'active' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                    Active
+                </button>
+                <button onClick={() => setFilterType('today')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'today' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                    Today
+                </button>
+                <button onClick={() => setFilterType('yesterday')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'yesterday' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                    Yesterday
+                </button>
+            </div>
+
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
-                <span className="text-gray-400 text-sm block">{t('active')}</span>
-                <span className="text-2xl font-bold text-brand-400">{activeOrders.filter(o => o.status !== 'completed').length}</span>
+                <span className="text-gray-400 text-sm block">Orders</span>
+                <span className="text-2xl font-bold text-brand-400">{displayOrders.length}</span>
             </div>
             <button 
                 onClick={adminLogout} 
@@ -57,7 +84,7 @@ export const KitchenView: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {activeOrders.map(order => (
+        {displayOrders.map(order => (
            <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 flex flex-col overflow-hidden text-gray-900 ${order.status === 'completed' ? 'border-gray-400 opacity-60' : 'border-brand-500'}`}>
               {/* Header */}
               <div className={`p-4 border-b flex justify-between items-start ${order.status === 'pending' ? 'bg-red-50' : 'bg-white'}`}>
