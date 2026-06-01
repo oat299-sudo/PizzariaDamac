@@ -74,6 +74,7 @@ interface StoreContextType {
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   updateOrderDeliveryFee: (orderId: string, fee: number) => Promise<void>;
+  updateOrderNetAmount: (orderId: string, netAmount: number) => Promise<void>;
   completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
@@ -273,7 +274,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           try {
               const lighterSettings = { ...storeSettings, eventGalleryUrls: [], promoBannerUrl: '' };
               localStorage.setItem('damac_store_settings', JSON.stringify(lighterSettings));
-              alert("Storage limits exceeded. Large images were not saved locally.");
           } catch (e2) {
               console.error("Critical Storage Error", e2);
           }
@@ -980,6 +980,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } : o));
   };
   
+  const updateOrderNetAmount = async (orderId: string, netAmount: number) => {
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').update({ 
+              net_amount: netAmount
+          }).eq('id', orderId);
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          netAmount: netAmount
+      } : o));
+  };
+  
   const completeOrder = async (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => {
       if (isSupabaseConfigured) {
           await supabase.from('orders').update({ 
@@ -1126,7 +1138,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, completeOrder, deleteOrder, reorderItem, fetchOrders,
+      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,

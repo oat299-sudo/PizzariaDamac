@@ -15,12 +15,26 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee
+        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount
     } = useStore();
     
     // Unified Tab State
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
+
+    const handleUpdateGPDeduction = async (order: Order) => {
+        const suggestion = (order.totalAmount - (order.netAmount || order.totalAmount)).toFixed(2);
+        const deductionStr = prompt(`Enter GP Deduction Amount for Order #${order.id.slice(-4)}:`, suggestion);
+        if (deductionStr !== null) {
+            const deduction = parseFloat(deductionStr);
+            if (!isNaN(deduction) && deduction >= 0) {
+                const newNetAmount = order.totalAmount - deduction;
+                await updateOrderNetAmount(order.id, newNetAmount);
+            } else {
+                alert("Invalid deduction amount.");
+            }
+        }
+    };
     const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
     const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
     const [activeCategory, setActiveCategory] = useState<ProductCategory>('pizza');
@@ -584,7 +598,7 @@ export const POSView: React.FC = () => {
         const file = e.target.files?.[0];
         if (file) { 
             try {
-                const compressed = await compressImage(file, 800); // 800px max width for gallery
+                const compressed = await compressImage(file, 400); // 400px max width to severely save space
                 const newGallery = [...(mediaForm.eventGalleryUrls || []), compressed]; 
                 setMediaForm(p => ({ ...p, eventGalleryUrls: newGallery })); 
             } catch(e) { alert("Gallery upload failed"); }
@@ -735,6 +749,18 @@ export const POSView: React.FC = () => {
                                         <tr className="align-top">
                                             <td className="pr-1 whitespace-pre-wrap">
                                                 {i + 1}. {item.name}
+                                                {((item.selectedToppings?.length || 0) > 0 || (item.subItems?.length || 0) > 0) && (
+                                                    <div className="pl-3 text-[10px] text-black">
+                                                        {item.selectedToppings?.map(t => `+ ${t.name}`).join(' ')}
+                                                        {item.subItems?.map(s => {
+                                                            let str = `+ ${s.name}`;
+                                                            if (s.toppings?.length) {
+                                                                str += ` (${s.toppings.map(t=>t.name).join(', ')})`;
+                                                            }
+                                                            return str;
+                                                        }).join('\n')}
+                                                    </div>
+                                                )}
                                                 {item.specialInstructions && ` [**${item.specialInstructions}**]`}
                                             </td>
                                             <td className="text-center">{item.quantity}</td>
@@ -912,6 +938,12 @@ export const POSView: React.FC = () => {
                                                     <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
                                                 </div>
                                             )}
+                                            {order.source !== 'store' && (
+                                                <div className="mt-2 flex justify-between items-center bg-orange-50 p-2 rounded border border-orange-100">
+                                                    <span className="text-sm font-bold text-orange-800">GP Deduction</span>
+                                                    <button onClick={() => handleUpdateGPDeduction(order)} className="text-xs bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 font-bold shadow-sm">Edit GP</button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="p-4 border-t bg-gray-50 grid grid-cols-2 gap-3">
                                             <button onClick={() => handleCheckTableBill(order)} className="bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-lg"><Receipt size={20}/> Check Bill</button>
@@ -965,7 +997,7 @@ export const POSView: React.FC = () => {
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs border-b border-gray-100">
-                                                <tr><th className="p-4">Time</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount</th><th className="p-4 text-right">Actions</th></tr>
+                                                <tr><th className="p-4">Time</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount(Total)</th><th className="p-4 text-orange-500">Net(After GP)</th><th className="p-4 text-right">Actions</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {filteredOrders.reverse().map(order => (
@@ -978,9 +1010,13 @@ export const POSView: React.FC = () => {
                                                                 {order.status}
                                                             </span>
                                                         </td>
-                                                        <td className="p-4 font-bold text-brand-600">฿{order.totalAmount}</td>
-                                                        <td className="p-4 text-right">
-                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 px-3 py-1 rounded">View Receipt</button>
+                                                        <td className="p-4 font-bold text-gray-600">฿{order.totalAmount}</td>
+                                                        <td className="p-4 font-bold text-brand-600">฿{order.netAmount || order.totalAmount}</td>
+                                                        <td className="p-4 text-right flex justify-end gap-2">
+                                                            {order.source !== 'store' && (
+                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 px-3 py-1 rounded">Edit GP</button>
+                                                            )}
+                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 px-3 py-1 rounded">Receipt</button>
                                                         </td>
                                                     </tr>
                                                 ))}

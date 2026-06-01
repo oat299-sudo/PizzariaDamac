@@ -7,6 +7,12 @@ import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknot
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+
+  const toggleItemCheck = (orderId: string, itemIdx: number) => {
+      const key = `${orderId}-${itemIdx}`;
+      setCheckedItems(prev => ({...prev, [key]: !prev[key]}));
+  };
 
   const getStatusColor = (status: OrderStatus) => {
       switch(status) {
@@ -137,12 +143,16 @@ export const KitchenView: React.FC = () => {
                   <ul className="space-y-4">
                       {(order.items || []).map((item, idx) => {
                           const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                          const isChecked = checkedItems[`${order.id}-${idx}`] || false;
                           return (
-                          <li key={idx} className="flex flex-col border-b border-dashed border-gray-100 pb-3 last:border-0 last:pb-0">
+                          <li key={idx} className={`flex flex-col border-b border-dashed border-gray-100 pb-3 last:border-0 last:pb-0 transition-all ${isChecked ? 'opacity-50 grayscale' : ''}`}>
                               <div className="flex items-start gap-3">
+                                  <button onClick={() => toggleItemCheck(order.id, idx)} className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border-2 transition-colors ${isChecked ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 text-transparent hover:border-green-400'}`}>
+                                      <CheckCircle size={20} />
+                                  </button>
                                   <span className="bg-gray-900 text-white w-8 h-8 flex items-center justify-center rounded-lg text-lg font-bold flex-shrink-0">{item.quantity}</span> 
-                                  <div className="flex-1">
-                                      <span className="font-bold text-gray-800 text-lg leading-tight block">{name}</span>
+                                  <div className="flex-1 overflow-hidden" onClick={() => toggleItemCheck(order.id, idx)}>
+                                      <span className={`font-bold text-gray-800 text-lg leading-tight block ${isChecked ? 'line-through text-gray-500' : ''}`}>{name}</span>
                                       
                                       {/* Sub Items (Combo Choices) */}
                                       {item.subItems && item.subItems.length > 0 && (
