@@ -99,6 +99,8 @@ interface StoreContextType {
   deleteNewsItem: (id: string) => Promise<void>;
 
   tableSession: string | null;
+  paperSize: '58mm' | '80mm';
+  setPaperSize: (size: '58mm' | '80mm') => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -116,6 +118,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           } catch(e) { console.error("Storage Error", e); }
           return newLang;
       });
+  };
+
+  // --- Printer Preference State ---
+  const [paperSize, setPaperSizeState] = useState<'58mm' | '80mm'>(() => {
+      if (typeof window !== 'undefined') {
+          return (localStorage.getItem('damac_paper_size') as '58mm' | '80mm') || '80mm';
+      }
+      return '80mm';
+  });
+  const setPaperSize = (size: '58mm' | '80mm') => {
+      setPaperSizeState(size);
+      try {
+          localStorage.setItem('damac_paper_size', size);
+      } catch(e) { console.error("Storage Error", e); }
   };
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
       let text = TRANSLATIONS[language][key] || TRANSLATIONS['en'][key] || key;
@@ -1227,7 +1243,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,
-      tableSession
+      tableSession,
+      paperSize, setPaperSize
   };
 
   return (

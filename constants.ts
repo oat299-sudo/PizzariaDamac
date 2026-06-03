@@ -46,7 +46,9 @@ export const GP_RATES: Record<OrderSource, number> = {
   grab: 0.32,      // 32%
   lineman: 0.32,   // 32%
   robinhood: 0.25, // 25%
-  foodpanda: 0.35  // 35%
+  foodpanda: 0.35, // 35%
+  shopeefood: 0.30, // 30%
+  other: 0         // 0%
 };
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [

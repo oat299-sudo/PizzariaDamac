@@ -53,7 +53,8 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
-        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount
+        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount,
+        paperSize, setPaperSize
     } = useStore();
     
     // Unified Tab State
@@ -900,60 +901,78 @@ export const POSView: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden flex-col lg:flex-row font-sans print:h-auto print:overflow-visible print:bg-white print:block">
-            
-            {/* --- ROBUST THAI RECEIPT PRINTER (Hidden, 58mm Format) --- */}
-            <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
+                     {/* --- DYNAMIC PRINTER STYLE INJECTION --- */}
+            <style dangerouslySetInnerHTML={{ __html: `
+                @media print {
+                    @page {
+                        size: ${paperSize === '58mm' ? '58mm' : '80mm'} auto !important;
+                        margin: 0mm !important;
+                    }
+                    html, body {
+                        width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    .printable-area {
+                        width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                        padding: ${paperSize === '58mm' ? '1mm' : '2mm'} !important;
+                    }
+                }
+            ` }} />
+
+            {/* --- ROBUST THAI RECEIPT PRINTER (58mm/80mm Adaptive Channel) --- */}
+            <div className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm] text-[10.5px]' : 'print:w-[80mm] text-[12px]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}>
                 {receiptData && (
-                    <div className="w-[58mm] text-[11px] overflow-hidden">
+                    <div className={`${paperSize === '58mm' ? 'w-[58mm] text-[10.5px]' : 'w-[80mm] text-[12px]'} overflow-hidden`}>
                         <div className="text-center font-bold">
-                            <div>=============================</div>
-                            <div className="mt-1 mb-1 text-[13px]">{receiptData.storeName}</div>
+                            <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
+                            <div className={`${paperSize === '58mm' ? 'text-[12px]' : 'text-[15px]'} mt-1 mb-1 font-black`}>{receiptData.storeName}</div>
                             <div className="mb-1">โทร: {receiptData.phone}</div>
                             {receiptData.deliveryPlatformRef && receiptData.source !== 'STORE' && (
                                 <div className="mt-2 mb-1">
                                     {receiptData.source.toUpperCase() === 'GRAB' ? (
-                                        <div className="whitespace-pre-wrap">Order Grab เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                        <div className="whitespace-pre-wrap text-[11px] font-extrabold bg-gray-150 p-1">Order Grab {receiptData.deliveryPlatformRef}</div>
                                     ) : receiptData.source.toUpperCase() === 'LINEMAN' ? (
-                                        <div className="whitespace-pre-wrap">Order Lineman เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                        <div className="whitespace-pre-wrap text-[11px] font-extrabold bg-gray-150 p-1">Order Lineman {receiptData.deliveryPlatformRef}</div>
                                     ) : (
-                                        <div className="whitespace-pre-wrap">Order {receiptData.source} เลขที่: {receiptData.deliveryPlatformRef}</div>
+                                        <div className="whitespace-pre-wrap text-[11px] font-extrabold bg-gray-150 p-1">Order {receiptData.source} {receiptData.deliveryPlatformRef}</div>
                                     )}
                                 </div>
                             )}
-                            <div>=============================</div>
-                            <div className="mt-1">ใบเสร็จรับเงิน / ใบสั่งอาหาร</div>
-                            <div>(Receipt/Order)</div>
-                            <div>-----------------------------</div>
+                            <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
+                            <div className="mt-1 text-[11px] font-extrabold">ใบเสร็จรับเงิน / ใบสั่งอาหาร</div>
+                            <div className="text-[10px] font-bold">(Receipt / Order Bill)</div>
+                            <div>{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
                         </div>
 
-                        <div className="mt-1 mb-1 px-1">
+                        <div className="mt-1 mb-1 px-0.5 space-y-0.5 font-bold">
                             <div className="flex justify-between">
                                 <span>เลขที่บิล: {receiptData.orderId}</span>
                                 <span>วันที่: {receiptData.date.split(' ')[0]}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span>โต๊ะ: {receiptData.tableOrType.replace('Table ', '')}</span>
+                                <span>โต๊ะ/ประเภท: {receiptData.tableOrType.replace('Table ', '')}</span>
                                 <span>เวลา: {receiptData.date.split(' ')[1] || '00:00'} น.</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>พนักงาน: Cashier</span>
-                                <span>จำนวนลูกค้า: 1 ท่าน</span>
+                                <span>จำนวน: 1 ท่าน</span>
                             </div>
                         </div>
 
-                        <div className="text-center font-bold">-----------------------------</div>
-                        <table className="w-full text-left text-[10px]">
+                        <div className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
+                        <table className="w-full text-left font-bold">
                             <thead>
-                                <tr>
-                                    <th className="font-normal w-1/2">รายการ</th>
-                                    <th className="font-normal text-right">จำนวน</th>
-                                    <th className="font-normal text-right">ราคา</th>
-                                    <th className="font-normal text-right">รวม</th>
+                                <tr className="font-bold border-b border-black">
+                                    <th className="w-[50%] py-1">รายการ (Item)</th>
+                                    <th className="text-center py-1">จำนวน</th>
+                                    <th className="text-right py-1">{paperSize === '58mm' ? 'หน่วย' : 'ราคา/หน่วย'}</th>
+                                    <th className="text-right py-1">รวม (Sub)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td colSpan={4} className="text-center font-bold">-----------------------------</td>
+                                    <td colSpan={4} className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</td>
                                 </tr>
                                  {(receiptData.items || []).map((item, i) => {
                                      const displayName = item.nameTh && item.nameTh !== item.name ? `${item.name} (${item.nameTh})` : item.name;
@@ -963,7 +982,7 @@ export const POSView: React.FC = () => {
                                                  <td className="pr-1 whitespace-pre-wrap py-1">
                                                      <div className="font-bold">{i + 1}. {displayName}</div>
                                                      {((item.selectedToppings?.length || 0) > 0 || (item.subItems?.length || 0) > 0) && (
-                                                         <div className="pl-3.5 text-[9.5px] text-black mt-1 space-y-0.5">
+                                                         <div className="pl-3 text-[9.5px] text-black mt-1 space-y-0.5">
                                                              {item.selectedToppings?.map(t => {
                                                                  const toppingName = t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name;
                                                                  return (
@@ -978,7 +997,7 @@ export const POSView: React.FC = () => {
                                                                      <div key={sIdx} className="pl-1 font-extrabold text-[9px]">
                                                                          ↳ [เซ็ต/COMBO] {comboItemName}
                                                                          {s.toppings?.length > 0 && (
-                                                                             <div className="pl-3.5 text-[8.5px] font-bold text-gray-750 italic">
+                                                                             <div className="pl-3 text-[8.5px] font-bold text-gray-750 italic">
                                                                                  {s.toppings.map(t => {
                                                                                      const toppingName = t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name;
                                                                                      return `+ ${toppingName}`;
@@ -991,7 +1010,7 @@ export const POSView: React.FC = () => {
                                                          </div>
                                                      )}
                                                      {item.specialInstructions && (
-                                                         <div className="mt-1 pl-2 border-l border-black text-[9.5px] font-black bg-gray-100 p-1">
+                                                         <div className="mt-1 pl-2 border-l border-black text-[9px] font-black bg-gray-100 p-1">
                                                              !!! [พิเศษ/REQUEST] : "{item.specialInstructions}" !!!
                                                          </div>
                                                      )}
@@ -1004,16 +1023,16 @@ export const POSView: React.FC = () => {
                                      );
                                  })}
                              </tbody>
-                         </table>
-                         
-                         {receiptData.note && (
-                             <div className="my-2 p-1.5 border border-black text-black">
-                                 <div className="text-[9.5px] font-black">📝 หมายเหตุออเดอร์ (ORDER NOTE):</div>
-                                 <div className="text-[10px] font-bold mt-0.5">"{receiptData.note}"</div>
-                             </div>
-                         )}
+                        </table>
                         
-                        <div className="text-center font-bold">-----------------------------</div>
+                        {receiptData.note && (
+                            <div className="my-2 p-1.5 border border-black text-black">
+                                <div className="text-[9.5px] font-black">📝 หมายเหตุออเดอร์ (ORDER NOTE):</div>
+                                <div className="text-[10px] font-bold mt-0.5">"{receiptData.note}"</div>
+                            </div>
+                        )}
+                        
+                        <div className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
 
                         <div className="px-1 mt-1 font-bold">
                             <div className="flex justify-between">
@@ -1026,19 +1045,18 @@ export const POSView: React.FC = () => {
                                     <span>{Number(receiptData.deliveryFee).toFixed(0)}.-</span>
                                 </div>
                             )}
-                            {/* Assuming no explicit discount data currently */}
                             <div className="flex justify-between text-[13px] mt-1">
                                 <span>ยอดสุทธิ (Total)</span>
                                 <span>{receiptData.total.toFixed(0)}.-</span>
                             </div>
                         </div>
 
-                        <div className="text-center font-bold mt-1">-----------------------------</div>
+                        <div className="text-center font-bold mt-1">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
                         <div className="text-center mt-2 mb-2 font-bold px-1">
                             <div className="mb-2 text-[10px]">({receiptData.total} บาทถ้วน)</div>
                             <div>ขอบคุณที่ใช้บริการ / Thank You</div>
                         </div>
-                        <div className="text-center font-bold">=============================</div>
+                        <div className="text-center font-bold">{paperSize === '58mm' ? '=============================' : '========================================'}</div>
                     </div>
                 )}
             </div>
@@ -1147,7 +1165,7 @@ export const POSView: React.FC = () => {
                                 {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{(item.selectedToppings || []).map(t => t.name).join(', ')}{(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
                             </div>
                             <div className="p-4 bg-white border-t space-y-3 pb-24 lg:pb-4">
-                                <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option></select></div>
+                                <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option><option value="shopeefood">ShopeeFood</option><option value="other">Other / อื่นๆ</option></select></div>
                                 {orderSource !== 'store' && (
                                     <div className="w-full"><input type="text" placeholder={`${orderSource.toUpperCase()} Order No.`} className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" value={deliveryPlatformRef} onChange={e => setDeliveryPlatformRef(e.target.value)}/></div>
                                 )}
@@ -1394,6 +1412,38 @@ export const POSView: React.FC = () => {
                                      </div>
                                 </div>
                                 <button onClick={() => { updateStoreSettings(contactForm); alert("Contact Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Contact Settings</button>
+                            </div>
+
+                            {/* Printer Settings */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Printer size={20} className="text-brand-500"/> {language === 'th' ? 'ตั้งค่าความกว้างกระดาษเครื่องพิมพ์' : 'Printer & Paper Width Settings'}</h3>
+                                <div className="space-y-4">
+                                    <p className="text-sm text-gray-500">
+                                        {language === 'th' ? 'เลือกความกว้างกระดาษเครื่องพิมพ์ความร้อนที่คุณใช้อยู่ เพื่อจัดสัดส่วนใบเสร็จให้สวยงาม ไม่ตกขอบกระดาษ' : 'Choose your physical thermal printer paper width so that receipt formats align perfectly without margins clipping.'}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <button 
+                                            key="btn-58"
+                                            onClick={() => setPaperSize('58mm')} 
+                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition ${paperSize === '58mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+                                        >
+                                            <span className="text-lg">58 mm</span>
+                                            <span className="text-xs font-normal opacity-75 mt-1">{language === 'th' ? 'เครื่องขนาดเล็ก / พกพา' : 'Small / Portable Thermal'}</span>
+                                        </button>
+                                        <button 
+                                            key="btn-80"
+                                            onClick={() => setPaperSize('80mm')} 
+                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition ${paperSize === '80mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+                                        >
+                                            <span className="text-lg">80 mm</span>
+                                            <span className="text-xs font-normal opacity-75 mt-1">{language === 'th' ? 'เครื่องตั้งโต๊ะมาตรฐาน' : 'Standard Desktop Thermal'}</span>
+                                        </button>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-2">
+                                        <span className="text-gray-600 font-bold">{language === 'th' ? 'สลิปปัจจุบัน:' : 'Currently Selected Width:'} <strong className="text-brand-600 font-extrabold text-base">{paperSize}</strong></span>
+                                        <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 rounded-xl">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

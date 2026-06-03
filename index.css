@@ -19,3 +19,42 @@
   0% { opacity: 0; }
   100% { opacity: 1; }
 }
+
+/* Custom print formatting for 80mm thermal printers */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0mm !important;
+  }
+  
+  html, body {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force print scale and rendering */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Specifically enable receipt printing block */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm !important;
+    padding: 2mm !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+

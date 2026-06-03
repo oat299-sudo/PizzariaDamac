@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../types';
-import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer } from 'lucide-react';
+import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer, Phone, Globe } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage } = useStore();
+  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
@@ -581,29 +581,47 @@ export const KitchenView: React.FC = () => {
     </div>
 
     {/* --- PRINTABLE KITCHEN CHIT --- */}
-    <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
+    <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+            @page {
+                size: ${paperSize === '58mm' ? '58mm' : '80mm'} auto !important;
+                margin: 0mm !important;
+            }
+            html, body {
+                width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .printable-area {
+                width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                padding: ${paperSize === '58mm' ? '1mm' : '2mm'} !important;
+            }
+        }
+    ` }} />
+
+    <div className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm]' : 'print:w-[80mm]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}>
         {printOrder && (
-            <div className="w-[58mm] text-[10px] overflow-hidden">
+            <div className={`${paperSize === '58mm' ? 'w-[58mm] text-[10.5px]' : 'w-[80mm] text-[12px]'} overflow-hidden`}>
                 <div className="text-center font-bold">
-                    <div>=============================</div>
-                    <div className="text-[12px] font-black uppercase my-1">KITCHEN TICKET</div>
+                    <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
+                    <div className={`${paperSize === '58mm' ? 'text-[11px]' : 'text-[12px]'} font-black uppercase my-1`}>KITCHEN TICKET</div>
                     <div>ใบสั่งอาหาร / ครัว</div>
-                    <div>=============================</div>
-                    <div className="text-[15px] font-black my-1">
+                    <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
+                    <div className={`${paperSize === '58mm' ? 'text-[13px]' : 'text-[15px]'} font-black my-1`}>
                         {printOrder.tableNumber ? (language === 'th' ? `โต๊ะ ${printOrder.tableNumber}` : `Table ${printOrder.tableNumber}`) : (printOrder.type === 'delivery' ? `DELIVERY` : `TAKE AWAY`)}
                     </div>
                     {printOrder.customerName && !printOrder.tableNumber && (
                         <div className="text-[11px] font-extrabold my-0.5">ลูกค้า: {printOrder.customerName}</div>
                     )}
-                    <div>-----------------------------</div>
+                    <div>{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
                 </div>
 
-                <div className="mt-1 mb-1 px-1">
-                    <div className="flex justify-between font-bold">
+                <div className="mt-1 mb-1 px-1 font-bold">
+                    <div className="flex justify-between">
                         <span>บิล: #{printOrder.id.slice(-4)}</span>
                         <span>วันที่: {new Date(printOrder.createdAt).toLocaleDateString('th-TH')}</span>
                     </div>
-                    <div className="flex justify-between font-bold">
+                    <div className="flex justify-between">
                         <span>ช่องทาง: {printOrder.source.toUpperCase()}</span>
                         <span>เวลา: {new Date(printOrder.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                     </div>
@@ -612,16 +630,21 @@ export const KitchenView: React.FC = () => {
                             เวลารับ: {printOrder.pickupTime}
                         </div>
                     )}
+                    {printOrder.deliveryPlatformRef && (
+                        <div className="font-bold mt-1 text-[11px] bg-gray-150 p-1">
+                            Ref: {printOrder.deliveryPlatformRef}
+                        </div>
+                    )}
                 </div>
 
-                <div className="text-center font-bold">-----------------------------</div>
-                <div className="px-1 text-[10px]">
+                <div className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
+                <div className="px-1 font-bold">
                     {(printOrder.items || []).map((item, i) => {
                         const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
                         return (
                             <div key={i} className="mb-2 pb-1 border-b border-dashed border-gray-300 last:border-0 last:mb-0">
                                 <div className="flex justify-between items-start font-black text-black">
-                                    <span className="text-[12px]">[{item.quantity}x] {name}</span>
+                                    <span className={`${paperSize === '58mm' ? 'text-[11px]' : 'text-[12px]'}`}>[{item.quantity}x] {name}</span>
                                 </div>
                                 
                                 {/* Combo choices */}
@@ -675,7 +698,7 @@ export const KitchenView: React.FC = () => {
                     </div>
                 )}
 
-                <div className="text-center font-bold">=============================</div>
+                <div className="text-center font-bold">{paperSize === '58mm' ? '=============================' : '========================================'}</div>
                 <div className="text-center text-[9px] mt-1 mb-2 font-bold font-mono">
                     Damac Pizza Kitchen
                 </div>
