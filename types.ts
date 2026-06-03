@@ -106,6 +106,8 @@ export interface Order {
   paymentMethod?: PaymentMethod;
   pickupTime?: string;
   deliveryPlatformRef?: string;
+  rating?: number;
+  comment?: string;
 }
 
 // Accounting

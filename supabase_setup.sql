@@ -86,7 +86,9 @@ CREATE TABLE orders (
     delivery_fee NUMERIC,
     payment_method TEXT,
     pickup_time TEXT,
-    table_number TEXT
+    table_number TEXT,
+    rating INTEGER,
+    comment TEXT
 );
 
 -- 6. Expenses Table

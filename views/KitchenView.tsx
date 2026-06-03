@@ -17,6 +17,46 @@ export const KitchenView: React.FC = () => {
           return true;
       }
   });
+  const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Function to initialize & unlock the AudioContext
+  const initAudio = () => {
+      try {
+          if (!audioCtxRef.current) {
+              audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+          if (audioCtxRef.current.state === 'suspended') {
+              audioCtxRef.current.resume();
+          }
+          setAudioUnlocked(true);
+          // Play a test chime to let the user know it works
+          playBellChime(true);
+      } catch (e) {
+          console.warn("Failed to initialize or resume AudioContext", e);
+      }
+  };
+
+  // Add click listener to document to automatically auto-unlock audio context on first interaction
+  useEffect(() => {
+      const handleUserGesture = () => {
+          if (!audioUnlocked) {
+              initAudio();
+          }
+          // Remove listener once unlocked
+          window.removeEventListener('click', handleUserGesture);
+          window.removeEventListener('touchstart', handleUserGesture);
+      };
+
+      window.addEventListener('click', handleUserGesture);
+      window.addEventListener('touchstart', handleUserGesture);
+
+      return () => {
+          window.removeEventListener('click', handleUserGesture);
+          window.removeEventListener('touchstart', handleUserGesture);
+      };
+  }, [audioUnlocked]);
 
   const toggleSound = () => {
       setSoundEnabled(prev => {
@@ -24,36 +64,45 @@ export const KitchenView: React.FC = () => {
           localStorage.setItem('damac_kds_sound', JSON.stringify(next));
           return next;
       });
+      // Try initializing on toggle sound click too
+      initAudio();
   };
 
-  const playBellChime = () => {
+  const playBellChime = (isTest = false) => {
+      if (!soundEnabled && !isTest) return;
       try {
-          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          if (audioCtx.state === 'suspended') {
-              audioCtx.resume();
+          let ctx = audioCtxRef.current;
+          if (!ctx) {
+              ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              audioCtxRef.current = ctx;
+          }
+          if (ctx.state === 'suspended') {
+              ctx.resume();
           }
           
           const chime = (freq: number, delay: number, duration: number) => {
-              const osc = audioCtx.createOscillator();
-              const gainNode = audioCtx.createGain();
+              if (!ctx) return;
+              const osc = ctx.createOscillator();
+              const gainNode = ctx.createGain();
               
               osc.connect(gainNode);
-              gainNode.connect(audioCtx.destination);
+              gainNode.connect(ctx.destination);
               
               osc.type = 'sine';
-              osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+              osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
               
-              gainNode.gain.setValueAtTime(0, audioCtx.currentTime + delay);
-              gainNode.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + delay + 0.05);
-              gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+              gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+              gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + delay + 0.05);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
               
-              osc.start(audioCtx.currentTime + delay);
-              osc.stop(audioCtx.currentTime + delay + duration + 0.1);
+              osc.start(ctx.currentTime + delay);
+              osc.stop(ctx.currentTime + delay + duration + 0.1);
           };
           
-          // E5 followed by G5 chime
-          chime(659.25, 0, 0.6);
-          chime(783.99, 0.15, 0.8);
+          // Satisfying triple ring
+          chime(523.25, 0, 0.4);      // C5
+          chime(659.25, 0.12, 0.4);    // E5
+          chime(783.99, 0.24, 0.8);    // G5
       } catch (e) {
           console.warn("Audio Context failed to play sound", e);
       }
@@ -129,7 +178,29 @@ export const KitchenView: React.FC = () => {
   });
 
   return (
-    <div className="p-6 bg-gray-800 min-h-screen pb-24 text-gray-100">
+    <div className="p-6 bg-gray-800 min-h-screen pb-24 text-gray-100 animate-fade-in">
+      
+      {/* Interactive Sound Activation / Browser Autoplay restriction banner */}
+      {soundEnabled && !audioUnlocked && (
+        <div 
+          onClick={initAudio}
+          className="mb-6 bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 text-white p-4 rounded-xl flex items-center justify-between shadow-lg cursor-pointer hover:brightness-110 active:scale-[0.99] transition-all border border-amber-400 group animate-pulse"
+        >
+          <div className="flex items-center gap-3">
+            <span className="bg-white/20 p-2 rounded-lg animate-bounce">
+              <Bell size={24} className="text-white" />
+            </span>
+            <div>
+              <p className="font-bold text-base md:text-lg">📢 กดที่นี่เพื่อเปิดใช้งานเสียงแจ้งเตือนออเดอร์ใหม่</p>
+              <p className="text-xs text-amber-50 font-medium">Click here to enable sound notifications for new orders (Required by browsers)</p>
+            </div>
+          </div>
+          <button className="bg-white text-amber-700 hover:bg-amber-50 px-4 py-2 rounded-lg font-bold text-xs select-none shadow">
+            เปิดเสียง (Enable)
+          </button>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-gray-700 pb-4 gap-4">
         <div className="flex-1">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">

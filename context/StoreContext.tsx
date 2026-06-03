@@ -79,6 +79,7 @@ interface StoreContextType {
   deleteOrder: (orderId: string) => Promise<void>;
   reorderItem: (orderId: string) => void;
   fetchOrders: () => Promise<void>;
+  submitOrderFeedback: (orderId: string, rating: number, comment: string) => Promise<void>;
 
   expenses: Expense[];
   addExpense: (expense: Expense) => Promise<void>;
@@ -403,7 +404,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               deliveryFee: d.type === 'delivery' && d.delivery_fee === null ? 'pending' : d.delivery_fee,
               paymentMethod: d.payment_method,
               pickupTime: d.pickup_time,
-              tableNumber: d.table_number
+              tableNumber: d.table_number,
+              rating: d.rating,
+              comment: d.comment
           })));
       } catch (err) { console.error("Orders fetch failed", err); }
   };
@@ -495,8 +498,28 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             subscription.unsubscribe(); 
             clearInterval(interval);
         }
+    } else {
+        try {
+            const saved = localStorage.getItem('damac_mock_orders');
+            if (saved) {
+                setOrders(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error("Failed to load local mock orders", e);
+        }
     }
   }, []);
+
+  // Persist orders to local storage for offline fallback and backup
+  useEffect(() => {
+      if (orders.length > 0) {
+          try {
+              localStorage.setItem('damac_mock_orders', JSON.stringify(orders));
+          } catch (e) {
+              console.warn("Storage Full: Mock orders could not be saved locally.", e);
+          }
+      }
+  }, [orders]);
 
   // Update customer profile on load if logged in
   useEffect(() => {
@@ -1024,6 +1047,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
   };
 
+  const submitOrderFeedback = async (orderId: string, rating: number, comment: string) => {
+      if (isSupabaseConfigured) {
+          try {
+              const { error } = await supabase.from('orders').update({ rating, comment }).eq('id', orderId);
+              if (error) console.error("Error updating order feedback", error);
+          } catch (e) {
+              console.error("Supabase feedback update failed", e);
+          }
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, rating, comment } : o));
+  };
+
   // Expenses
   const addExpense = async (expense: Expense) => {
       if (isSupabaseConfigured) {
@@ -1138,7 +1173,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders,
+      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders, submitOrderFeedback,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,

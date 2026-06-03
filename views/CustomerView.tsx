@@ -94,19 +94,84 @@ const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
 export const CustomerView: React.FC = () => {
   const { 
     menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
-    addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza,
+    addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
     toppings, fetchOrders, tableSession
   } = useStore();
   
-  // ... (State declarations remain same) ...
+  // Feedback Modal States
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackOrderId, setFeedbackOrderId] = useState<string | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<number>(5);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showProfile, setShowProfile] = useState(false);
+  
+  // Order History & Search States
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [searchOrderId, setSearchOrderId] = useState('');
+  const [orderHistoryError, setOrderHistoryError] = useState('');
+  const [historyOrderIds, setHistoryOrderIds] = useState<string[]>(() => {
+      try {
+          const savedIds = localStorage.getItem('damac_history_order_ids');
+          const lastId = localStorage.getItem('damac_last_order');
+          const initial = savedIds ? JSON.parse(savedIds) : [];
+          if (lastId && !initial.includes(lastId)) {
+              initial.push(lastId);
+          }
+          return initial;
+      } catch (e) {
+          return [];
+      }
+  });
+
+  const historyOrders = useMemo(() => {
+      let list: any[] = [];
+      if (customer) {
+          list = orders.filter(o => o.customerPhone === customer.phone);
+      }
+      // Combine with locally tracked order IDs
+      historyOrderIds.forEach(id => {
+          const ord = orders.find(o => o.id === id);
+          if (ord && !list.some(l => l.id === id)) {
+              list.push(ord);
+          }
+      });
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [orders, customer, historyOrderIds]);
+
+  const handleSearchOrder = (e: React.FormEvent) => {
+      e.preventDefault();
+      setOrderHistoryError('');
+      if (!searchOrderId.trim()) return;
+      
+      const query = searchOrderId.trim().toLowerCase();
+      const found = orders.find(o => 
+          o.id.toLowerCase() === query || 
+          (query.length >= 4 && o.id.toLowerCase().endsWith(query))
+      );
+      
+      if (found) {
+          setHistoryOrderIds(prev => {
+              if (prev.includes(found.id)) return prev;
+              const nextList = [found.id, ...prev];
+              try {
+                  localStorage.setItem('damac_history_order_ids', JSON.stringify(nextList));
+              } catch (e) {}
+              return nextList;
+          });
+          setSearchOrderId('');
+      } else {
+          setOrderHistoryError(t('orderNotFound' as any));
+      }
+  };
+
   const [showTracker, setShowTracker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -185,6 +250,19 @@ export const CustomerView: React.FC = () => {
           setOrderDate('tomorrow');
       }
   }, [isStoreOpen]);
+
+  const handleFeedbackSubmit = async () => {
+      if (!feedbackOrderId) return;
+      await submitOrderFeedback(feedbackOrderId, feedbackRating, feedbackComment);
+      setFeedbackSuccess(true);
+      setTimeout(() => {
+          setShowFeedbackModal(false);
+          setFeedbackSuccess(false);
+          setFeedbackOrderId(null);
+          setFeedbackRating(5);
+          setFeedbackComment("");
+      }, 1500);
+  };
 
   const handleCustomize = (pizza: Pizza) => {
     if (!pizza.available) return;
@@ -347,7 +425,18 @@ export const CustomerView: React.FC = () => {
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
-        setLocalOrderId(localStorage.getItem('damac_last_order'));
+        const lastId = localStorage.getItem('damac_last_order');
+        setLocalOrderId(lastId);
+        if (lastId) {
+            setHistoryOrderIds(prev => {
+                if (prev.includes(lastId)) return prev;
+                const updated = [lastId, ...prev];
+                try {
+                    localStorage.setItem('damac_history_order_ids', JSON.stringify(updated));
+                } catch (e) {}
+                return updated;
+            });
+        }
         setShowTracker(true);
      }
   };
@@ -479,7 +568,16 @@ export const CustomerView: React.FC = () => {
                  ) : (
                      <button onClick={() => setShowAuthModal(true)} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg hover:bg-black transition">{t('login')}</button>
                  )}
-                 <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:bg-orange-100 rounded-full transition">
+                 <button onClick={() => {}} className="hidden">dummy</button>
+                  <button 
+                      onClick={() => setShowOrderHistory(true)} 
+                      className="p-2 text-gray-700 hover:bg-orange-100 rounded-full transition"
+                      title={t('orderHistory')}
+                      id="order-history-nav-btn"
+                  >
+                      <History size={24}/>
+                  </button>
+                  <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:bg-orange-150 rounded-full transition">
                      <ShoppingBag size={24}/>
                      {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce-short">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}
                  </button>
@@ -1361,6 +1459,35 @@ export const CustomerView: React.FC = () => {
                                                   ))}
                                               </div>
                                               
+                                              {/* Feedback section */}
+                                              {order.rating ? (
+                                                  <div className="mb-2 p-2 bg-yellow-50 rounded-lg border border-yellow-105 text-xs flex flex-col gap-1 text-left">
+                                                      <div className="flex items-center gap-1 font-bold text-yellow-700">
+                                                          {Array.from({ length: 5 }).map((_, i) => (
+                                                              <Star 
+                                                                  key={i} 
+                                                                  size={10} 
+                                                                  className={`${i < (order.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-gray-300'}`} 
+                                                              />
+                                                          ))}
+                                                          <span className="ml-1 text-[11px] text-yellow-800 font-bold">{order.rating} / 5</span>
+                                                      </div>
+                                                      {order.comment && <div className="italic text-gray-600 font-medium mt-0.5">"{order.comment}"</div>}
+                                                  </div>
+                                              ) : (
+                                                  <button 
+                                                      onClick={() => {
+                                                          setFeedbackOrderId(order.id);
+                                                          setFeedbackRating(5);
+                                                          setFeedbackComment("");
+                                                          setShowFeedbackModal(true);
+                                                      }} 
+                                                      className="w-full mb-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-101 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 border border-yellow-200"
+                                                  >
+                                                      <Star size={14} className="fill-yellow-400 text-yellow-500" /> {t('giveFeedback')}
+                                                  </button>
+                                              )}
+
                                               <button 
                                                   onClick={() => { reorderItem(order.id); setShowProfile(false); setIsCartOpen(true); }} 
                                                   className="w-full bg-brand-50 text-brand-600 py-2 rounded-lg font-bold text-sm hover:bg-brand-100 transition flex items-center justify-center gap-2"
@@ -1376,9 +1503,279 @@ export const CustomerView: React.FC = () => {
                      
                      <div className="p-4 bg-white border-t">
                          <button onClick={() => { setCustomer(null as any); localStorage.removeItem('damac_customer'); setShowProfile(false); }} className="w-full py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Log Out</button>
+                      </div>
+                  </div>
+              </div>
+         )}
+
+         {/* ORDER HISTORY MODAL */}
+         {showOrderHistory && (() => {
+             const getStatusColor = (status: string) => {
+                 switch (status) {
+                     case 'pending': return 'bg-yellow-100/80 text-yellow-800 border border-yellow-250';
+                     case 'confirmed': return 'bg-blue-50 text-blue-800 border border-blue-200';
+                     case 'acknowledged': return 'bg-indigo-50 text-indigo-800 border border-indigo-200';
+                     case 'cooking': return 'bg-orange-50 text-orange-850 border border-orange-200 animate-pulse';
+                     case 'ready': return 'bg-green-50 text-green-800 border border-green-200 font-bold';
+                     case 'completed': return 'bg-green-100/80 text-green-900 border border-green-300';
+                     case 'cancelled': return 'bg-red-50 text-red-800 border border-red-250';
+                     default: return 'bg-gray-50 text-gray-800 border border-gray-200';
+                 }
+             };
+
+             return (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" id="order-history-overlay">
+                     <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col" id="order-history-modal">
+                         {/* Header */}
+                         <div className="bg-gray-950 p-5 text-white flex justify-between items-center shrink-0">
+                             <div className="flex items-center gap-2">
+                                 <History className="text-brand-500" size={24}/>
+                                 <h2 className="text-xl font-bold">{t('orderHistory')}</h2>
+                             </div>
+                             <button 
+                                 onClick={() => { setShowOrderHistory(false); setOrderHistoryError(''); }} 
+                                 className="text-white/60 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 rounded-full transition"
+                             >
+                                 <X size={20}/>
+                             </button>
+                         </div>
+                         
+                         {/* Search Section */}
+                         <div className="p-4 bg-gray-50 border-b border-gray-200 shrink-0">
+                             <form onSubmit={handleSearchOrder} className="flex gap-2">
+                                 <input 
+                                     type="text" 
+                                     placeholder={t('searchOrderPlaceholder')} 
+                                     value={searchOrderId}
+                                     onChange={e => { setSearchOrderId(e.target.value); setOrderHistoryError(''); }}
+                                     className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-sm"
+                                 />
+                                 <button 
+                                     type="submit" 
+                                     className="bg-brand-600 hover:bg-brand-700 text-white font-bold px-4 rounded-xl text-sm transition flex items-center gap-1 shrink-0"
+                                 >
+                                     {t('search')}
+                                 </button>
+                             </form>
+                             {orderHistoryError && (
+                                 <p className="text-red-500 text-xs mt-2 font-semibold bg-red-50 p-2 rounded-lg border border-red-100 flex items-center gap-1">
+                                     <AlertTriangle size={12}/> {orderHistoryError}
+                                 </p>
+                             )}
+                         </div>
+                         
+                         {/* History List */}
+                         <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50">
+                             {historyOrders.length === 0 ? (
+                                 <div className="py-12 flex flex-col items-center justify-center text-center text-gray-400 space-y-3 bg-white border border-dashed rounded-2xl">
+                                     <History size={48} className="text-gray-300 stroke-[1.5] animate-pulse"/>
+                                     <p className="font-bold text-gray-600">{language === 'th' ? 'ไม่มีประวัติคำสั่งซื้อ' : 'No past orders yet'}</p>
+                                     <p className="text-xs max-w-[250px]">{language === 'th' ? 'คุณสามารถค้นหาข้อมูลออเดอร์ด้วยรหัสที่ได้รับได้ที่นี่' : 'Enter an Order ID above to track status or save it to this list.'}</p>
+                                 </div>
+                             ) : (
+                                 historyOrders.map(order => (
+                                     <div key={order.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col transition hover:border-gray-300">
+                                         {/* Item Header */}
+                                         <div className="bg-gray-50/80 p-3.5 border-b border-gray-100 flex justify-between items-start gap-2">
+                                             <div>
+                                                 <div className="font-mono text-xs font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded inline-block select-all">
+                                                     #{order.id}
+                                                 </div>
+                                                 <p className="text-[11px] text-gray-500 font-medium mt-1">
+                                                     {new Date(order.createdAt).toLocaleDateString()} • {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                 </p>
+                                             </div>
+                                             <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase shrink-0 ${getStatusColor(order.status)}`}>
+                                                 {t(order.status as any)}
+                                             </span>
+                                         </div>
+                                         
+                                         {/* Item Details */}
+                                         <div className="p-3.5">
+                                             <div className="space-y-1 text-sm border-b pb-3 mb-3">
+                                                 {order.items.map((item: any, idx: number) => (
+                                                     <div key={idx} className="flex justify-between items-start text-xs text-gray-700">
+                                                         <p className="font-medium text-left">
+                                                             {item.quantity}x {item.name}
+                                                             {item.specialInstructions && <span className="text-[10px] text-red-500 block italic">"{item.specialInstructions}"</span>}
+                                                             {item.selectedToppings && item.selectedToppings.length > 0 && (
+                                                                 <span className="text-[10px] text-gray-400 block">
+                                                                     + {item.selectedToppings.map((t: any) => language === 'th' ? t.nameTh : t.name).join(', ')}
+                                                                 </span>
+                                                             )}
+                                                         </p>
+                                                         <span className="font-bold text-gray-900 shrink-0">฿{item.totalPrice}</span>
+                                                     </div>
+                                                 ))}
+                                             </div>
+                                             
+                                             {/* Totals and Metadata */}
+                                             <div className="flex justify-between items-end mb-3">
+                                                 <div className="text-[11px] text-gray-500 text-left">
+                                                     <div>{order.type === 'delivery' ? (language === 'th' ? 'จัดส่ง' : 'Delivery') : (order.type === 'online' ? (language === 'th' ? 'รับที่ร้าน' : 'Pickup') : (language === 'th' ? 'ทานที่ร้าน' : 'Dine-In'))}</div>
+                                                     {order.tableNumber && <div className="text-green-600 font-bold">{language === 'th' ? 'โต๊ะ' : 'Table'} {order.tableNumber}</div>}
+                                                     {order.pickupTime && <div className="mt-0.5">{language === 'th' ? 'เวลา' : 'Time'}: {order.pickupTime}</div>}
+                                                 </div>
+                                                 <div className="text-right">
+                                                     <div className="text-lg font-extrabold text-brand-600">฿{order.totalAmount}</div>
+                                                     {order.deliveryFee === 'pending' ? (
+                                                         <span className="text-[10px] text-orange-500 font-bold">{t('deliveryTBD')}</span>
+                                                     ) : (
+                                                         typeof order.deliveryFee === 'number' && order.deliveryFee > 0 && (
+                                                             <span className="text-[10px] text-gray-400 font-medium">{language === 'th' ? `รวมค่าส่ง ฿${order.deliveryFee}` : `Incl. ฿${order.deliveryFee} shipping`}</span>
+                                                         )
+                                                     )}
+                                                 </div>
+                                             </div>
+                                             
+                                             {/* Actions - Feedback & Follow */}
+                                             <div className="flex flex-col gap-2 pt-2 border-t border-gray-101">
+                                                 {order.rating ? (
+                                                     <div className="p-2.5 bg-yellow-50 rounded-xl border border-yellow-100 text-xs text-left mb-1">
+                                                         <div className="flex items-center gap-1 font-bold text-yellow-700">
+                                                             {Array.from({ length: 5 }).map((_, i) => (
+                                                                 <Star 
+                                                                     key={i} 
+                                                                     size={11} 
+                                                                     className={`${i < (order.rating || 0) ? 'fill-yellow-400 text-yellow-500' : 'text-gray-300'}`} 
+                                                                 />
+                                                             ))}
+                                                             <span className="ml-1 text-[11px] text-yellow-800 font-bold">{order.rating} / 5</span>
+                                                         </div>
+                                                         {order.comment && <div className="italic text-gray-600 font-medium mt-1">"{order.comment}"</div>}
+                                                     </div>
+                                                 ) : (
+                                                     <button 
+                                                         onClick={() => {
+                                                             setFeedbackOrderId(order.id);
+                                                             setFeedbackRating(5);
+                                                             setFeedbackComment("");
+                                                             setShowFeedbackModal(true);
+                                                         }} 
+                                                         className="w-full bg-yellow-50 hover:bg-yellow-101 text-yellow-700 py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1.5 border border-yellow-250"
+                                                     >
+                                                         <Star size={13} className="fill-yellow-400 text-yellow-500" /> {t('giveFeedback')}
+                                                     </button>
+                                                 )}
+                                                 
+                                                 <div className="grid grid-cols-2 gap-2">
+                                                     <button 
+                                                         onClick={() => { reorderItem(order.id); setShowOrderHistory(false); setIsCartOpen(true); }} 
+                                                         className="bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1"
+                                                     >
+                                                         <RefreshCw size={13}/> {t('reorder')}
+                                                     </button>
+                                                     {order.status !== 'completed' && order.status !== 'cancelled' ? (
+                                                         <button 
+                                                             onClick={() => { setLocalOrderId(order.id); setShowTracker(true); setShowOrderHistory(false); }} 
+                                                             className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1 shadow-sm"
+                                                         >
+                                                             <Activity size={13} className="animate-pulse"/> {t('trackOrder')}
+                                                         </button>
+                                                     ) : (
+                                                         <div className="bg-gray-100 text-gray-400 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center select-none">
+                                                             Finished
+                                                         </div>
+                                                     )}
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 ))
+                             )}
+                         </div>
+                     </div>
+                 </div>
+             );
+         })()}
+
+         {/* dummy wrapper continuation */}
+         {false && (
+             <div>
+                 <div>
+                     <div>
+                         <button onClick={async () => {}} className="hidden">
+                             Log Out
+                         </button>
                      </div>
                  </div>
              </div>
+        )}
+
+        {/* FEEDBACK MODAL */}
+        {showFeedbackModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative p-6">
+                    <button 
+                        onClick={() => setShowFeedbackModal(false)} 
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                    >
+                        <X size={24}/>
+                    </button>
+                    
+                    {feedbackSuccess ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center animate-fade-in">
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                                <Check size={36} className="stroke-[3]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">{t('feedbackSubmitted')}</h3>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col">
+                            <h3 className="text-lg font-bold text-gray-950 mb-4 flex items-center gap-2">
+                                <Star size={20} className="text-yellow-500 fill-yellow-400" />
+                                {t('feedbackTitle', { id: feedbackOrderId || '' })}
+                            </h3>
+                            
+                            {/* Rating Stars Section */}
+                            <div className="mb-6 flex flex-col items-center">
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">{t('rating')}</label>
+                                <div className="flex items-center gap-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setFeedbackRating(star)}
+                                            className="transform hover:scale-125 transition duration-150 p-1"
+                                        >
+                                            <Star
+                                                size={36}
+                                                className={`transition-colors duration-150 ${
+                                                    star <= feedbackRating
+                                                        ? "fill-yellow-400 text-yellow-500"
+                                                        : "text-gray-201"
+                                                }`}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Comment Section */}
+                            <div className="mb-6">
+                                <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+                                    {t('comment')}
+                                </label>
+                                <textarea
+                                    value={feedbackComment}
+                                    onChange={(e) => setFeedbackComment(e.target.value)}
+                                    placeholder={t('commentPlaceholder')}
+                                    rows={4}
+                                    className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                            </div>
+                            
+                            {/* Submit Button */}
+                            <button
+                                onClick={handleFeedbackSubmit}
+                                className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 shadow-md transition"
+                            >
+                                {t('submitFeedback')}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
         )}
 
     </div>
