@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye } from 'lucide-react';
@@ -37,6 +37,11 @@ const convertGoogleDriveUrl = (url: string): string => {
 const isDriveUrl = (url: string): boolean => {
     if (!url) return false;
     return url.includes('drive.google.com/thumbnail') || url.includes('lh3.googleusercontent.com') || url.includes('drive.google.com') || url.includes('docs.google.com');
+};
+
+const isPhotosUrl = (url: string): boolean => {
+    if (!url) return false;
+    return url.includes('photos.app.goo.gl') || url.includes('photos.google.com');
 };
 
 export const POSView: React.FC = () => {
@@ -981,7 +986,7 @@ export const POSView: React.FC = () => {
                             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                                 {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{(item.selectedToppings || []).map(t => t.name).join(', ')}{(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
                             </div>
-                            <div className="p-4 bg-white border-t space-y-3">
+                            <div className="p-4 bg-white border-t space-y-3 pb-24 lg:pb-4">
                                 <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option></select></div>
                                 {orderSource !== 'store' && (
                                     <div className="w-full"><input type="text" placeholder={`${orderSource.toUpperCase()} Order No.`} className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" value={deliveryPlatformRef} onChange={e => setDeliveryPlatformRef(e.target.value)}/></div>
@@ -1036,9 +1041,37 @@ export const POSView: React.FC = () => {
                                             </div>
                                             {order.note && <div className="mt-2 text-xs italic text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-100">Note: {order.note}</div>}
                                             {order.type === 'delivery' && (
-                                                <div className="mt-3 flex justify-between items-center bg-blue-50 p-2 rounded border border-blue-100">
-                                                    <span className="text-sm font-bold text-blue-800">Delivery Fee: {order.deliveryFee === 'pending' ? 'TBD' : `฿${order.deliveryFee}`}</span>
-                                                    <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
+                                                <div className="mt-3 space-y-2 bg-blue-50 p-3 rounded-xl border border-blue-100 shadow-sm animate-fade-in">
+                                                    <div className="flex justify-between items-center pb-2 border-b border-blue-100/40">
+                                                        <span className="text-sm font-bold text-blue-800">Delivery Fee: {order.deliveryFee === 'pending' ? 'TBD' : `฿${order.deliveryFee}`}</span>
+                                                        <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
+                                                    </div>
+                                                    
+                                                    {/* Decoded delivery address annotations */}
+                                                    <div className="text-xs space-y-1.5 pt-1">
+                                                        {parseDeliveryPhone(order.deliveryAddress) && (
+                                                            <div className="flex items-center gap-1.5 font-sans font-bold text-gray-700">
+                                                                <Phone size={13} className="text-blue-600 shrink-0"/>
+                                                                <span>เบอร์โทรจัดส่ง: {parseDeliveryPhone(order.deliveryAddress)}</span>
+                                                            </div>
+                                                        )}
+                                                        {parseGPSCoordinates(order.deliveryAddress) && (
+                                                            <div className="flex items-center justify-between gap-1.5 font-bold pt-1 border-t border-dashed border-blue-100/60">
+                                                                <div className="flex items-center gap-1.5 text-gray-750">
+                                                                    <MapPin size={13} className="text-red-500 animate-pulse shrink-0"/>
+                                                                    <span>บันทึกพิกัด GPS แล้ว</span>
+                                                                </div>
+                                                                <a 
+                                                                    href={parseGPSCoordinates(order.deliveryAddress)?.url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer" 
+                                                                    className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded font-extrabold flex items-center gap-1 shadow-xs transition"
+                                                                >
+                                                                    <Globe size={10}/> ดูแผนที่ GPS
+                                                                </a>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                             {order.source !== 'store' && (
@@ -1048,11 +1081,15 @@ export const POSView: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="p-4 border-t bg-gray-50 grid grid-cols-2 gap-3">
-                                            <button onClick={() => handleCheckTableBill(order)} className="bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-lg"><Receipt size={20}/> Check Bill</button>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs" title="Force Complete">Clear</button>
-                                                <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold text-xs" title="Cancel Order">Cancel</button>
+                                        <div className="p-4 border-t bg-gray-50 space-y-2.5">
+                                            <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition" title="Force Complete">
+                                                    <Check size={12}/> Clear Table
+                                                </button>
+                                                <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-205 text-red-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition" title="Cancel Order">
+                                                    <X size={12}/> Cancel Order
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -1390,6 +1427,17 @@ export const POSView: React.FC = () => {
                               {isDriveUrl(itemForm.image) && (
                                   <div className="text-green-700 text-xs font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 w-full justify-center">
                                       <span>✨ แปลงลิงก์ Google Drive สำเร็จ!</span>
+                                  </div>
+                              )}
+                              {isPhotosUrl(itemForm.image) && (
+                                  <div className="text-amber-800 text-xs font-sans p-3 rounded-lg border border-amber-250 bg-amber-50 w-full leading-relaxed space-y-1.5 text-left">
+                                      <p className="font-bold flex items-center gap-1 text-amber-900">⚠️ ตรวจพบลิงก์อัลบั้ม Google Photos!</p>
+                                      <p>ลิงก์ประเภทอัลบั้มแชร์จะไม่แสดงรูปภาพอ้างอิงของระบบ ให้แก้ไขดังนี้:</p>
+                                      <ol className="list-decimal pl-4 space-y-1">
+                                          <li>เปิดรูปภาพของคุณในแถบใหม่ของเบราว์เซอร์</li>
+                                          <li>คลิกขวาที่ตัวรูปภาพ แล้วเลือกเมนู <span className="font-bold bg-white px-1 py-0.5 rounded shadow-xs border">"คัดลอกที่อยู่อิมเมจ" (Copy image address)</span></li>
+                                          <li>ก๊อปปี้ลิงก์ตรงนั้น (ขึ้นต้นด้วย <span className="font-mono text-[10px] text-brand-700">https://lh3.googleusercontent.com/...</span>) มาวางแทนที่</li>
+                                      </ol>
                                   </div>
                               )}
                               <img src={itemForm.image} className="w-36 h-36 object-cover rounded-xl border-2 border-brand-200 shadow-md bg-gray-100" />

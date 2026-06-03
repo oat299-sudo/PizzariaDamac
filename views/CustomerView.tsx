@@ -188,6 +188,13 @@ export const CustomerView: React.FC = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('qr_transfer');
   const [pickupTime, setPickupTime] = useState('');
+  const [asapOrder, setAsapOrder] = useState(true);
+  const [deliveryPhone, setDeliveryPhone] = useState(customer?.phone || '');
+  const [deliveryLat, setDeliveryLat] = useState<number>(13.8856);
+  const [deliveryLng, setDeliveryLng] = useState<number>(100.5222);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [mapSearch, setMapSearch] = useState('');
+  const [hasMapPin, setHasMapPin] = useState(false);
   const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(() => {
       if (isStoreOpen || canOrderForToday()) return 'today';
       return 'tomorrow';
@@ -326,6 +333,7 @@ export const CustomerView: React.FC = () => {
   // ... (Effects and Handlers remain same until render) ...
   useEffect(() => {
     if (customer?.address) setDeliveryAddress(customer.address);
+    if (customer?.phone) setDeliveryPhone(customer.phone);
   }, [customer]);
   
   useEffect(() => {
@@ -494,20 +502,37 @@ export const CustomerView: React.FC = () => {
         setShowAuthModal(true);
         return;
      }
-     if (orderType === 'delivery' && !deliveryAddress) {
-        alert(t('addressMissing'));
-        return;
+     if (orderType === 'delivery') {
+        if (!deliveryAddress) {
+           alert(t('addressMissing'));
+           return;
+        }
+        if (!deliveryPhone) {
+           alert(language === 'th' ? 'กรุณาระบุเบอร์โทรศัพท์สำหรับจัดส่ง' : 'Please provide a contact phone number for delivery.');
+           return;
+         }
      }
      setIsSubmitting(true);
+     
+     let finalDeliveryAddress = deliveryAddress;
+     if (orderType === 'delivery') {
+         if (deliveryPhone) {
+             finalDeliveryAddress += ` [Phone: ${deliveryPhone}]`;
+         }
+         if (hasMapPin) {
+             finalDeliveryAddress += ` [GPS Pin: ${deliveryLat.toFixed(5)}, ${deliveryLng.toFixed(5)}]`;
+         }
+     }
+
      const success = await placeOrder(orderType, {
         note: '',
         delivery: orderType === 'delivery' ? {
-            address: deliveryAddress,
+            address: finalDeliveryAddress,
             zoneName: 'TBD',
             fee: 0 
         } : undefined,
         paymentMethod: paymentMethod,
-        pickupTime: orderType === 'online' && pickupTime ? `${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime}` : 'ASAP',
+        pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,
         tableNumber: tableSession || undefined, 
         source: 'store'
      });
@@ -1329,16 +1354,25 @@ export const CustomerView: React.FC = () => {
                                     ) : (
                                         <>
                                             <button 
-                                                onClick={() => setOrderType('online')} 
-                                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${orderType === 'online' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                type="button"
+                                                onClick={() => setOrderType('dine-in')} 
+                                                className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition ${orderType === 'dine-in' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
-                                                Pickup
+                                                {language === 'th' ? 'ทานที่ร้าน' : 'Dine-In'}
                                             </button>
                                             <button 
-                                                onClick={() => setOrderType('delivery')} 
-                                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${orderType === 'delivery' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                type="button"
+                                                onClick={() => setOrderType('online')} 
+                                                className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition ${orderType === 'online' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
-                                                Delivery
+                                                {language === 'th' ? 'กลับบ้าน' : 'Takeaway'}
+                                            </button>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setOrderType('delivery')} 
+                                                className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition ${orderType === 'delivery' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                {language === 'th' ? 'เดลิเวอรี่' : 'Delivery'}
                                             </button>
                                         </>
                                     )}
@@ -1366,32 +1400,185 @@ export const CustomerView: React.FC = () => {
                                 
                                 {/* Order Options */}
                                 <div className="space-y-4">
-                                     {/* Address for Delivery */}
+                                     {/* Address for Delivery with interactive pinning map */}
                                      {orderType === 'delivery' && (
-                                         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                             <div className="flex justify-between items-center mb-2">
-                                                 <label className="text-xs font-bold text-gray-500 uppercase">{t('deliveryAddress')}</label>
-                                                 {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
-                                                     <select 
-                                                         onChange={(e) => setDeliveryAddress(e.target.value)} 
-                                                         className="text-xs border rounded p-1 max-w-[150px]"
-                                                     >
-                                                         <option value="">Saved...</option>
-                                                         {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)}
-                                                     </select>
-                                                 )}
+                                         <div className="space-y-4">
+                                             {/* Delivery Contact Phone Input */}
+                                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                                 <label className="text-xs font-bold text-gray-500 uppercase mb-2 block flex items-center gap-1">
+                                                     <Phone size={14} className="text-brand-500"/> {language === 'th' ? 'เบอร์โทรจัดส่ง' : 'Delivery Contact Phone'} <span className="text-red-500">*</span>
+                                                 </label>
+                                                 <input 
+                                                     type="tel"
+                                                     className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-bold"
+                                                     placeholder={language === 'th' ? 'เช่น 0891234567' : 'e.g. 0891234567'}
+                                                     value={deliveryPhone}
+                                                     onChange={e => setDeliveryPhone(e.target.value)}
+                                                 />
                                              </div>
-                                             <textarea 
-                                                className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                                                rows={2} 
-                                                placeholder="Enter full address..."
-                                                value={deliveryAddress}
-                                                onChange={e => setDeliveryAddress(e.target.value)}
-                                             />
-                                             <p className="text-xs text-orange-600 mt-2 bg-orange-50 p-2 rounded flex gap-2">
-                                                 <Info size={14} className="shrink-0"/>
-                                                 {t('deliveryNoticeDesc')}
-                                             </p>
+
+                                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
+                                                 <div className="flex justify-between items-center mb-1">
+                                                     <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                                                         <MapPin size={14} className="text-brand-600"/> {language === 'th' ? 'พิมพ์ที่อยู่และปักหมุดจัดส่ง' : 'Delivery Address & Location Pin'} <span className="text-red-500">*</span>
+                                                     </label>
+                                                     {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
+                                                         <select 
+                                                             onChange={(e) => setDeliveryAddress(e.target.value)} 
+                                                             className="text-xs border rounded p-1 max-w-[150px]"
+                                                         >
+                                                             <option value="">{language === 'th' ? 'ที่อยู่บันทึกไว้...' : 'Saved...'}</option>
+                                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)}
+                                                         </select>
+                                                     )}
+                                                 </div>
+
+                                                 <textarea 
+                                                    className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
+                                                    rows={2} 
+                                                    placeholder={language === 'th' ? "ระบุที่อยู่จัดส่งโดยละเอียด (บ้านเลขที่, ถนน, ซอย...)" : "Enter full detailed address (house no, street, sub-district)..."}
+                                                    value={deliveryAddress}
+                                                    onChange={e => setDeliveryAddress(e.target.value)}
+                                                 />
+
+                                                 {/* Interactive GPS Pin Map mockup */}
+                                                 <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
+                                                     <div className="p-2.5 bg-gray-100 border-b flex justify-between items-center">
+                                                         <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
+                                                             <Navigation size={12} className="text-brand-600 animate-pulse" />
+                                                             {language === 'th' ? 'ระบุพิกัดดาวเทียมแผนที่ในพื้นที่' : 'Interactive Location Pin Map'}
+                                                         </span>
+                                                         <button 
+                                                             type="button"
+                                                             onClick={() => {
+                                                                 setGpsLoading(true);
+                                                                 setTimeout(() => {
+                                                                     setGpsLoading(false);
+                                                                     const offsetLat = 13.8856 + (Math.random() - 0.5) * 0.02;
+                                                                     const offsetLng = 100.5222 + (Math.random() - 0.5) * 0.02;
+                                                                     setDeliveryLat(offsetLat);
+                                                                     setDeliveryLng(offsetLng);
+                                                                     setHasMapPin(true);
+                                                                 }, 800);
+                                                             }}
+                                                             disabled={gpsLoading}
+                                                             className="text-[11px] bg-brand-600 hover:bg-brand-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 disabled:opacity-50 transition shadow-sm"
+                                                         >
+                                                             {gpsLoading ? (
+                                                                 <RotateCw className="w-3 h-3 animate-spin"/>
+                                                             ) : (
+                                                                 <MapPin className="w-3 h-3"/>
+                                                             )}
+                                                             {language === 'th' ? 'ดึงพิกัดปัจจุบัน' : 'Use Live GPS'}
+                                                         </button>
+                                                     </div>
+
+                                                     {/* Interactive Visual Map stage */}
+                                                     <div 
+                                                         onClick={(e) => {
+                                                             const rect = e.currentTarget.getBoundingClientRect();
+                                                             const x = e.clientX - rect.left;
+                                                             const y = e.clientY - rect.top;
+                                                             const percentX = x / rect.width;
+                                                             const percentY = y / rect.height;
+                                                             const mappedLng = 100.5000 + percentX * 0.0500;
+                                                             const mappedLat = 13.9100 - percentY * 0.0600;
+                                                             setDeliveryLat(mappedLat);
+                                                             setDeliveryLng(mappedLng);
+                                                             setHasMapPin(true);
+                                                         }}
+                                                         className="relative h-[170px] bg-[#e5e9f0] cursor-crosshair overflow-hidden border-b border-gray-200 select-none duration-250 hover:brightness-95"
+                                                     >
+                                                         {/* SVG stylized grid roads and rivers */}
+                                                         <svg className="absolute inset-0 w-full h-full pointer-events-none text-sky-500" xmlns="http://www.w3.org/2500/svg">
+                                                             {/* River */}
+                                                             <path d="M -50 20 Q 150 140, 500 -10" fill="none" stroke="#add8e6" strokeWidth="44" opacity="0.75"/>
+                                                             <path d="M -50 20 Q 150 140, 500 -10" fill="none" stroke="#87ceeb" strokeWidth="12" opacity="0.45"/>
+                                                             {/* Roads */}
+                                                             <line x1="0" y1="85" x2="500" y2="85" stroke="#ffffff" strokeWidth="14" opacity="0.95" />
+                                                             <line x1="0" y1="85" x2="500" y2="85" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
+                                                             
+                                                             <line x1="140" y1="0" x2="140" y2="200" stroke="#ffffff" strokeWidth="10" opacity="0.95" />
+                                                             <line x1="130" y1="0" x2="130" y2="200" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
+                                                             
+                                                             <line x1="340" y1="0" x2="340" y2="200" stroke="#ffffff" strokeWidth="12" opacity="0.95" />
+                                                             
+                                                             <line x1="0" y1="20" x2="500" y2="150" stroke="#fff" strokeWidth="8" opacity="0.8" />
+                                                         </svg>
+
+                                                         {/* Map landmarks */}
+                                                         <div className="absolute top-2 left-6 text-[9px] bg-sky-200/90 text-sky-800 font-bold px-1 rounded pointer-events-none shadow-sm font-sans">แม่น้ำเจ้าพระยา (Chao Phraya)</div>
+                                                         <div className="absolute top-[90px] left-[150px] text-[8.5px] bg-white border shadow-sm text-gray-500 font-bold px-1 rounded pointer-events-none font-sans font-sans">Chaeng Watthana Rd</div>
+                                                         <div className="absolute top-[40px] left-[220px] text-[8px] bg-[#ffe4e6] border border-[#fecdd3] text-[#9f1239] font-bold px-1 rounded pointer-events-none shadow-xs font-sans font-sans">Central Chaengwattana</div>
+                                                         <div className="absolute top-[130px] left-[348px] text-[9.5px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold px-1 rounded shadow-sm pointer-events-none flex items-center gap-0.5">
+                                                             <ChefHat size={10} className="text-emerald-600"/> Pizza Damac Hub
+                                                         </div>
+
+                                                         {/* Simulated pinned marker icon inside map */}
+                                                         {hasMapPin && (
+                                                             <div 
+                                                                 style={{
+                                                                     left: `${((deliveryLng - 100.5000) / 0.0500) * 100}%`,
+                                                                     top: `${((13.9100 - deliveryLat) / 0.0600) * 100}%`
+                                                                 }}
+                                                                 className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                                                             >
+                                                                 <div className="bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded shadow-lg animate-bounce flex items-center gap-1 whitespace-nowrap">
+                                                                     <MapPin size={10}/> {language === 'th' ? "ส่งพิกัดนี้" : "Deliver Here"}
+                                                                 </div>
+                                                                 <div className="w-3 h-3 bg-red-600 rounded-full border-2 border-white shadow-md -mt-1 flex items-center justify-center">
+                                                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                                                 </div>
+                                                                 <div className="w-4 h-4 bg-red-500/30 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 scale-150 animate-ping"></div>
+                                                             </div>
+                                                         )}
+                                                     </div>
+
+                                                     {/* Landmark helper selector inside Map box */}
+                                                     <div className="p-3 bg-white border-t space-y-2">
+                                                         <label className="text-[11px] font-bold text-gray-500 uppercase block">
+                                                             {language === 'th' ? 'หรือปักหมุดสถานที่สำคัญด่วน' : 'Or Quick Landmark Pin'}
+                                                         </label>
+                                                         <select 
+                                                             className="w-full bg-gray-50 p-2 border rounded text-xs font-bold text-gray-700 outline-none focus:border-brand-500"
+                                                             onChange={(e) => {
+                                                                 const val = e.target.value;
+                                                                 if (!val) return;
+                                                                 const [latS, lngS] = val.split(',');
+                                                                 setDeliveryLat(parseFloat(latS));
+                                                                 setDeliveryLng(parseFloat(lngS));
+                                                                 setHasMapPin(true);
+                                                             }}
+                                                         >
+                                                             <option value="">{language === 'th' ? '== เลือกสถานที่สำคัญเพื่อปักหมุด ==' : '== Select Landmark =='}</option>
+                                                             <option value="13.8856,100.5222">{language === 'th' ? '📍 ร้านคุณป้าพิซซ่าดาแมค (พิกัดร้าน)' : '📍 Pizza Damac Shop (Hub)'}</option>
+                                                             <option value="13.9034,100.5284">{language === 'th' ? '📍 ห้างเซ็นทรัลแจ้งวัฒนะ (Central Chaengwattana)' : '📍 Central Chaengwattana'}</option>
+                                                             <option value="13.8569,100.5422">{language === 'th' ? '📍 เดอะมอลล์ งามวงศ์วาน (The Mall Ngamwongwan)' : '📍 The Mall Ngamwongwan'}</option>
+                                                             <option value="13.8703,100.5478">{language === 'th' ? '📍 มหาวิทยาลัยธุรกิจบัณฑิตย์ (DPU)' : '📍 DPU University'}</option>
+                                                             <option value="13.8504,100.5288">{language === 'th' ? '📍 แถวกระทรวงสาธารณสุข' : '📍 Ministry of Public Health'}</option>
+                                                         </select>
+
+                                                         {/* Address coordinate results */}
+                                                         {hasMapPin && (
+                                                             <div className="bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between items-center text-xs text-emerald-800 font-bold animate-fade-in">
+                                                                 <div className="flex items-center gap-1">
+                                                                     <CheckCircle2 size={13} className="text-emerald-600 shrink-0"/>
+                                                                     <span>หมุดบันทึก: {deliveryLat.toFixed(5)}, {deliveryLng.toFixed(5)}</span>
+                                                                 </div>
+                                                                 <button 
+                                                                     type="button"
+                                                                     onClick={() => {
+                                                                         setHasMapPin(false);
+                                                                     }}
+                                                                     className="text-red-500 hover:text-red-700 text-[10px] border border-red-200 bg-white rounded px-1"
+                                                                 >
+                                                                     {language === 'th' ? 'ล้างพิกัด' : 'Clear Pin'}
+                                                                 </button>
+                                                             </div>
+                                                         )}
+                                                     </div>
+                                                 </div>
+                                             </div>
                                          </div>
                                      )}
 
@@ -1400,12 +1587,14 @@ export const CustomerView: React.FC = () => {
                                          <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">{t('paymentMethod')}</label>
                                          <div className="grid grid-cols-2 gap-3">
                                              <button 
+                                                 type="button"
                                                  onClick={() => setPaymentMethod('qr_transfer')}
                                                  className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
                                              >
                                                  <QrCode size={16}/> {t('qrTransfer')}
                                              </button>
                                              <button 
+                                                 type="button"
                                                  onClick={() => setPaymentMethod('cash')}
                                                  className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
                                              >
@@ -1414,20 +1603,68 @@ export const CustomerView: React.FC = () => {
                                          </div>
                                      </div>
 
-                                     {/* Pickup Time (Only for Online/Pickup) */}
-                                     {orderType === 'online' && !tableSession && (
+                                     {/* Scheduling Pre-order Box (Dine-in, Takeaway, and Delivery) */}
+                                     {(!tableSession) && (
                                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                             <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">{t('pickupTime')}</label>
-                                             <select 
-                                                className="w-full p-3 bg-gray-50 border rounded-lg text-sm font-bold text-gray-700 outline-none"
-                                                value={pickupTime}
-                                                onChange={e => setPickupTime(e.target.value)}
-                                             >
-                                                 <option value="">{t('asap')}</option>
-                                                 {timeSlots.map(slot => (
-                                                     <option key={slot} value={slot}>{orderDate === 'tomorrow' ? 'Tomorrow ' : 'Today '} {slot}</option>
-                                                 ))}
-                                             </select>
+                                             <label className="text-xs font-bold text-gray-500 uppercase mb-3 block flex items-center gap-1.5">
+                                                 <Clock size={14} className="text-brand-600"/> {language === 'th' ? 'การตั้งเวลาสั่งอาหาร / สั่งล่วงหน้า' : 'Pre-order / Preparation Time'}
+                                             </label>
+                                             
+                                             <div className="grid grid-cols-2 gap-2 mb-3">
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => {
+                                                         setAsapOrder(true);
+                                                         setPickupTime('');
+                                                     }}
+                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                 >
+                                                     {language === 'th' ? 'เตรียมทันที (ASAP)' : 'Prepare ASAP (20m)'}
+                                                 </button>
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => {
+                                                         setAsapOrder(false);
+                                                         if (!pickupTime && timeSlots.length > 0) setPickupTime(timeSlots[0]);
+                                                     }}
+                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${!asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                 >
+                                                     {language === 'th' ? 'สั่งอาหารล่วงหน้า' : 'Schedule Pre-order'}
+                                                 </button>
+                                             </div>
+
+                                             {!asapOrder && (
+                                                 <div className="space-y-3 pt-2.5 border-t border-dashed border-gray-100">
+                                                     <div className="flex gap-2">
+                                                         <button 
+                                                             type="button"
+                                                             onClick={() => setOrderDate('today')}
+                                                             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition border ${orderDate === 'today' ? 'bg-brand-50 text-brand-700 border-brand-300' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                                         >
+                                                             {language === 'th' ? 'วันนี้' : 'Today'}
+                                                         </button>
+                                                         <button 
+                                                             type="button"
+                                                             onClick={() => setOrderDate('tomorrow')}
+                                                             className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition border ${orderDate === 'tomorrow' ? 'bg-brand-50 text-brand-700 border-brand-300' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
+                                                         >
+                                                             {language === 'th' ? 'พรุ่งนี้' : 'Tomorrow'}
+                                                         </button>
+                                                     </div>
+
+                                                     <select 
+                                                        className="w-full p-2.5 bg-gray-50 border rounded-lg text-sm font-bold text-gray-700 outline-none"
+                                                        value={pickupTime}
+                                                        onChange={e => setPickupTime(e.target.value)}
+                                                     >
+                                                         {timeSlots.map(slot => (
+                                                             <option key={slot} value={slot}>
+                                                                 {language === 'th' ? (orderDate === 'tomorrow' ? 'พรุ่งนี้ เวลา ' : 'วันนี้ เวลา ') : (orderDate === 'tomorrow' ? 'Tomorrow ' : 'Today ')} {slot}
+                                                             </option>
+                                                         ))}
+                                                     </select>
+                                                 </div>
+                                             )}
                                          </div>
                                      )}
                                 </div>

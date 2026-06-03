@@ -10,7 +10,7 @@ export interface Topping {
   available?: boolean; // New: Stock status
 }
 
-export type ProductCategory = 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'drink' | 'promotion' | 'cake';
+export type ProductCategory = 'pizza' | 'pasta' | 'appetizer' | 'salad' | 'drink' | 'promotion' | 'cake' | 'rice';
 
 export interface Pizza {
   id: string;
@@ -159,3 +159,25 @@ export interface StoreSettings {
   
   newsItems?: NewsItem[];
 }
+
+export function parseGPSCoordinates(address?: string) {
+  if (!address) return null;
+  const match = address.match(/\[(?:พิกัด GPS|GPS Pin):\s*([\d.-]+),\s*([\d.-]+)\]/);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    return {
+      lat,
+      lng,
+      url: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+    };
+  }
+  return null;
+}
+
+export function parseDeliveryPhone(address?: string) {
+  if (!address) return null;
+  const match = address.match(/\[(?:ติดต่อโทร|Phone):\s*([^\]]+)\]/);
+  return match ? match[1] : null;
+}
+

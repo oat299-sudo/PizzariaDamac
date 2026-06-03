@@ -631,6 +631,29 @@ export const INITIAL_MENU: Pizza[] = [
     image: 'https://images.unsplash.com/photo-1564414297441-112e3743527d?auto=format&fit=crop&w=800&q=80',
     available: true,
     category: 'drink'
+  },
+  {
+    id: 'rice_basil',
+    name: 'Rice with Basil Pork/Chicken',
+    nameTh: 'ข้าวราดกะเพราหมู/ไก่',
+    basePrice: 120,
+    description: 'Authentic Thai stir-fried pork or chicken with holy basil, garlic, and chilies served on rice.',
+    descriptionTh: 'ผัดกะเพราหมูหรือไก่แท้ๆ รสจัดจ้าน เสิร์ฟพร้อมข้าวสวยร้อนๆ',
+    image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'rice'
+  },
+  {
+    id: 'rice_garlic',
+    name: 'Rice with Garlic Pork/Chicken',
+    nameTh: 'ข้าวราดหมู/ไก่ทอดกระเทียม',
+    basePrice: 120,
+    description: 'Stir-fried pork or chicken with garlic and black pepper served on warm rice.',
+    descriptionTh: 'หมูหรือไก่ทอดกระเทียมพริกไทย หอมกรุ่น เสิร์ฟพร้อมข้าวสวย',
+    image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80',
+    available: true,
+    category: 'rice',
+    isBestSeller: true
   }
 ];
 
@@ -642,6 +665,7 @@ export const CATEGORIES: {id: ProductCategory; label: string; labelTh: string}[]
   { id: 'salad', label: 'Salads', labelTh: 'สลัด' },
   { id: 'cake', label: 'Cakes', labelTh: 'เค้ก' },
   { id: 'drink', label: 'Drinks', labelTh: 'เครื่องดื่ม' },
+  { id: 'rice', label: 'Rice with Pork&Chicken', labelTh: 'เมนูข้าว (หมู/ไก่)' },
 ];
 
 export const INITIAL_TOPPINGS: Topping[] = [

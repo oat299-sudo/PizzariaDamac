@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
@@ -286,11 +286,36 @@ export const KitchenView: React.FC = () => {
 
               {/* Delivery Info Block */}
               {order.type === 'delivery' && (
-                  <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-start gap-2">
-                      <MapPin size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                          <p className="text-xs font-bold text-blue-800 uppercase mb-0.5">{t('deliveryAddress')}:</p>
-                          <p className="text-sm text-gray-800 leading-snug">{order.deliveryAddress}</p>
+                  <div className="bg-blue-50 p-3 border-b border-blue-100 space-y-2">
+                      <div className="flex items-start gap-2">
+                          <MapPin size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                              <p className="text-xs font-bold text-blue-800 uppercase mb-0.5">{t('deliveryAddress')}:</p>
+                              <p className="text-sm text-gray-850 leading-snug">{order.deliveryAddress}</p>
+                          </div>
+                      </div>
+                      
+                      {/* Interactive metadata annotations decoded for the kitchen */}
+                      <div className="pl-6 text-xs space-y-1.5 pt-1.5 border-t border-dashed border-blue-200/60">
+                          {parseDeliveryPhone(order.deliveryAddress) && (
+                              <div className="flex items-center gap-1.5 font-bold text-gray-700">
+                                  <Phone size={13} className="text-blue-600 shrink-0"/>
+                                  <span>เบอร์ติดต่อ: {parseDeliveryPhone(order.deliveryAddress)}</span>
+                              </div>
+                          )}
+                          {parseGPSCoordinates(order.deliveryAddress) && (
+                              <div className="flex items-center justify-between gap-1.5 font-bold pt-1">
+                                  <span className="text-red-700 flex items-center gap-1">📍 ปักหมุดพิกัด GPS เรียบร้อย</span>
+                                  <a 
+                                      href={parseGPSCoordinates(order.deliveryAddress)?.url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-[10px] bg-red-650 hover:bg-red-700 text-white px-1.5 py-0.5 rounded font-extrabold flex items-center gap-1 shadow-sm transition"
+                                  >
+                                      <Globe size={10}/> เปิดแผนที่นำทาง
+                                  </a>
+                              </div>
+                          )}
                       </div>
                   </div>
               )}
