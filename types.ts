@@ -163,13 +163,21 @@ export interface StoreSettings {
 export function parseGPSCoordinates(address?: string) {
   if (!address) return null;
   const match = address.match(/\[(?:พิกัด GPS|GPS Pin):\s*([\d.-]+),\s*([\d.-]+)\]/);
+  const linkMatch = address.match(/\[(?:Google Maps Link):\s*(https?:\/\/[^\s\]]+)\]/);
+  
   if (match) {
     const lat = parseFloat(match[1]);
     const lng = parseFloat(match[2]);
     return {
       lat,
       lng,
-      url: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+      url: linkMatch ? linkMatch[1] : `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+    };
+  } else if (linkMatch) {
+    return {
+      lat: 13.8856,
+      lng: 100.5222,
+      url: linkMatch[1]
     };
   }
   return null;

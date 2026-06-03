@@ -521,6 +521,9 @@ export const CustomerView: React.FC = () => {
          }
          if (hasMapPin) {
              finalDeliveryAddress += ` [GPS Pin: ${deliveryLat.toFixed(5)}, ${deliveryLng.toFixed(5)}]`;
+          }
+          if (mapSearch && (mapSearch.includes('maps') || mapSearch.includes('goo.gl'))) {
+              finalDeliveryAddress += ` [Google Maps Link: ${mapSearch.trim()}]`;
          }
      }
 
@@ -1433,7 +1436,7 @@ export const CustomerView: React.FC = () => {
                                                              className="text-xs border rounded p-1 max-w-[150px]"
                                                          >
                                                              <option value="">{language === 'th' ? 'ที่อยู่บันทึกไว้...' : 'Saved...'}</option>
-                                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)}
+                                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)} {/* SELECT_UNIQUE_SAVED_ADDR_ANCHOR */}
                                                          </select>
                                                      )}
                                                  </div>
@@ -1457,7 +1460,33 @@ export const CustomerView: React.FC = () => {
                                                              type="button"
                                                              onClick={() => {
                                                                  setGpsLoading(true);
-                                                                 setTimeout(() => {
+                                                                if (navigator.geolocation) {
+                                                                    navigator.geolocation.getCurrentPosition(
+                                                                        (pos) => {
+                                                                            setDeliveryLat(pos.coords.latitude);
+                                                                            setDeliveryLng(pos.coords.longitude);
+                                                                            setHasMapPin(true);
+                                                                            setGpsLoading(false);
+                                                                        },
+                                                                        (error) => {
+                                                                            console.error(error);
+                                                                            setGpsLoading(false);
+                                                                            const offsetLat = 13.8856 + (Math.random() - 0.5) * 0.01;
+                                                                            const offsetLng = 100.5222 + (Math.random() - 0.5) * 0.01;
+                                                                            setDeliveryLat(offsetLat);
+                                                                            setDeliveryLng(offsetLng);
+                                                                            setHasMapPin(true);
+                                                                        },
+                                                                        { enableHighAccuracy: true, timeout: 8000 }
+                                                                    );
+                                                                } else {
+                                                                    setDeliveryLat(13.8856);
+                                                                    setDeliveryLng(100.5222);
+                                                                    setHasMapPin(true);
+                                                                    setGpsLoading(false);
+                                                                }
+
+                                                                 if (false) setTimeout(() => {
                                                                      setGpsLoading(false);
                                                                      const offsetLat = 13.8856 + (Math.random() - 0.5) * 0.02;
                                                                      const offsetLng = 100.5222 + (Math.random() - 0.5) * 0.02;
@@ -1561,11 +1590,164 @@ export const CustomerView: React.FC = () => {
                                                              <option value="13.8569,100.5422">{language === 'th' ? '📍 เดอะมอลล์ งามวงศ์วาน (The Mall Ngamwongwan)' : '📍 The Mall Ngamwongwan'}</option>
                                                              <option value="13.8703,100.5478">{language === 'th' ? '📍 มหาวิทยาลัยธุรกิจบัณฑิตย์ (DPU)' : '📍 DPU University'}</option>
                                                              <option value="13.8504,100.5288">{language === 'th' ? '📍 แถวกระทรวงสาธารณสุข' : '📍 Ministry of Public Health'}</option>
-                                                         </select>
+                                                          </select>
+
+                                                          {/* Coords / Link paste search */}
+                                                          <div className="space-y-1.5 pt-1 border-t border-gray-150 mt-2">
+                                                              <label className="text-[11px] font-extrabold text-brand-600 uppercase flex items-center gap-1">
+                                                                  <Globe size={11} className="text-brand-500"/>
+                                                                  {language === 'th' ? 'หรือ วางลิงก์แชร์ Google Maps / คัดลอกพิกัดมาวางที่นี่' : 'Or Paste Google Maps Share Link / GPS Coords'}
+                                                              </label>
+                                                              <div className="relative">
+                                                                  <input 
+                                                                      type="text"
+                                                                      className="w-full bg-blue-50/40 p-2.5 border border-blue-200 rounded-lg text-xs font-bold text-gray-800 outline-none focus:border-blue-500 pr-10 shadow-xs"
+                                                                      placeholder={language === 'th' ? 'วางพิกัด เช่น 13.88, 100.52 หรือวางลิงก์แชร์ตรงนี้...' : 'Paste maps link or coords here...'}
+                                                                      value={mapSearch}
+                                                                      onChange={(e) => {
+                                                                          const val = e.target.value;
+                                                                          setMapSearch(val);
+                                                                          
+                                                                          const trimmed = val.trim();
+                                                                          if (!trimmed) return;
+
+                                                                          // Parse direct lat,lng coords (e.g. 13.8856, 100.5222)
+                                                                          const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
+                                                                          const coordMatch = trimmed.match(coordRegex);
+                                                                          if (coordMatch) {
+                                                                              setDeliveryLat(parseFloat(coordMatch[1]));
+                                                                              setDeliveryLng(parseFloat(coordMatch[2]));
+                                                                              setHasMapPin(true);
+                                                                              return;
+                                                                          }
+
+                                                                          // Parse lat,lng embedded in standard google maps URL
+                                                                          const longUrlMatch = trimmed.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
+                                                                                               trimmed.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                                                                                               trimmed.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+                                                                          if (longUrlMatch) {
+                                                                              setDeliveryLat(parseFloat(longUrlMatch[1]));
+                                                                              setDeliveryLng(parseFloat(longUrlMatch[2]));
+                                                                              setHasMapPin(true);
+                                                                              return;
+                                                                          }
+
+                                                                          if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
+                                                                              setHasMapPin(true);
+                                                                          }
+                                                                      }}
+                                                                  />
+                                                                  {mapSearch && (
+                                                                      <button 
+                                                                          type="button" 
+                                                                          onClick={() => setMapSearch('')} 
+                                                                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                                      >
+                                                                          <X size={14}/>
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                              <p className="text-[10px] text-gray-500 leading-normal">
+                                                                  {language === 'th' 
+                                                                      ? '💡 เปิดแอป Google Maps กดค้างที่ตำแหน่งของคุณเพื่อคัดลอกละติจูด ลองจิจูด นำมาวางได้ทันที หรือกดปุ่มดึงพิกัดปัจจุบันข้างบนเพื่อจับพิกัดจริง' 
+                                                                      : '💡 Drag simulated pin, click live GPS geolocation, or paste Google Maps address share link or coordinates.'}
+                                                              </p>
+                                                          </div>
+
+                                                          {/* Real Google Maps iframe embed */}
+                                                          {hasMapPin && (
+                                                              <div className="w-full h-[180px] rounded-xl overflow-hidden shadow-inner border-2 border-brand-500 mt-2 animate-fade-in relative">
+                                                                  <iframe
+                                                                      title="Google Maps Location Preview"
+                                                                      src={`https://maps.google.com/maps?q=${deliveryLat},${deliveryLng}&z=16&output=embed`}
+                                                                      className="w-full h-full border-0"
+                                                                      allowFullScreen
+                                                                      loading="lazy"
+                                                                      referrerPolicy="no-referrer"
+                                                                  ></iframe>
+                                                                  <div className="absolute top-2 right-2 bg-brand-600 text-white text-[9px] px-2 py-0.5 rounded-md font-bold shadow uppercase">
+                                                                      Google Maps LIVE PREVIEW
+                                                                  </div>
+                                                              </div>
+                                                          )}
+
+                                                          {/* Custom Address coordinate results */}
+                                                          {hasMapPin && (
+                                                              <div className="space-y-2 animate-fade-in pt-1">
+                                                                  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-150 space-y-1.5 text-xs text-emerald-800 font-bold">
+                                                                      <div className="flex justify-between items-center bg-white p-1.5 rounded-lg border border-emerald-250">
+                                                                          <div className="flex items-center gap-1 font-mono text-[11px]">
+                                                                              <CheckCircle2 size={13} className="text-emerald-600 shrink-0 animate-bounce"/>
+                                                                              <span>พิกัด GPS: {deliveryLat.toFixed(5)}, {deliveryLng.toFixed(5)}</span>
+                                                                          </div>
+                                                                          <button 
+                                                                              type="button"
+                                                                              onClick={() => {
+                                                                                  setHasMapPin(false);
+                                                                                  setMapSearch('');
+                                                                              }}
+                                                                              className="text-red-500 hover:bg-red-50 hover:text-red-700 text-[10px] font-extrabold border border-red-200 bg-white rounded-md px-1.5 py-0.5 transition"
+                                                                          >
+                                                                              {language === 'th' ? 'ล้างพิกัด x' : 'Clear x'}
+                                                                          </button>
+                                                                      </div>
+                                                                      
+                                                                      {/* Live Distance & Estimate */}
+                                                                      <div className="pt-2 border-t border-emerald-200/50 flex flex-col gap-1 text-[11px] text-emerald-700 font-sans">
+                                                                          <div className="flex justify-between">
+                                                                              <span>ระยะห่างจากร้านพิซซ่า:</span>
+                                                                              <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.2 rounded">{(
+                                                                                  (() => {
+                                                                                      const lat1 = 13.8856;
+                                                                                      const lon1 = 100.5222;
+                                                                                      const lat2 = deliveryLat;
+                                                                                      const lon2 = deliveryLng;
+                                                                                      const R = 6371;
+                                                                                      const dLat = (lat2 - lat1) * Math.PI / 180;
+                                                                                      const dLon = (lon2 - lon1) * Math.PI / 180;
+                                                                                      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                                                                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                                                                                      return R * c;
+                                                                                  })()
+                                                                              ).toFixed(2)} กม.</span>
+                                                                          </div>
+                                                                          <div className="flex justify-between">
+                                                                              <span>เวลาส่งอาหารประมาณ:</span>
+                                                                              <span className="font-extrabold text-emerald-950 bg-emerald-100 px-1.5 py-0.2 rounded">~ {
+                                                                                  (() => {
+                                                                                      const lat1 = 13.8856;
+                                                                                      const lon1 = 100.5222;
+                                                                                      const lat2 = deliveryLat;
+                                                                                      const lon2 = deliveryLng;
+                                                                                      const R = 6371;
+                                                                                      const dLat = (lat2 - lat1) * Math.PI / 180;
+                                                                                      const dLon = (lon2 - lon1) * Math.PI / 180;
+                                                                                      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                                                                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                                                                                      const d = R * c;
+                                                                                      return Math.round(15 + d * 3.5);
+                                                                                  })()
+                                                                              } นาที</span>
+                                                                          </div>
+                                                                          <div className="mt-1 pt-1 border-t border-dashed border-emerald-200/50">
+                                                                              <a 
+                                                                                  href={`https://www.google.com/maps/dir/?api=1&origin=13.8856,100.5222&destination=${deliveryLat},${deliveryLng}&travelmode=driving`} 
+                                                                                  target="_blank" 
+                                                                                  rel="noopener noreferrer"
+                                                                                  className="text-brand-600 hover:text-brand-700 hover:underline inline-flex items-center gap-1 font-bold"
+                                                                              >
+                                                                                  <Navigation size={10} className="animate-pulse mr-0.5 text-brand-610"/> {language === 'th' ? 'เปิดแผนที่นำทาง Google Maps Navigation ↗' : 'Open Google Maps Directions ↗'}
+                                                                              </a>
+                                                                          </div>
+                                                                      </div>
+                                                                  </div>
+                                                              </div>
+                                                          )}
+
 
                                                          {/* Address coordinate results */}
                                                          {hasMapPin && (
-                                                             <div className="bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between items-center text-xs text-emerald-800 font-bold animate-fade-in">
+                                                             <div className="hidden bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between items-center text-xs text-emerald-800 font-bold animate-fade-in">
                                                                  <div className="flex items-center gap-1">
                                                                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0"/>
                                                                      <span>หมุดบันทึก: {deliveryLat.toFixed(5)}, {deliveryLng.toFixed(5)}</span>
