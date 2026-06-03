@@ -4,16 +4,17 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
     const trimmed = url.trim();
-    if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com')) {
+    if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com') || trimmed.includes('googleusercontent.com')) {
         let fileId = '';
-        const dMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{25,50})/);
-        const dShortMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{25,50})/);
-        const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{25,50})/);
+        const dMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{15,80})/);
+        const dShortMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{15,80})/);
+        const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{15,80})/);
+        const lhMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{15,80})/);
 
         if (dMatch && dMatch[1]) {
             fileId = dMatch[1];
@@ -21,10 +22,13 @@ const convertGoogleDriveUrl = (url: string): string => {
             fileId = dShortMatch[1];
         } else if (idMatch && idMatch[1]) {
             fileId = idMatch[1];
+        } else if (lhMatch && lhMatch[1]) {
+            fileId = lhMatch[1];
         }
 
         if (fileId) {
-            return `https://lh3.googleusercontent.com/d/${fileId}`;
+            // drive.google.com/thumbnail is serving-safe and bypasses third-party cookie restrictions
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
         }
     }
     return trimmed;
@@ -32,13 +36,13 @@ const convertGoogleDriveUrl = (url: string): string => {
 
 const isDriveUrl = (url: string): boolean => {
     if (!url) return false;
-    return url.includes('lh3.googleusercontent.com/d/') || url.includes('drive.google.com') || url.includes('docs.google.com');
+    return url.includes('drive.google.com/thumbnail') || url.includes('lh3.googleusercontent.com') || url.includes('drive.google.com') || url.includes('docs.google.com');
 };
 
 export const POSView: React.FC = () => {
     const { 
         menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder,
-        updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza, toggleBestSeller,
+        updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza, toggleBestSeller, reorderMenu,
         toppings, addTopping, updateTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
         expenses, addExpense, deleteExpense,
@@ -538,11 +542,11 @@ export const POSView: React.FC = () => {
 
     // --- ITEM & TOPPING MANAGEMENT ---
     const handleOpenAddModal = () => {
-        setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: [] });
+        setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: [], badge: '', badgeTh: '' });
         setShowItemModal(true);
     };
     const handleEditMenuItem = (item: Pizza) => {
-        setItemForm({ ...item, comboCount: item.comboCount || 0, allowedPromotions: item.allowedPromotions || [] });
+        setItemForm({ ...item, comboCount: item.comboCount || 0, allowedPromotions: item.allowedPromotions || [], badge: item.badge || '', badgeTh: item.badgeTh || '' });
         setShowItemModal(true);
     };
     const handleSaveItem = async () => {
@@ -552,6 +556,27 @@ export const POSView: React.FC = () => {
             if (itemForm.category) setActiveCategory(itemForm.category);
             setShowItemModal(false);
         }
+    };
+    
+    const handleMoveMenuItem = (pizzaId: string, direction: 'up' | 'down') => {
+        // Filter menu by current active category to handle category-scoped reordering or overall reordering
+        // Reordering the raw 'menu' array is best, as it represents the stored order of all items.
+        const currentIndex = menu.findIndex(p => p.id === pizzaId);
+        if (currentIndex === -1) return;
+        
+        const newMenu = [...menu];
+        const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+        
+        // Boundaries check
+        if (targetIndex < 0 || targetIndex >= newMenu.length) return;
+        
+        // Swap items
+        const temp = newMenu[currentIndex];
+        newMenu[currentIndex] = newMenu[targetIndex];
+        newMenu[targetIndex] = temp;
+        
+        const sortedIds = newMenu.map(p => p.id);
+        reorderMenu(sortedIds);
     };
     
     // UPDATED: Compress Image Handlers
@@ -919,8 +944,27 @@ export const POSView: React.FC = () => {
                                             <div key={item.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col transition h-full group ${!item.available ? 'opacity-60 grayscale' : ''} ${isEditMode ? 'hover:border-blue-400' : 'hover:border-brand-400 cursor-pointer active:scale-95'}`}>
                                                 <div className="relative aspect-square overflow-hidden" onClick={() => !isEditMode && handleCustomize(item)}>
                                                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                                    
+                                                    {/* Promo Badge Tag */}
+                                                    {(() => {
+                                                        const activeBadge = language === 'th' ? (item.badgeTh || item.badge) : (item.badge || item.badgeTh);
+                                                        return activeBadge ? (
+                                                            <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white font-black text-[10px] uppercase tracking-wider py-1 px-2 rounded-lg shadow-md animate-pulse">
+                                                                {activeBadge}
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
+
                                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-lg">SOLD OUT</div>}
-                                                    {isEditMode && (<div className="absolute top-2 right-2 flex gap-1"><button onClick={(e) => { e.stopPropagation(); handleEditMenuItem(item); }} className="bg-blue-500 text-white p-2 rounded-lg shadow hover:bg-blue-600"><Edit2 size={16}/></button><button onClick={(e) => { e.stopPropagation(); togglePizzaAvailability(item.id); }} className={`p-2 rounded-lg shadow text-white ${item.available ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}><Power size={16}/></button><button onClick={(e) => { e.stopPropagation(); toggleBestSeller(item.id); }} className={`p-2 rounded-lg shadow text-white ${item.isBestSeller ? 'bg-yellow-400' : 'bg-gray-400'}`}><Star size={16} fill="currentColor"/></button></div>)}
+                                                    {isEditMode && (
+                                                        <div className="absolute top-2 right-2 flex flex-wrap gap-1 max-w-[125px] justify-end z-20">
+                                                            <button onClick={(e) => { e.stopPropagation(); handleMoveMenuItem(item.id, 'up'); }} className="bg-gray-800 text-white p-1.5 rounded-lg shadow hover:bg-black" title="Move Up"><ChevronUp size={14}/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleMoveMenuItem(item.id, 'down'); }} className="bg-gray-800 text-white p-1.5 rounded-lg shadow hover:bg-black" title="Move Down"><ChevronDown size={14}/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleEditMenuItem(item); }} className="bg-blue-500 text-white p-1.5 rounded-lg shadow hover:bg-blue-600" title="Edit"><Edit2 size={14}/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); togglePizzaAvailability(item.id); }} className={`p-1.5 rounded-lg shadow text-white ${item.available ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} title="Toggle Availability"><Power size={14}/></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); toggleBestSeller(item.id); }} className={`p-1.5 rounded-lg shadow text-white ${item.isBestSeller ? 'bg-yellow-400' : 'bg-gray-400'}`} title="Mark Bestseller"><Star size={14} fill="currentColor"/></button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="p-4 flex flex-col flex-1" onClick={() => !isEditMode && handleCustomize(item)}>
                                                     <h3 className="font-bold text-gray-800 text-base md:text-lg leading-tight mb-1">{localized.name}</h3>
@@ -1187,12 +1231,20 @@ export const POSView: React.FC = () => {
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in">
                                 <div className="text-sm font-bold text-gray-800 mb-2">Options for Item {activeComboSlot + 1}:</div>
                                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                                    {menu.filter(m => !m.comboCount).map(m => ( // Exclude combos from combo
-                                        <button key={m.id} onClick={() => handleComboPizzaSelect(m)} className="text-left p-2 border rounded-lg bg-white hover:border-brand-300">
-                                            <div className="text-sm font-bold truncate">{m.name}</div>
-                                            <div className="text-xs text-brand-600">฿{m.basePrice}</div>
-                                        </button>
-                                    ))}
+                                    {menu.filter(m => !m.comboCount).map(m => { // Exclude combos from combo
+                                        const promoBadge = language === 'th' ? (m.badgeTh || m.badge) : (m.badge || m.badgeTh);
+                                        return (
+                                            <button key={m.id} onClick={() => handleComboPizzaSelect(m)} className="text-left p-2.5 border rounded-lg bg-white hover:border-brand-300 flex flex-col justify-between gap-1 transition">
+                                                <div className="text-sm font-bold text-gray-800 line-clamp-1 flex items-center justify-between w-full gap-1">
+                                                    <span className="truncate">{language === 'th' && m.nameTh ? m.nameTh : m.name}</span>
+                                                    {promoBadge && (
+                                                        <span className="bg-gradient-to-r from-red-600 to-amber-500 text-white text-[8px] font-extrabold uppercase px-1 py-0.5 rounded shrink-0 animate-pulse">{promoBadge}</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-brand-600 font-bold">฿{m.basePrice}</div>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -1279,6 +1331,17 @@ export const POSView: React.FC = () => {
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Base Price (฿)</label>
                         <input type="number" className="w-full border rounded-lg px-3 py-2" value={itemForm.basePrice || 0} onChange={e => setItemForm({...itemForm, basePrice: Number(e.target.value)})}/>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">Promo Badge (EN) (e.g. New)</label>
+                        <input className="w-full border rounded-lg px-3 py-2" placeholder="e.g. New, Promo" value={itemForm.badge || ''} onChange={e => setItemForm({...itemForm, badge: e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-1">ป้ายโปรโมชั่น (TH)</label>
+                        <input className="w-full border rounded-lg px-3 py-2" placeholder="เช่น เมนูใหม่, แนะนำ" value={itemForm.badgeTh || ''} onChange={e => setItemForm({...itemForm, badgeTh: e.target.value})}/>
                     </div>
                 </div>
                 

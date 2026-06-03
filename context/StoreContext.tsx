@@ -36,6 +36,7 @@ interface StoreContextType {
   toggleBestSeller: (id: string) => Promise<void>;
   generateLuckyPizza: () => { pizza: Pizza; toppings: Topping[] } | null;
   seedDatabase: () => Promise<void>;
+  reorderMenu: (sortedIds: string[]) => void;
 
   toppings: Topping[];
   addTopping: (topping: Topping) => Promise<void>;
@@ -345,9 +346,25 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                    isBestSeller: d.is_best_seller,
                    comboCount: d.combo_count !== undefined ? d.combo_count : (local?.comboCount || 0),
                    category: d.category || local?.category || 'pizza',
-                   available: d.available
+                   available: d.available,
+                   badge: savedLocal?.badge || local?.badge || d.badge || '',
+                   badgeTh: savedLocal?.badgeTh || local?.badgeTh || d.badge_th || ''
                };
            });
+
+           // Sort mergedMenu based on the sequence in localMenu or INITIAL_MENU!
+           mergedMenu.sort((a, b) => {
+               let indexA = localMenu.findIndex(m => m.id === a.id);
+               if (indexA === -1) indexA = INITIAL_MENU.findIndex(m => m.id === a.id);
+               if (indexA === -1) indexA = 9999;
+               
+               let indexB = localMenu.findIndex(m => m.id === b.id);
+               if (indexB === -1) indexB = INITIAL_MENU.findIndex(m => m.id === b.id);
+               if (indexB === -1) indexB = 9999;
+               
+               return indexA - indexB;
+           });
+
            setMenu(mergedMenu);
         }
       } catch (err) { console.error("Menu fetch failed", err); }
@@ -1164,12 +1181,26 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setStoreSettings(prev => ({ ...prev, newsItems: updatedNews }));
   };
 
+  const reorderMenu = (sortedIds: string[]) => {
+      setMenu(prev => {
+          const sorted = [...prev];
+          sorted.sort((a, b) => {
+              let indexA = sortedIds.indexOf(a.id);
+              let indexB = sortedIds.indexOf(b.id);
+              if (indexA === -1) indexA = 9999;
+              if (indexB === -1) indexB = 9999;
+              return indexA - indexB;
+          });
+          return sorted;
+      });
+  };
+
   const value = {
       language, toggleLanguage, t, getLocalizedItem,
       currentView, navigateTo,
       isAdminLoggedIn, adminLogin, adminLogout,
       shopLogo, updateShopLogo,
-      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase,
+      menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase, reorderMenu,
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,

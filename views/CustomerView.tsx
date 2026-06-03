@@ -841,6 +841,17 @@ export const CustomerView: React.FC = () => {
                             <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-2 md:p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
                                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-2 md:mb-3">
                                     <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                    
+                                    {/* Promotional Badge tag */}
+                                    {(() => {
+                                        const activeBadge = language === 'th' ? (item.badgeTh || item.badge) : (item.badge || item.badgeTh);
+                                        return activeBadge ? (
+                                            <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[9px] md:text-[11px] uppercase tracking-wider py-1 px-2.5 rounded-lg shadow-md animate-pulse">
+                                                {activeBadge}
+                                            </div>
+                                        ) : null;
+                                    })()}
+
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
                                     {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
@@ -918,6 +929,17 @@ export const CustomerView: React.FC = () => {
                             <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-2 md:p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
                                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-2 md:mb-3">
                                     <img src={item.image} alt={localized.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
+                                    
+                                    {/* Promotional Badge tag */}
+                                    {(() => {
+                                        const activeBadge = language === 'th' ? (item.badgeTh || item.badge) : (item.badge || item.badgeTh);
+                                        return activeBadge ? (
+                                            <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[9px] md:text-[11px] uppercase tracking-wider py-1 px-2.5 rounded-lg shadow-md animate-pulse">
+                                                {activeBadge}
+                                            </div>
+                                        ) : null;
+                                    })()}
+
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
                                     {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
@@ -1135,7 +1157,7 @@ export const CustomerView: React.FC = () => {
                                              >
                                                  <img src={pizza.image} className="w-12 h-12 rounded-lg object-cover"/>
                                                  <div>
-                                                     <div className="font-bold text-sm text-gray-800">{getLocalizedItem(pizza).name}</div>
+                                                     <div className="font-bold text-sm text-gray-800 flex items-center gap-1.5">{(() => { const subB = language === 'th' ? (pizza.badgeTh || pizza.badge) : (pizza.badge || pizza.badgeTh); return subB ? <span className="bg-gradient-to-r from-red-600 to-amber-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm shrink-0 animate-pulse">{subB}</span> : null; })()}{getLocalizedItem(pizza).name}</div>
                                                  </div>
                                              </button>
                                          ))}

@@ -25,6 +25,8 @@ export interface Pizza {
   isBestSeller?: boolean;
   comboCount?: number; // New: How many pizzas allowed in this combo
   allowedPromotions?: string[]; // IDs of promotions this item can be added to. If empty/undefined, allowed in all.
+  badge?: string; // Promo badge (e.g., 'New', 'Promo')
+  badgeTh?: string; // Thai Promo badge (e.g., 'เมนูใหม่', 'เมนูประจำเดือน')
 }
 
 export interface SubItem {
