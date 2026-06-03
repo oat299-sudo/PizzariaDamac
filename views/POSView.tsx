@@ -688,7 +688,7 @@ export const POSView: React.FC = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col md:flex-row font-sans print:h-auto print:overflow-visible print:bg-white print:block">
+        <div className="flex h-screen bg-gray-100 overflow-hidden flex-col lg:flex-row font-sans print:h-auto print:overflow-visible print:bg-white print:block">
             
             {/* --- ROBUST THAI RECEIPT PRINTER (Hidden, 58mm Format) --- */}
             <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
@@ -803,7 +803,7 @@ export const POSView: React.FC = () => {
             </div>
 
             {/* --- MOBILE HEADER --- */}
-            <div className="md:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14 print:hidden">
+            <div className="lg:hidden bg-gray-900 text-white p-3 flex justify-between items-center z-30 shadow-md shrink-0 h-14 print:hidden">
                 <div className="flex items-center gap-2">
                     {shopLogo ? <img src={shopLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover" /> : <div className="bg-brand-600 p-1 rounded-lg"><DollarSign size={16} /></div>}
                     <span className="font-bold text-lg tracking-tight">POS v2.1</span>
@@ -815,7 +815,7 @@ export const POSView: React.FC = () => {
             </div>
 
             {/* --- DESKTOP SIDEBAR --- */}
-            <aside className="hidden md:flex w-24 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
+            <aside className="hidden lg:flex w-24 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
                 <div className="flex flex-col items-center gap-6 w-full">
                     <div className="mb-2 relative group cursor-pointer">
                         {shopLogo ? <img src={shopLogo} alt="Logo" className="w-14 h-14 rounded-full object-cover border-2 border-brand-500" /> : <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg shadow-brand-500/50"><DollarSign size={28} /></div>}
@@ -834,7 +834,7 @@ export const POSView: React.FC = () => {
             </aside>
             
             {/* --- MOBILE BOTTOM NAV --- */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden">
                 <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">Order</span></button>
                  <button onClick={() => { setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">Active</span></button>
                 <div className="relative -top-5"><button onClick={() => setShowMobileCart(!showMobileCart)} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
@@ -846,14 +846,14 @@ export const POSView: React.FC = () => {
             <main className="flex-1 flex overflow-hidden relative print:hidden">
                 {activeTab === 'order' && (
                     <>
-                        <div className={`flex-1 flex flex-col h-full bg-gray-100 relative ${showMobileCart ? 'hidden md:flex' : 'flex'}`}>
+                        <div className={`flex-1 flex flex-col h-full bg-gray-100 relative ${showMobileCart ? 'hidden lg:flex' : 'flex'}`}>
                             <div className="bg-white px-4 py-3 shadow-sm border-b shrink-0 overflow-x-auto no-scrollbar flex items-center gap-2">
-                                <button onClick={() => setIsEditMode(!isEditMode)} className={`hidden md:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}><Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? 'Editing' : 'Order'}</span></button>
+                                <button onClick={() => setIsEditMode(!isEditMode)} className={`hidden lg:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}><Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? 'Editing' : 'Order'}</span></button>
                                 {CATEGORIES.map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-6 py-3 rounded-xl text-base font-bold transition ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-md scale-105' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>{language === 'th' ? cat.labelTh : cat.label}</button>))}
                                 {isEditMode && <button onClick={handleOpenAddModal} className="whitespace-nowrap px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto"><Plus size={18}/> New Item</button>}
                             </div>
-                            <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+                            <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
                                         return (
@@ -873,8 +873,8 @@ export const POSView: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className={`w-full md:w-80 lg:w-96 bg-white border-l shadow-xl flex flex-col z-40 fixed md:relative inset-0 md:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}`}>
-                            <div className="md:hidden p-4 bg-gray-900 text-white flex justify-between items-center"><h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag/> Current Order</h2><button onClick={() => setShowMobileCart(false)} className="bg-white/20 p-2 rounded-full"><X size={20}/></button></div>
+                        <div className={`w-full lg:w-96 bg-white border-l shadow-xl flex flex-col z-40 fixed lg:relative inset-0 lg:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}`}>
+                            <div className="lg:hidden p-4 bg-gray-900 text-white flex justify-between items-center"><h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag/> Current Order</h2><button onClick={() => setShowMobileCart(false)} className="bg-white/20 p-2 rounded-full"><X size={20}/></button></div>
                             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
                                 {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{(item.selectedToppings || []).map(t => t.name).join(', ')}{(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
                             </div>
@@ -891,11 +891,11 @@ export const POSView: React.FC = () => {
                 )}
 
                 {activeTab === 'tables' && (
-                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                         <div className="max-w-7xl mx-auto">
                             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Layers className="text-brand-600"/> Active Orders & Tables</h2>
                             {activeTables.length === 0 ? <div className="flex flex-col items-center justify-center h-64 text-gray-400"><Layers size={64} className="mb-4 opacity-20"/><p className="text-xl font-bold">No active orders</p><button onClick={() => setActiveTab('order')} className="mt-4 text-brand-600 hover:underline font-bold">Start New Order</button></div> : 
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{activeTables.map(order => (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">{activeTables.map(order => (
                                     <div key={order.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col relative group hover:border-brand-300 transition">
                                         <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
                                             <div>
@@ -967,7 +967,7 @@ export const POSView: React.FC = () => {
                     const totalExpensesValue = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
                     
                     return (
-                        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                             <div className="max-w-7xl mx-auto space-y-6">
                                 <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><PieChart className="text-brand-600"/> Reports & History</h2>
                                 
@@ -1031,10 +1031,10 @@ export const POSView: React.FC = () => {
                 })()}
 
                 {activeTab === 'qr_gen' && (
-                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                         <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
                             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><QrCode className="text-brand-600"/> QR Generator</h2>
-                            <div className="flex flex-col md:flex-row gap-8">
+                            <div className="flex flex-col lg:flex-row gap-8">
                                 <div className="flex-1 space-y-4">
                                     <div>
                                         <label className="text-sm font-bold text-gray-500 uppercase">Base URL</label>
@@ -1065,13 +1065,13 @@ export const POSView: React.FC = () => {
                 )}
 
                 {activeTab === 'manage' && (
-                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 md:pb-6">
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                         <div className="max-w-4xl mx-auto space-y-6">
                             <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><Settings className="text-brand-600"/> Store Settings & Management</h2>
                             {/* Contact Info Settings */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                 <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Phone size={20} className="text-brand-500"/> Connect & Links (Footer)</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                      <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Contact Phone</label>
                                         <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.contactPhone} onChange={e => setContactForm({...contactForm, contactPhone: e.target.value})} />
@@ -1089,7 +1089,7 @@ export const POSView: React.FC = () => {
                                         <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={contactForm.lineUrl} onChange={e => setContactForm({...contactForm, lineUrl: e.target.value})} />
                                      </div>
                                 </div>
-                                <button onClick={() => { updateStoreSettings(contactForm); alert("Contact Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full md:w-auto">Save Contact Settings</button>
+                                <button onClick={() => { updateStoreSettings(contactForm); alert("Contact Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Contact Settings</button>
                             </div>
                         </div>
                     </div>
@@ -1274,12 +1274,12 @@ export const POSView: React.FC = () => {
 
 
             {showPaymentModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 md:p-4 print:hidden">
-                    {/* Updated Modal Container: Full Screen on Mobile, Centered on Desktop */}
-                    <div className="bg-white w-full h-full md:h-[85vh] md:max-w-4xl md:rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-fade-in">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 lg:p-4 print:hidden">
+                    {/* Updated Modal Container: Full Screen on Mobile/Tablet, Centered on Desktop */}
+                    <div className="bg-white w-full h-full lg:h-[85vh] lg:max-w-4xl lg:rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden animate-fade-in">
                         
                         {/* Order Summary Column */}
-                        <div className="hidden md:flex md:w-1/2 bg-gray-50 border-r border-gray-200 p-6 flex-col">
+                        <div className="hidden lg:flex lg:w-1/2 bg-gray-50 border-r border-gray-200 p-6 flex-col">
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800"><Receipt size={24}/> {selectedOrder ? `Bill for Table ${selectedOrder.tableNumber}` : 'Current Order'}</h2>
                             <div className="flex-1 overflow-y-auto pr-2 space-y-3">
                                 {(selectedOrder ? selectedOrder.items : cart).map((item, idx) => (
@@ -1315,28 +1315,28 @@ export const POSView: React.FC = () => {
                         </div>
 
                         {/* Payment Action Column */}
-                        <div className="w-full md:w-1/2 p-4 md:p-6 flex flex-col bg-white h-full">
-                            <div className="flex justify-between items-center mb-4 md:mb-6">
-                                <div className="md:hidden">
+                        <div className="w-full lg:w-1/2 p-4 lg:p-6 flex flex-col bg-white h-full">
+                            <div className="flex justify-between items-center mb-4 lg:mb-6">
+                                <div className="lg:hidden">
                                     <h3 className="font-bold text-lg text-gray-900">{selectedOrder ? `Table ${selectedOrder.tableNumber}` : 'Payment'}</h3>
                                     <p className="text-sm text-brand-600 font-bold">Total: ฿{selectedOrder ? selectedOrder.totalAmount : cartTotal}</p>
                                     {selectedOrder && selectedOrder.deliveryFee === 'pending' && (
                                         <p className="text-xs text-red-500 font-bold mt-1">* Update delivery fee first</p>
                                     )}
                                 </div>
-                                <h3 className="hidden md:block font-bold text-lg text-gray-500 uppercase">Payment Method</h3>
+                                <h3 className="hidden lg:block font-bold text-lg text-gray-500 uppercase">Payment Method</h3>
                                 <button onClick={() => setShowPaymentModal(false)} className="bg-gray-100 p-3 rounded-full hover:bg-gray-200"><X size={24}/></button>
                             </div>
 
                             {/* Method Selector */}
                             <div className="grid grid-cols-2 gap-4 mb-6">
-                                <button onClick={() => setPaymentMethod('cash')} className={`p-4 md:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 md:gap-3 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <Banknote size={28} className="md:w-8 md:h-8"/>
-                                    <span className="font-bold text-base md:text-lg">CASH</span>
+                                <button onClick={() => setPaymentMethod('cash')} className={`p-4 lg:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 lg:gap-3 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
+                                    <Banknote size={28} className="lg:w-8 lg:h-8"/>
+                                    <span className="font-bold text-base lg:text-lg">CASH</span>
                                 </button>
-                                <button onClick={() => setPaymentMethod('qr_transfer')} className={`p-4 md:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 md:gap-3 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <QrCode size={28} className="md:w-8 md:h-8"/>
-                                    <span className="font-bold text-base md:text-lg">SCAN QR</span>
+                                <button onClick={() => setPaymentMethod('qr_transfer')} className={`p-4 lg:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 lg:gap-3 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
+                                    <QrCode size={28} className="lg:w-8 lg:h-8"/>
+                                    <span className="font-bold text-base lg:text-lg">SCAN QR</span>
                                 </button>
                             </div>
 
@@ -1365,7 +1365,7 @@ export const POSView: React.FC = () => {
                                 ) : (
                                     <div className="flex flex-col items-center animate-fade-in justify-center h-full">
                                         <div className="bg-white p-4 rounded-xl border-2 border-brand-500 shadow-lg mb-4">
-                                            <img src={promptPayQRUrl} className="w-56 h-56 md:w-64 md:h-64 mix-blend-multiply" />
+                                            <img src={promptPayQRUrl} className="w-56 h-56 lg:w-64 lg:h-64 mix-blend-multiply" />
                                         </div>
                                         <p className="text-center text-gray-500 text-sm font-bold">Scan with any Banking App</p>
                                         <div className="mt-2 text-3xl font-bold text-brand-600">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</div>

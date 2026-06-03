@@ -1,13 +1,89 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus } from '../types';
-import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar } from 'lucide-react';
+import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+      try {
+          const saved = localStorage.getItem('damac_kds_sound');
+          return saved !== null ? JSON.parse(saved) : true;
+      } catch (e) {
+          return true;
+      }
+  });
+
+  const toggleSound = () => {
+      setSoundEnabled(prev => {
+          const next = !prev;
+          localStorage.setItem('damac_kds_sound', JSON.stringify(next));
+          return next;
+      });
+  };
+
+  const playBellChime = () => {
+      try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (audioCtx.state === 'suspended') {
+              audioCtx.resume();
+          }
+          
+          const chime = (freq: number, delay: number, duration: number) => {
+              const osc = audioCtx.createOscillator();
+              const gainNode = audioCtx.createGain();
+              
+              osc.connect(gainNode);
+              gainNode.connect(audioCtx.destination);
+              
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+              
+              gainNode.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+              gainNode.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + delay + 0.05);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+              
+              osc.start(audioCtx.currentTime + delay);
+              osc.stop(audioCtx.currentTime + delay + duration + 0.1);
+          };
+          
+          // E5 followed by G5 chime
+          chime(659.25, 0, 0.6);
+          chime(783.99, 0.15, 0.8);
+      } catch (e) {
+          console.warn("Audio Context failed to play sound", e);
+      }
+  };
+
+  const prevOrderIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+      if (!orders || orders.length === 0) return;
+
+      // Initialize on load to avoid chiming for older items currently loaded
+      if (prevOrderIdsRef.current.size === 0) {
+          prevOrderIdsRef.current = new Set(orders.map(o => o.id));
+          return;
+      }
+
+      let hasNewOrder = false;
+      for (const order of orders) {
+          if (!prevOrderIdsRef.current.has(order.id)) {
+              prevOrderIdsRef.current.add(order.id);
+              if (order.status === 'pending' || order.status === 'confirmed') {
+                  hasNewOrder = true;
+              }
+          }
+      }
+
+      if (hasNewOrder && soundEnabled) {
+          playBellChime();
+      }
+  }, [orders, soundEnabled]);
 
   const toggleItemCheck = (orderId: string, itemIdx: number) => {
       const key = `${orderId}-${itemIdx}`;
@@ -75,6 +151,16 @@ export const KitchenView: React.FC = () => {
                     Yesterday
                 </button>
             </div>
+
+            {/* Sound Notification Toggle */}
+            <button 
+                onClick={toggleSound} 
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition border cursor-pointer ${soundEnabled ? 'bg-green-900/30 text-green-400 border-green-700/80 hover:bg-green-900/50' : 'bg-red-900/30 text-red-400 border-red-700/80 hover:bg-red-900/50'}`}
+                title={soundEnabled ? "Mute alert sounds" : "Enable alert sounds"}
+            >
+                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                <span>{soundEnabled ? "Sound: ON" : "Sound: OFF"}</span>
+            </button>
 
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
                 <span className="text-gray-400 text-sm block">Orders</span>
