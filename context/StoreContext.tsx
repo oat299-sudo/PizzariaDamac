@@ -735,7 +735,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
             if (profile.savedAddresses !== undefined) payload.saved_addresses = profile.savedAddresses;
 
-            const { error: upsertError } = await supabase.from('customers').upsert(payload);
+            let { error: upsertError } = await supabase.from('customers').upsert(payload);
+            if (upsertError) {
+                // Resilient fallback logic: If db schema is older and lacks pdpa_accepted or saved_addresses
+                if (upsertError.message && upsertError.message.includes("column") && 
+                    (upsertError.message.includes("pdpa_accepted") || upsertError.message.includes("saved_addresses") || upsertError.message.includes("schema cache"))) {
+                    console.warn("Database structure is missing pdpa_accepted or saved_addresses column. Retrying sync with a stripped payload.");
+                    const strippedPayload = { ...payload };
+                    delete strippedPayload.pdpa_accepted;
+                    delete strippedPayload.saved_addresses;
+                    const { error: retryError } = await supabase.from('customers').upsert(strippedPayload);
+                    upsertError = retryError;
+                }
+            }
             if (upsertError) {
                 console.error("Customer sync failed:", upsertError);
                 throw upsertError;

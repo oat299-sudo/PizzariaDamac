@@ -2,12 +2,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../types';
-import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX } from 'lucide-react';
+import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [printOrder, setPrintOrder] = useState<Order | null>(null);
+
+  const handlePrintOrder = (order: Order) => {
+    setPrintOrder(order);
+    setTimeout(() => {
+        window.print();
+    }, 250);
+  };
   
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
       try {
@@ -66,6 +74,89 @@ export const KitchenView: React.FC = () => {
       });
       // Try initializing on toggle sound click too
       initAudio();
+      setTimeout(() => {
+          playSuccessFeedback();
+      }, 50);
+  };
+
+  const playClickSound = () => {
+      if (!soundEnabled) return;
+      try {
+          const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (!audioCtxRef.current) audioCtxRef.current = ctx;
+          if (ctx.state === 'suspended') ctx.resume();
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(580, ctx.currentTime);
+          
+          gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+          
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.08);
+      } catch (e) {
+          console.warn("Failed to play click sound", e);
+      }
+  };
+
+  const playSuccessFeedback = () => {
+      if (!soundEnabled) return;
+      try {
+          const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (!audioCtxRef.current) audioCtxRef.current = ctx;
+          if (ctx.state === 'suspended') ctx.resume();
+          
+          const beep = (freq: number, delay: number, duration: number) => {
+              if (!ctx) return;
+              const osc = ctx.createOscillator();
+              const gainNode = ctx.createGain();
+              osc.connect(gainNode);
+              gainNode.connect(ctx.destination);
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+              gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+              gainNode.gain.linearRampToValueAtTime(0.18, ctx.currentTime + delay + 0.02);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+              osc.start(ctx.currentTime + delay);
+              osc.stop(ctx.currentTime + delay + duration + 0.05);
+          };
+          beep(659.25, 0, 0.08); // E5
+          beep(880.00, 0.07, 0.2);  // A5
+      } catch (e) {
+          console.warn("Failed to play success sound", e);
+      }
+  };
+
+  const playAlertSound = () => {
+      if (!soundEnabled) return;
+      try {
+          const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (!audioCtxRef.current) audioCtxRef.current = ctx;
+          if (ctx.state === 'suspended') ctx.resume();
+          
+          const buzz = (freq: number, delay: number, duration: number) => {
+              if (!ctx) return;
+              const osc = ctx.createOscillator();
+              const gainNode = ctx.createGain();
+              osc.connect(gainNode);
+              gainNode.connect(ctx.destination);
+              osc.type = 'sawtooth';
+              osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+              gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+              gainNode.gain.linearRampToValueAtTime(0.12, ctx.currentTime + delay + 0.03);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+              osc.start(ctx.currentTime + delay);
+              osc.stop(ctx.currentTime + delay + duration + 0.05);
+          };
+          buzz(160, 0, 0.12);
+          buzz(120, 0.08, 0.2);
+      } catch (e) {
+          console.warn("Failed to play alert sound", e);
+      }
   };
 
   const playBellChime = (isTest = false) => {
@@ -108,14 +199,16 @@ export const KitchenView: React.FC = () => {
       }
   };
 
+  const isFirstLoadRef = useRef<boolean>(true);
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-      if (!orders || orders.length === 0) return;
+      if (!orders) return;
 
-      // Initialize on load to avoid chiming for older items currently loaded
-      if (prevOrderIdsRef.current.size === 0) {
+      // Real-time Order Monitoring Logic
+      if (isFirstLoadRef.current) {
           prevOrderIdsRef.current = new Set(orders.map(o => o.id));
+          isFirstLoadRef.current = false;
           return;
       }
 
@@ -135,6 +228,7 @@ export const KitchenView: React.FC = () => {
   }, [orders, soundEnabled]);
 
   const toggleItemCheck = (orderId: string, itemIdx: number) => {
+      playClickSound();
       const key = `${orderId}-${itemIdx}`;
       setCheckedItems(prev => ({...prev, [key]: !prev[key]}));
   };
@@ -191,7 +285,8 @@ export const KitchenView: React.FC = () => {
   });
 
   return (
-    <div className="p-6 bg-gray-800 min-h-screen pb-24 text-gray-100 animate-fade-in">
+    <div className="p-6 bg-gray-800 min-h-screen pb-24 text-gray-100 animate-fade-in print:bg-white print:p-0 print:m-0 print:min-h-0 print:pb-0">
+      <div className="print:hidden">
       
       {/* Interactive Sound Activation / Browser Autoplay restriction banner */}
       {soundEnabled && !audioUnlocked && (
@@ -225,13 +320,13 @@ export const KitchenView: React.FC = () => {
             
             {/* Filter Buttons */}
             <div className="flex gap-2 bg-gray-700 p-1 rounded-lg">
-                <button onClick={() => setFilterType('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'active' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                <button onClick={() => { playClickSound(); setFilterType('active'); }} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'active' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
                     {language === 'th' ? 'ออเดอร์ปัจจุบัน' : 'Active'}
                 </button>
-                <button onClick={() => setFilterType('today')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'today' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                <button onClick={() => { playClickSound(); setFilterType('today'); }} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'today' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
                     {language === 'th' ? 'วันนี้' : 'Today'}
                 </button>
-                <button onClick={() => setFilterType('yesterday')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'yesterday' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                <button onClick={() => { playClickSound(); setFilterType('yesterday'); }} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'yesterday' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
                     {language === 'th' ? 'เมื่อวาน' : 'Yesterday'}
                 </button>
             </div>
@@ -436,42 +531,157 @@ export const KitchenView: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div className="p-4 border-t bg-gray-50 flex justify-end gap-2">
-                {order.status === 'pending' && (
-                    <>
-                        <button onClick={() => updateOrderStatus(order.id, 'cancelled')} className="px-3 py-2 text-red-600 hover:bg-red-50 rounded font-semibold text-sm">{t('reject')}</button>
-                        <button onClick={() => updateOrderStatus(order.id, 'confirmed')} className="flex-1 bg-brand-600 text-white px-4 py-3 rounded-lg shadow hover:bg-brand-700 font-bold text-lg flex items-center justify-center gap-2 animate-bounce-short">
-                            <Bell size={20} /> {t('confirm')}
+              <div className="p-4 border-t bg-gray-50 flex items-center justify-between gap-2">
+                <button 
+                    onClick={() => { playSuccessFeedback(); handlePrintOrder(order); }} 
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-750 px-3 py-2 rounded-lg font-black text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-xs print:hidden"
+                    title={language === 'th' ? 'พิมพ์ใบครัว' : 'Print Receipt'}
+                >
+                    <Printer size={14} />
+                    <span>{language === 'th' ? 'พิมพ์ใบครัว' : 'Print'}</span>
+                </button>
+
+                <div className="flex gap-2 flex-1 justify-end items-center">
+                    {order.status === 'pending' && (
+                        <>
+                            <button onClick={() => { playAlertSound(); updateOrderStatus(order.id, 'cancelled'); }} className="px-2 py-2 text-red-650 hover:bg-red-50 rounded font-semibold text-xs transition">{t('reject')}</button>
+                            <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'confirmed'); }} className="bg-brand-600 text-white px-3 py-2 rounded-lg shadow hover:bg-brand-700 font-bold text-xs flex items-center justify-center gap-1 transition">
+                                <Bell size={14} /> {t('confirm')}
+                            </button>
+                        </>
+                    )}
+                    {order.status === 'confirmed' && (
+                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'acknowledged'); }} className="w-full max-w-[140px] bg-blue-600 text-white px-3 py-2 rounded-lg shadow hover:bg-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition">
+                            <ChefHat size={14} /> {t('acknowledged')}
                         </button>
-                    </>
-                )}
-                {order.status === 'confirmed' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'acknowledged')} className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg shadow hover:bg-blue-700 font-bold text-lg flex items-center justify-center gap-2">
-                        <ChefHat size={20} /> {t('acknowledged')}
-                    </button>
-                )}
-                {order.status === 'acknowledged' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'cooking')} className="flex-1 bg-orange-500 text-white px-4 py-3 rounded-lg shadow hover:bg-orange-600 font-bold text-lg flex items-center justify-center gap-2">
-                        <Flame size={20} /> {t('startCooking')}
-                    </button>
-                )}
-                {order.status === 'cooking' && (
-                    <button onClick={() => updateOrderStatus(order.id, 'ready')} className="flex-1 bg-green-500 text-white px-4 py-3 rounded-lg shadow hover:bg-green-600 font-bold text-lg flex items-center justify-center gap-2">
-                        <CheckCircle size={20} /> {t('markReady')}
-                    </button>
-                )}
-                {order.status === 'ready' && (
-                    <div className="flex-1 bg-green-100 text-green-800 px-4 py-3 rounded-lg font-bold text-center border border-green-200">
-                        {t('ready')} - {language === 'th' ? 'รอพนักงานเสิร์ฟ / จัดส่ง' : 'Waiting for Server'}
-                    </div>
-                )}
-                 {order.status === 'completed' && (
-                    <span className="text-gray-400 text-sm font-medium w-full text-center py-2">{t('completed')}</span>
-                )}
+                    )}
+                    {order.status === 'acknowledged' && (
+                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'cooking'); }} className="w-full max-w-[140px] bg-orange-500 text-white px-3 py-2 rounded-lg shadow hover:bg-orange-600 font-bold text-xs flex items-center justify-center gap-1 transition">
+                            <Flame size={14} /> {t('startCooking')}
+                        </button>
+                    )}
+                    {order.status === 'cooking' && (
+                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'ready'); }} className="w-full max-w-[140px] bg-green-500 text-white px-3 py-2 rounded-lg shadow hover:bg-green-600 font-bold text-xs flex items-center justify-center gap-1 transition">
+                            <CheckCircle size={14} /> {t('markReady')}
+                        </button>
+                    )}
+                    {order.status === 'ready' && (
+                        <div className="w-full max-w-[160px] bg-green-100 text-green-800 px-2 py-1.5 rounded-lg font-bold text-center border border-green-200 text-[10px]">
+                            {t('ready')} - {language === 'th' ? 'รอเสิร์ฟ / จัดส่ง' : 'Waiting for Server'}
+                        </div>
+                    )}
+                    {order.status === 'completed' && (
+                        <span className="text-gray-400 text-xs font-semibold py-1">{t('completed')}</span>
+                    )}
+                </div>
               </div>
            </div>
         ))}
       </div>
+    </div>
+
+    {/* --- PRINTABLE KITCHEN CHIT --- */}
+    <div className="hidden print:block print:w-[58mm] print:font-mono p-0 m-0 bg-white text-black leading-snug">
+        {printOrder && (
+            <div className="w-[58mm] text-[10px] overflow-hidden">
+                <div className="text-center font-bold">
+                    <div>=============================</div>
+                    <div className="text-[12px] font-black uppercase my-1">KITCHEN TICKET</div>
+                    <div>ใบสั่งอาหาร / ครัว</div>
+                    <div>=============================</div>
+                    <div className="text-[15px] font-black my-1">
+                        {printOrder.tableNumber ? (language === 'th' ? `โต๊ะ ${printOrder.tableNumber}` : `Table ${printOrder.tableNumber}`) : (printOrder.type === 'delivery' ? `DELIVERY` : `TAKE AWAY`)}
+                    </div>
+                    {printOrder.customerName && !printOrder.tableNumber && (
+                        <div className="text-[11px] font-extrabold my-0.5">ลูกค้า: {printOrder.customerName}</div>
+                    )}
+                    <div>-----------------------------</div>
+                </div>
+
+                <div className="mt-1 mb-1 px-1">
+                    <div className="flex justify-between font-bold">
+                        <span>บิล: #{printOrder.id.slice(-4)}</span>
+                        <span>วันที่: {new Date(printOrder.createdAt).toLocaleDateString('th-TH')}</span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                        <span>ช่องทาง: {printOrder.source.toUpperCase()}</span>
+                        <span>เวลา: {new Date(printOrder.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    {printOrder.pickupTime && (
+                        <div className="font-bold">
+                            เวลารับ: {printOrder.pickupTime}
+                        </div>
+                    )}
+                </div>
+
+                <div className="text-center font-bold">-----------------------------</div>
+                <div className="px-1 text-[10px]">
+                    {(printOrder.items || []).map((item, i) => {
+                        const name = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                        return (
+                            <div key={i} className="mb-2 pb-1 border-b border-dashed border-gray-300 last:border-0 last:mb-0">
+                                <div className="flex justify-between items-start font-black text-black">
+                                    <span className="text-[12px]">[{item.quantity}x] {name}</span>
+                                </div>
+                                
+                                {/* Combo choices */}
+                                {item.subItems && item.subItems.length > 0 && (
+                                    <div className="pl-2 mt-1 text-[9px] space-y-0.5">
+                                        {item.subItems.map((sub, sIdx) => {
+                                            const subName = sub.nameTh && sub.nameTh !== sub.name ? `${sub.name} (${sub.nameTh})` : sub.name;
+                                            return (
+                                                <div key={sIdx} className="font-black">
+                                                    ↳ [เซ็ต] {subName}
+                                                    {sub.toppings && sub.toppings.length > 0 && (
+                                                        <div className="pl-3 text-[8px] font-bold italic text-gray-700">
+                                                            {sub.toppings.map(t => t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name).join(', ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Toppings */}
+                                {item.selectedToppings && item.selectedToppings.length > 0 && (
+                                    <div className="pl-2 mt-1 text-[9px] space-y-0.5">
+                                        {item.selectedToppings.map((t, tIdx) => {
+                                            const toppingName = t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name;
+                                            return (
+                                                <div key={tIdx} className="font-bold">
+                                                    * [บวกเพิ่ม] {toppingName}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Special Instructions */}
+                                {item.specialInstructions && (
+                                    <div className="mt-1 pl-1 border-l border-black text-[9px] font-black bg-gray-100 p-0.5 leading-normal">
+                                        ⚠️ พิเศษ: "{item.specialInstructions}"
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {printOrder.note && (
+                    <div className="my-2 p-1 border border-black text-black leading-normal">
+                        <div className="text-[9px] font-black">📝 หมายเหตุ:</div>
+                        <div className="text-[9.5px] font-black mt-0.5">"{printOrder.note}"</div>
+                    </div>
+                )}
+
+                <div className="text-center font-bold">=============================</div>
+                <div className="text-center text-[9px] mt-1 mb-2 font-bold font-mono">
+                    Damac Pizza Kitchen
+                </div>
+            </div>
+        )}
+    </div>
     </div>
   );
 };

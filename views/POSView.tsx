@@ -4,7 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -134,6 +134,140 @@ export const POSView: React.FC = () => {
     const [taxInvoice, setTaxInvoice] = useState({ isRequested: false, companyName: '', taxId: '', address: '' });
     const [change, setChange] = useState<number>(0);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+    // --- POS AUDIO ALERTS AND SYSTEM SOUND FEEDBACK ---
+    const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+        try {
+            const saved = localStorage.getItem('damac_pos_sound');
+            return saved !== null ? JSON.parse(saved) : true;
+        } catch (e) {
+            return true;
+        }
+    });
+    const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
+    const audioCtxRef = React.useRef<AudioContext | null>(null);
+
+    const initAudio = () => {
+        try {
+            if (!audioCtxRef.current) {
+                audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            }
+            if (audioCtxRef.current.state === 'suspended') {
+                audioCtxRef.current.resume();
+            }
+            setAudioUnlocked(true);
+        } catch (e) {
+            console.warn("Failed to initialize or resume AudioContext", e);
+        }
+    };
+
+    useEffect(() => {
+        const handleUserGesture = () => {
+            if (!audioUnlocked) {
+                initAudio();
+            }
+            window.removeEventListener('click', handleUserGesture);
+            window.removeEventListener('touchstart', handleUserGesture);
+        };
+        window.addEventListener('click', handleUserGesture);
+        window.addEventListener('touchstart', handleUserGesture);
+        return () => {
+            window.removeEventListener('click', handleUserGesture);
+            window.removeEventListener('touchstart', handleUserGesture);
+        };
+    }, [audioUnlocked]);
+
+    const toggleSound = () => {
+        setSoundEnabled(prev => {
+            const next = !prev;
+            localStorage.setItem('damac_pos_sound', JSON.stringify(next));
+            return next;
+        });
+        initAudio();
+        setTimeout(() => {
+            playSuccessFeedback();
+        }, 50);
+    };
+
+    const playClickSound = () => {
+        if (!soundEnabled) return;
+        try {
+            const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (!audioCtxRef.current) audioCtxRef.current = ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(580, ctx.currentTime);
+            
+            gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+            
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.08);
+        } catch (e) {
+            console.warn("Failed to play click sound", e);
+        }
+    };
+
+    const playSuccessFeedback = () => {
+        if (!soundEnabled) return;
+        try {
+            const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (!audioCtxRef.current) audioCtxRef.current = ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+            
+            const beep = (freq: number, delay: number, duration: number) => {
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+                gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+                gainNode.gain.linearRampToValueAtTime(0.18, ctx.currentTime + delay + 0.02);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + duration + 0.05);
+            };
+            beep(659.25, 0, 0.08); // E5
+            beep(880.00, 0.07, 0.2);  // A5
+        } catch (e) {
+            console.warn("Failed to play success sound", e);
+        }
+    };
+
+    const playAlertSound = () => {
+        if (!soundEnabled) return;
+        try {
+            const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (!audioCtxRef.current) audioCtxRef.current = ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+            
+            const buzz = (freq: number, delay: number, duration: number) => {
+                if (!ctx) return;
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+                gainNode.gain.setValueAtTime(0, ctx.currentTime + delay);
+                gainNode.gain.linearRampToValueAtTime(0.12, ctx.currentTime + delay + 0.03);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + duration + 0.05);
+            };
+            buzz(160, 0, 0.12);
+            buzz(120, 0.08, 0.2);
+        } catch (e) {
+            console.warn("Failed to play alert sound", e);
+        }
+    };
 
     // --- LOCAL STATE FOR SETTINGS FORMS ---
     const [mediaForm, setMediaForm] = useState({
@@ -309,6 +443,7 @@ export const POSView: React.FC = () => {
     // Cart Customization
     const handleCustomize = (pizza: Pizza) => {
         if (isEditMode && activeTab === 'order') return;
+        playClickSound();
         setSelectedPizza({...pizza}); 
         setSelectedToppings([]);
         setEditingCartItem(null);
@@ -322,6 +457,7 @@ export const POSView: React.FC = () => {
     };
 
     const handleEditCartItem = (item: CartItem) => {
+        playClickSound();
         const pizza = menu.find(p => p.id === item.pizzaId);
         if (pizza) {
             setSelectedPizza({...pizza});
@@ -335,6 +471,7 @@ export const POSView: React.FC = () => {
     };
 
     const toggleTopping = (topping: Topping) => {
+        playClickSound();
         if (selectedToppings.find(t => t.id === topping.id)) {
             setSelectedToppings(prev => prev.filter(t => t.id !== topping.id));
         } else {
@@ -344,6 +481,7 @@ export const POSView: React.FC = () => {
 
     const confirmAddToCart = () => {
         if (!selectedPizza) return;
+        playSuccessFeedback();
         const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
         const localized = getLocalizedItem(selectedPizza);
         const item: CartItem = {
@@ -375,6 +513,7 @@ export const POSView: React.FC = () => {
     }
     const confirmAddComboToCart = () => {
         if (!selectedPizza) return;
+        playSuccessFeedback();
         const localized = getLocalizedItem(selectedPizza);
         const item: CartItem = {
             id: Date.now().toString() + Math.random().toString(),
@@ -388,6 +527,7 @@ export const POSView: React.FC = () => {
     // POS Order Logic
     const handleSendToKitchen = async () => {
         if (!tableNumber && orderSource === 'store') { alert("Please enter a Table Number for store orders."); return; }
+        playSuccessFeedback();
         const success = await placeOrder('dine-in', {
             tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : 'Walk-in'),
             source: orderSource, paymentMethod: undefined, status: 'confirmed', 
@@ -399,19 +539,27 @@ export const POSView: React.FC = () => {
 
     const handleCheckBill = () => {
         if (cart.length === 0) return;
+        playClickSound();
         setSelectedOrder(null); setCashReceived(''); setPaymentMethod('cash'); setShowPaymentModal(true);
     };
     
     const handleCheckTableBill = (order: Order) => {
+        playClickSound();
         setSelectedOrder(order); setCashReceived(''); setPaymentMethod('cash'); setShowPaymentModal(true);
     }
     
     const handleCloseTable = async (orderId: string) => {
-        if(confirm("Close this table? (Mark as completed)")) await completeOrder(orderId, { paymentMethod: 'cash' });
+        if(confirm("Close this table? (Mark as completed)")) {
+            playSuccessFeedback();
+            await completeOrder(orderId, { paymentMethod: 'cash' });
+        }
     }
     
     const handleCancelTable = async (orderId: string) => {
-        if(confirm("Force Cancel/Delete this table order?")) await updateOrderStatus(orderId, 'cancelled');
+        if(confirm("Force Cancel/Delete this table order?")) {
+            playAlertSound();
+            await updateOrderStatus(orderId, 'cancelled');
+        }
     }
 
     const handleUpdateDeliveryFee = async (order: Order) => {
@@ -436,9 +584,11 @@ export const POSView: React.FC = () => {
         const note = paymentMethod === 'cash' ? `Cash: ${cashReceived}, Change: ${change}` : 'Paid via QR';
         
         if (selectedOrder) {
+            playSuccessFeedback();
             await completeOrder(selectedOrder.id, { paymentMethod: paymentMethod, note: note });
              alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Order Paid via QR!");
         } else {
+            playSuccessFeedback();
             const success = await placeOrder('dine-in', {
                 tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef
             });
@@ -496,11 +646,13 @@ export const POSView: React.FC = () => {
             taxInvoice: taxInvoice
         });
 
+        playSuccessFeedback();
         setTimeout(() => { window.print(); }, 200);
     };
 
     // --- REPRINT FOR LOG BOOK ---
     const handleReprintOrder = (order: Order) => {
+        playSuccessFeedback();
         // Calculate VAT (7% included)
         const vatAmount = (order.totalAmount * 7) / 107;
         const subtotal = order.totalAmount - vatAmount;
@@ -904,31 +1056,39 @@ export const POSView: React.FC = () => {
             </div>
 
             {/* --- DESKTOP SIDEBAR --- */}
-            <aside className="hidden lg:flex w-24 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden">
+            <aside className="hidden lg:flex w-24 bg-gray-900 flex-col items-center py-6 text-gray-400 z-10 shadow-xl justify-between shrink-0 print:hidden font-sans">
                 <div className="flex flex-col items-center gap-6 w-full">
                     <div className="mb-2 relative group cursor-pointer">
                         {shopLogo ? <img src={shopLogo} alt="Logo" className="w-14 h-14 rounded-full object-cover border-2 border-brand-500" /> : <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg shadow-brand-500/50"><DollarSign size={28} /></div>}
                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleLogoUpload}/>
                     </div>
-                    <button onClick={() => setActiveTab('order')} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="New Order"><ShoppingBag size={28} /></button>
-                    <button onClick={() => setActiveTab('tables')} className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Active Orders"><Layers size={28} />{activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</button>
-                    <button onClick={() => setActiveTab('sales')} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Reports"><PieChart size={28} /></button>
-                    <button onClick={() => setActiveTab('qr_gen')} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="QR Generator"><QrCode size={28} /></button>
-                     <button onClick={() => setActiveTab('manage')} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Store Settings"><Settings size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('order'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="New Order"><ShoppingBag size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('tables'); }} className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Active Orders"><Layers size={28} />{activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</button>
+                    <button onClick={() => { playClickSound(); setActiveTab('sales'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Reports"><PieChart size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="QR Generator"><QrCode size={28} /></button>
+                     <button onClick={() => { playClickSound(); setActiveTab('manage'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Store Settings"><Settings size={28} /></button>
                 </div>
                 <div className="flex flex-col items-center gap-4 w-full">
-                    <button onClick={toggleLanguage} className="text-xs font-bold bg-gray-800 text-gray-300 w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-700">{language.toUpperCase()}</button>
-                    <button onClick={adminLogout} className="p-4 text-red-400 hover:bg-gray-800 rounded-xl transition" title="Logout"><LogOut size={28} /></button>
+                    {/* SYSTEM SOUND TOGGLE CONTROLLER */}
+                    <button 
+                        onClick={toggleSound} 
+                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 border cursor-pointer ${soundEnabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-500 border-gray-700/50'}`} 
+                        title={soundEnabled ? 'Mute Sound Alerts' : 'Unmute Sound Alerts'}
+                    >
+                        {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                    </button>
+                    <button onClick={() => { playClickSound(); toggleLanguage(); }} className="text-xs font-bold bg-gray-800 text-gray-300 w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-700 active:scale-95 transition">{language.toUpperCase()}</button>
+                    <button onClick={() => { playAlertSound(); adminLogout(); }} className="p-4 text-red-400 hover:bg-gray-800 rounded-xl transition cursor-pointer" title="Logout"><LogOut size={28} /></button>
                 </div>
             </aside>
             
             {/* --- MOBILE BOTTOM NAV --- */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden">
-                <button onClick={() => { setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">Order</span></button>
-                 <button onClick={() => { setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">Active</span></button>
-                <div className="relative -top-5"><button onClick={() => setShowMobileCart(!showMobileCart)} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
-                <button onClick={() => { setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
-                <button onClick={() => { setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">Settings</span></button>
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden font-sans">
+                <button onClick={() => { playClickSound(); setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">Order</span></button>
+                 <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">Active</span></button>
+                <div className="relative -top-5"><button onClick={() => { playClickSound(); setShowMobileCart(!showMobileCart); }} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
+                <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">Settings</span></button>
             </div>
 
             {/* --- MAIN CONTENT --- */}
@@ -1083,12 +1243,15 @@ export const POSView: React.FC = () => {
                                         </div>
                                         <div className="p-4 border-t bg-gray-50 space-y-2.5">
                                             <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
-                                            <div className="grid grid-cols-2 gap-2.5">
-                                                <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition" title="Force Complete">
-                                                    <Check size={12}/> Clear Table
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <button onClick={() => handleReprintOrder(order)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Print Receipt">
+                                                    <Printer size={12}/> Print
                                                 </button>
-                                                <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-205 text-red-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition" title="Cancel Order">
-                                                    <X size={12}/> Cancel Order
+                                                <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Force Complete">
+                                                    <Check size={12}/> Clear
+                                                </button>
+                                                <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Cancel Order">
+                                                    <X size={12}/> Cancel
                                                 </button>
                                             </div>
                                         </div>
@@ -1156,6 +1319,7 @@ export const POSView: React.FC = () => {
                                                             {order.source !== 'store' && (
                                                                 <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 px-3 py-1 rounded">Edit GP</button>
                                                             )}
+                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 px-3 py-1 rounded flex items-center gap-1"><Printer size={12}/> Print</button>
                                                             <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 px-3 py-1 rounded">Receipt</button>
                                                         </td>
                                                     </tr>
