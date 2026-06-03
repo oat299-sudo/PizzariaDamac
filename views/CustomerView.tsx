@@ -565,23 +565,28 @@ export const CustomerView: React.FC = () => {
         alert("Password is required");
         return;
     }
-    const result = await registerCustomer({
-        name: regName,
-        phone: regPhone,
-        password: regPassword,
-        address: regAddress,
-        birthday: regBirthday,
-        pdpaAccepted: regPdpa,
-        loyaltyPoints: 0,
-        savedFavorites: [],
-        orderHistory: []
-    });
-    if (result === 'updated') {
-        alert("Account exists! Password has been reset and details updated. Welcome back!");
-    } else {
-        alert("Account created successfully! Welcome to Pizza Damac!");
+    try {
+        const result = await registerCustomer({
+            name: regName,
+            phone: regPhone,
+            password: regPassword,
+            address: regAddress,
+            birthday: regBirthday,
+            pdpaAccepted: regPdpa,
+            loyaltyPoints: 0,
+            savedFavorites: [],
+            orderHistory: []
+        });
+        if (result === 'updated') {
+            alert(language === 'th' ? "บัญชีนี้มีอยู่แล้ว! ระบบได้รีเซ็ตรหัสผ่านและอัปเดตข้อมูลของคุณแล้ว ยินดีต้อนรับกลับครับ!" : "Account exists! Password has been reset and details updated. Welcome back!");
+        } else {
+            alert(language === 'th' ? "สร้างบัญชีผู้ใช้ใหม่สำเร็จ! ยินดีต้อนรับสู่ Pizza Damac!" : "Account created successfully! Welcome to Pizza Damac!");
+        }
+        setShowAuthModal(false);
+    } catch (err: any) {
+        console.error("Registration failed:", err);
+        alert(language === 'th' ? `การสมัครสมาชิกไม่สำเร็จ: ${err?.message || err}` : `Registration failed: ${err?.message || err}`);
     }
-    setShowAuthModal(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {

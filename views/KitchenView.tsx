@@ -5,7 +5,7 @@ import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout, t, language } = useStore();
+  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   
@@ -157,6 +157,19 @@ export const KitchenView: React.FC = () => {
       return <Utensils size={16} className="text-blue-600" />;
   };
 
+  const getOrderTypeLabel = (type: string) => {
+      if (language === 'th') {
+          if (type === 'dinein') return 'ทานที่ร้าน';
+          if (type === 'takeaway') return 'กลับบ้าน / Takeaway';
+          if (type === 'delivery') return 'จัดส่งเดลิเวอรี่';
+          return type;
+      }
+      if (type === 'dinein') return 'Dine In';
+      if (type === 'takeaway') return 'Take Away';
+      if (type === 'delivery') return 'Delivery';
+      return type;
+  };
+
   const displayOrders = orders.filter(o => o.status !== 'cancelled').filter(o => {
       if (filterType === 'active') return o.status !== 'completed';
       
@@ -201,25 +214,25 @@ export const KitchenView: React.FC = () => {
         </div>
       )}
 
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-gray-700 pb-4 gap-4">
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b border-gray-700 pb-4 gap-4">
         <div className="flex-1">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                 <Utensils className="text-brand-500"/> {t('kitchenDisplay')}
             </h1>
             <p className="text-gray-400 text-sm mt-1">{t('realtimeTracking')}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+        <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
             
             {/* Filter Buttons */}
             <div className="flex gap-2 bg-gray-700 p-1 rounded-lg">
                 <button onClick={() => setFilterType('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'active' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
-                    Active
+                    {language === 'th' ? 'ออเดอร์ปัจจุบัน' : 'Active'}
                 </button>
                 <button onClick={() => setFilterType('today')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'today' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
-                    Today
+                    {language === 'th' ? 'วันนี้' : 'Today'}
                 </button>
                 <button onClick={() => setFilterType('yesterday')} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'yesterday' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
-                    Yesterday
+                    {language === 'th' ? 'เมื่อวาน' : 'Yesterday'}
                 </button>
             </div>
 
@@ -227,19 +240,29 @@ export const KitchenView: React.FC = () => {
             <button 
                 onClick={toggleSound} 
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition border cursor-pointer ${soundEnabled ? 'bg-green-900/30 text-green-400 border-green-700/80 hover:bg-green-900/50' : 'bg-red-900/30 text-red-400 border-red-700/80 hover:bg-red-900/50'}`}
-                title={soundEnabled ? "Mute alert sounds" : "Enable alert sounds"}
+                title={soundEnabled ? (language === 'th' ? "ปิดเสียงแจ้งเตือน" : "Mute alert sounds") : (language === 'th' ? "เปิดเสียงแจ้งเตือน" : "Enable alert sounds")}
             >
                 {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                <span>{soundEnabled ? "Sound: ON" : "Sound: OFF"}</span>
+                <span>{soundEnabled ? (language === 'th' ? 'เสียงแจ้งเตือน: เปิด' : 'Sound: ON') : (language === 'th' ? 'เสียงแจ้งเตือน: ปิด' : 'Sound: OFF')}</span>
             </button>
 
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
-                <span className="text-gray-400 text-sm block">Orders</span>
+                <span className="text-gray-400 text-sm block">{language === 'th' ? 'จำนวนออเดอร์' : 'Orders'}</span>
                 <span className="text-2xl font-bold text-brand-400">{displayOrders.length}</span>
             </div>
+
+            {/* Language Switcher */}
+            <button 
+                onClick={toggleLanguage} 
+                className="bg-gray-700 hover:bg-gray-650 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 text-sm font-black transition border border-gray-600 shadow-sm hover:border-gray-500 cursor-pointer active:scale-95"
+                title={language === 'th' ? "Switch to English" : "เปลี่ยนเป็นภาษาไทย"}
+            >
+                <span>🌐 {language === 'en' ? 'EN' : 'ไทย'}</span>
+            </button>
+
             <button 
                 onClick={adminLogout} 
-                className="bg-gray-700 hover:bg-red-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition border border-gray-600 hover:border-red-700"
+                className="bg-gray-700 hover:bg-red-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition border border-gray-600 hover:border-red-700 active:scale-95 cursor-pointer"
             >
                 <LogOut size={16} /> {t('logout')}
             </button>
@@ -259,7 +282,7 @@ export const KitchenView: React.FC = () => {
                           </span>
                       </div>
                       <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
-                          {order.tableNumber ? `Table ${order.tableNumber}` : order.customerName}
+                          {order.tableNumber ? (language === 'th' ? `โต๊ะ ${order.tableNumber}` : `Table ${order.tableNumber}`) : order.customerName}
                       </h3>
                       {order.source !== 'store' && (
                           <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-bold uppercase mt-1">
@@ -270,10 +293,12 @@ export const KitchenView: React.FC = () => {
                   <div className="text-right text-sm text-gray-500">
                       <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                       {order.pickupTime && (
-                           <div className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded mt-1 font-bold">Pickup: {order.pickupTime}</div>
+                           <div className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded mt-1 font-bold">
+                               {language === 'th' ? 'เวลารับสินค้า' : 'Pickup'}: {order.pickupTime}
+                           </div>
                       )}
                       <div className="flex items-center gap-1 mt-2 justify-end font-bold uppercase tracking-wide">
-                          {getOrderTypeIcon(order.type)} {order.type}
+                          {getOrderTypeIcon(order.type)} {getOrderTypeLabel(order.type)}
                       </div>
                       {order.paymentMethod && (
                           <div className="flex items-center gap-1 justify-end text-xs mt-1 text-gray-400">
@@ -405,7 +430,7 @@ export const KitchenView: React.FC = () => {
                   </ul>
                   {order.note && (
                       <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 italic font-medium">
-                          Note: "{order.note}"
+                          {language === 'th' ? 'หมายเหตุ' : 'Note'}: "{order.note}"
                       </div>
                   )}
               </div>
@@ -437,7 +462,7 @@ export const KitchenView: React.FC = () => {
                 )}
                 {order.status === 'ready' && (
                     <div className="flex-1 bg-green-100 text-green-800 px-4 py-3 rounded-lg font-bold text-center border border-green-200">
-                        {t('ready')} - Waiting for Server
+                        {t('ready')} - {language === 'th' ? 'รอพนักงานเสิร์ฟ / จัดส่ง' : 'Waiting for Server'}
                     </div>
                 )}
                  {order.status === 'completed' && (

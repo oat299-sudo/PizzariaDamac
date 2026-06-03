@@ -735,8 +735,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
             if (profile.savedAddresses !== undefined) payload.saved_addresses = profile.savedAddresses;
 
-            await supabase.from('customers').upsert(payload);
-          } catch(e) { console.error("Customer sync failed", e); }
+            const { error: upsertError } = await supabase.from('customers').upsert(payload);
+            if (upsertError) {
+                console.error("Customer sync failed:", upsertError);
+                throw upsertError;
+            }
+          } catch(e: any) { 
+            console.error("Customer sync failed with exception", e);
+            throw e;
+          }
       }
   };
   
