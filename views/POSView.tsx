@@ -1520,13 +1520,11 @@ export const POSView: React.FC = () => {
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Category</label>
                         <select className="w-full border rounded-lg px-3 py-2" value={itemForm.category || 'pizza'} onChange={e => setItemForm({...itemForm, category: e.target.value as ProductCategory})}>
-                            <option value="pizza">Pizza</option>
-                            <option value="pasta">Pasta</option>
-                            <option value="appetizer">Appetizer / Side</option>
-                            <option value="salad">Salad</option>
-                            <option value="drink">Drink</option>
-                            <option value="cake">Cake</option>
-                            <option value="promotion">Combo / Promotion</option>
+                            {CATEGORIES.map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                    {cat.label} / {cat.labelTh}
+                                </option>
+                            ))}
                         </select>
                     </div>
                     <div>

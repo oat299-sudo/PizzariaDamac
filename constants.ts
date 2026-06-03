@@ -212,7 +212,7 @@ export const TRANSLATIONS = {
         // Categories
         cat_promotion: "Pro & Combo",
         cat_pizza: "Pizza",
-        cat_cake: "Cakes",
+        cat_cake: "Dessert",
         cat_pasta: "Pasta",
         cat_appetizer: "Snacks",
         cat_salad: "Salads",
@@ -372,7 +372,7 @@ export const TRANSLATIONS = {
         // Categories
         cat_promotion: "โปรโมชั่น",
         cat_pizza: "พิซซ่า",
-        cat_cake: "เค้ก & ของหวาน",
+        cat_cake: "ของหวาน",
         cat_pasta: "พาสต้า",
         cat_appetizer: "ทานเล่น",
         cat_salad: "สลัด",
@@ -663,7 +663,7 @@ export const CATEGORIES: {id: ProductCategory; label: string; labelTh: string}[]
   { id: 'pasta', label: 'Pasta', labelTh: 'พาสต้า' },
   { id: 'appetizer', label: 'Snacks', labelTh: 'ทานเล่น' },
   { id: 'salad', label: 'Salads', labelTh: 'สลัด' },
-  { id: 'cake', label: 'Cakes', labelTh: 'เค้ก' },
+  { id: 'cake', label: 'Dessert', labelTh: 'ของหวาน' },
   { id: 'drink', label: 'Drinks', labelTh: 'เครื่องดื่ม' },
   { id: 'rice', label: 'Rice with Pork&Chicken', labelTh: 'เมนูข้าว (หมู/ไก่)' },
 ];
