@@ -313,42 +313,64 @@ export const KitchenView: React.FC = () => {
                                       
                                       {/* Sub Items (Combo Choices) */}
                                       {item.subItems && item.subItems.length > 0 && (
-                                          <div className="mt-2 pl-3 border-l-4 border-brand-200 space-y-1">
-                                              {item.subItems.map((sub, sIdx) => (
-                                                  <div key={sIdx} className="text-gray-700 text-sm font-semibold flex items-start gap-1">
-                                                      <span className="text-brand-500">•</span>
-                                                      <div>
-                                                          {language === 'th' && sub.nameTh ? sub.nameTh : sub.name}
+                                          <div className="mt-2.5 pl-3 border-l-4 border-purple-500 bg-purple-50/70 p-2.5 rounded-r-xl space-y-2">
+                                              <div className="text-[11px] font-black text-purple-900 uppercase tracking-wider flex items-center gap-1">
+                                                  <span>🍱 รายการในเซ็ต / COMBO ITEMS (x{item.subItems.length})</span>
+                                              </div>
+                                              {item.subItems.map((sub, sIdx) => {
+                                                  const subName = sub.nameTh && sub.nameTh !== sub.name ? `${sub.name} / ${sub.nameTh}` : sub.name;
+                                                  return (
+                                                      <div key={sIdx} className="text-gray-900 text-sm font-bold pl-1.5 border-b border-purple-100/50 pb-1.5 last:border-0 last:pb-0">
+                                                          <div className="flex items-start gap-1 font-extrabold text-purple-950">
+                                                              <span className="text-purple-600 font-black">↳</span>
+                                                              <span>{subName}</span>
+                                                          </div>
                                                           {sub.toppings && sub.toppings.length > 0 && (
-                                                              <div className="flex flex-wrap gap-1 mt-0.5">
-                                                                  {sub.toppings.map(t => (
-                                                                      <span key={t.id} className="text-xs text-brand-700 bg-brand-50 px-1 rounded border border-brand-100">
-                                                                          + {language === 'th' && t.nameTh ? t.nameTh : t.name}
-                                                                      </span>
-                                                                  ))}
+                                                              <div className="flex flex-wrap gap-1 mt-1.5 pl-3.5">
+                                                                  {sub.toppings.map(t => {
+                                                                      const isCheeseOrSauce = t.category === 'cheese' || t.category === 'sauce' || t.name.toLowerCase().includes('cheese') || t.nameTh?.includes('ชีส') || t.name.toLowerCase().includes('sauce') || t.nameTh?.includes('ซอส');
+                                                                      const icon = t.category === 'cheese' ? '🧀' : t.category === 'sauce' ? '🍅' : t.category === 'meat' ? '🍖' : t.category === 'vegetable' ? '🥦' : '✨';
+                                                                      const toppingText = t.nameTh && t.nameTh !== t.name ? `${t.name} / ${t.nameTh}` : t.name;
+                                                                      return (
+                                                                          <span key={t.id} className={`text-xs font-black px-2 py-1 rounded-md shadow-sm border flex items-center gap-1 ${isCheeseOrSauce ? 'bg-orange-100 text-orange-950 border-orange-300 ring-2 ring-orange-200' : 'bg-amber-50 text-amber-950 border-amber-200'}`}>
+                                                                              {icon} {toppingText}
+                                                                          </span>
+                                                                      );
+                                                                  })}
                                                               </div>
                                                           )}
                                                       </div>
-                                                  </div>
-                                              ))}
+                                                  );
+                                              })}
                                           </div>
                                       )}
 
                                       {/* Standard Toppings */}
                                       {(item.selectedToppings || []).length > 0 && (
-                                        <div className="mt-1 flex flex-wrap gap-1">
-                                            {(item.selectedToppings || []).map(t => (
-                                                <span key={t.id} className="text-sm font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
-                                                    + {language === 'th' && t.nameTh ? t.nameTh : t.name}
-                                                </span>
-                                            ))}
+                                        <div className="mt-2.5 pl-3 border-l-4 border-amber-500 bg-amber-50/70 p-2.5 rounded-r-xl space-y-1.5">
+                                            <div className="text-[11px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                                                <span>➕ เพิ่มท็อปปิ้งพิเศษ / EXTRA ADD-ONS (x{item.selectedToppings.length})</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {(item.selectedToppings || []).map(t => {
+                                                    const isCheeseOrSauce = t.category === 'cheese' || t.category === 'sauce' || t.name.toLowerCase().includes('cheese') || t.nameTh?.includes('ชีส') || t.name.toLowerCase().includes('sauce') || t.nameTh?.includes('ซอส');
+                                                    const icon = t.category === 'cheese' ? '🧀' : t.category === 'sauce' ? '🍅' : t.category === 'meat' ? '🍖' : t.category === 'vegetable' ? '🥦' : '✨';
+                                                    const toppingText = t.nameTh && t.nameTh !== t.name ? `${t.name} / ${t.nameTh}` : t.name;
+                                                    return (
+                                                        <span key={t.id} className={`text-sm font-black px-2.5 py-1.5 rounded-lg shadow-sm border flex items-center gap-1.5 ${isCheeseOrSauce ? 'bg-orange-100 text-orange-950 border-orange-300 ring-2 ring-orange-200 animate-pulse' : 'bg-amber-100 text-amber-950 border-amber-300'}`}>
+                                                            {icon} {toppingText}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                       )}
                                       
                                       {/* Special Instructions */}
                                       {item.specialInstructions && (
-                                          <div className="mt-1 text-red-600 font-bold text-sm bg-red-50 p-1 rounded inline-block">
-                                              ** {item.specialInstructions}
+                                          <div className="mt-2.5 text-red-900 bg-gradient-to-r from-red-50 to-red-100/80 border-2 border-red-500 rounded-xl px-3 py-2.5 text-sm md:text-base font-extrabold flex items-center gap-2.5 animate-pulse w-full shadow-md">
+                                              <span className="px-2 py-1 bg-red-600 text-white rounded-md text-xs shrink-0 font-black uppercase tracking-wider shadow">🚨 พิเศษ / SPECIAL REQUEST</span>
+                                              <span className="break-words font-black text-red-950 text-left">"{item.specialInstructions}"</span>
                                           </div>
                                       )}
                                   </div>

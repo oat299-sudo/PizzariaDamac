@@ -202,6 +202,95 @@ export const CustomerView: React.FC = () => {
       return null;
   });
 
+  // Track previous order statuses to trigger real-time notifications
+  const [prevStatuses, setPrevStatuses] = useState<Record<string, string>>(() => {
+      const initial: Record<string, string> = {};
+      orders.forEach(o => {
+          initial[o.id] = o.status;
+      });
+      return initial;
+  });
+
+  const [activeNotification, setActiveNotification] = useState<{
+      id: string;
+      orderId: string;
+      oldStatus: string;
+      newStatus: string;
+      timestamp: number;
+  } | null>(null);
+
+  useEffect(() => {
+      if (!activeNotification) return;
+      const timer = setTimeout(() => {
+          setActiveNotification(null);
+      }, 10000); // Keep it visible for 10 seconds, plenty of time to read
+      return () => clearTimeout(timer);
+  }, [activeNotification]);
+
+  useEffect(() => {
+      // Find orders that are relevant to this customer
+      const relevantOrders = orders.filter(o => 
+          (customer && o.customerPhone === customer.phone) ||
+          (historyOrderIds.includes(o.id)) ||
+          (o.id === localOrderId)
+      );
+
+      const nextStatuses = { ...prevStatuses };
+      let updatedNotification: any = null;
+
+      relevantOrders.forEach(order => {
+          const prevStatus = prevStatuses[order.id];
+          
+          // Trigger notification only if status has updated from an existing tracked state
+          if (prevStatus && prevStatus !== order.status) {
+              updatedNotification = {
+                  id: order.id + '-' + Date.now(),
+                  orderId: order.id,
+                  oldStatus: prevStatus,
+                  newStatus: order.status,
+                  timestamp: Date.now()
+              };
+          }
+          nextStatuses[order.id] = order.status;
+      });
+
+      // Maintain tracking list
+      relevantOrders.forEach(order => {
+          if (!nextStatuses[order.id]) {
+              nextStatuses[order.id] = order.status;
+          }
+      });
+
+      setPrevStatuses(nextStatuses);
+
+      if (updatedNotification) {
+          setActiveNotification(updatedNotification);
+          
+          // Ascending chime buzzer to alert customer elegantly
+          try {
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const osc = audioCtx.createOscillator();
+              const gainNode = audioCtx.createGain();
+              
+              osc.connect(gainNode);
+              gainNode.connect(audioCtx.destination);
+              
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(698.46, audioCtx.currentTime); // F5
+              gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+              
+              osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.12); // A5
+              gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime + 0.12);
+              gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+              
+              osc.start();
+              osc.stop(audioCtx.currentTime + 0.5);
+          } catch (e) {
+              console.warn("Audio chime failed to play", e);
+          }
+      }
+  }, [orders, customer, historyOrderIds, localOrderId]);
+
   const timeSlots = generateTimeSlots(orderDate === 'today' ? 0 : 1);
 
   const activeOrder = useMemo(() => {
@@ -543,7 +632,83 @@ export const CustomerView: React.FC = () => {
         : (DEFAULT_STORE_SETTINGS.eventGalleryUrls || []);
 
   return (
-    <div className="min-h-screen bg-orange-50 pb-32 md:pb-0 font-sans text-gray-900 flex flex-col">
+    <div className="min-h-screen bg-orange-50 pb-32 md:pb-0 font-sans text-gray-900 flex flex-col relative">
+        {/* --- REAL-TIME ORDER STATUS UPDATES NOTIFICATION --- */}
+        {activeNotification && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 animate-fade-in">
+                <div className="bg-gray-950 border-2 border-brand-500 text-white rounded-2xl shadow-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
+                    {/* Corner accent glow */}
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/15 rounded-full blur-xl pointer-events-none"></div>
+
+                    <div className="flex items-start justify-between relative z-10">
+                        <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-brand-600 rounded-xl text-white shadow-md">
+                                <Sparkles size={20} className="text-yellow-400 animate-pulse"/>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-yellow-300">
+                                    {language === 'th' ? '🍕 อัปเดตสถานะออเดอร์!' : '🍕 Order Status Updated!'}
+                                </h4>
+                                <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                                    #{activeNotification.orderId}
+                                </p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setActiveNotification(null)}
+                            className="bg-white/10 hover:bg-white/20 p-1.5 rounded-full text-white/70 hover:text-white transition"
+                        >
+                            <X size={14}/>
+                        </button>
+                    </div>
+                    
+                    <div className="bg-white/5 rounded-xl p-3 flex flex-col gap-2.5 border border-white/5 relative z-10">
+                        {/* Before/After Badges with elegant pointing arrow */}
+                        <div className="grid grid-cols-3 items-center gap-1 bg-black/40 p-2.5 rounded-lg border border-white/5">
+                            <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-gray-400 uppercase tracking-wider font-bold">{language === 'th' ? 'ก่อนหน้า' : 'Before'}</span>
+                                <span className="text-xs font-semibold text-gray-300 mt-0.5">
+                                    {t(activeNotification.oldStatus as any)}
+                                </span>
+                            </div>
+                            <div className="flex justify-center text-brand-400">
+                                <ArrowRight size={16} className="animate-pulse"/>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[9px] text-brand-400 uppercase tracking-wider font-bold">{language === 'th' ? 'ปัจจุบัน' : 'Current'}</span>
+                                <span className="text-sm font-extrabold text-green-400 mt-0.5 drop-shadow-[0_2px_4px_rgba(74,222,128,0.2)] animate-pulse">
+                                    {t(activeNotification.newStatus as any)}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <p className="text-xs text-gray-200 text-center font-medium leading-relaxed px-1">
+                            {activeNotification.newStatus === 'confirmed' && (language === 'th' ? '👍 ร้านค้ายืนยันและยอมรับคำสั่งซื้อของคุณแล้ว!' : '👍 The shop has accepted and confirmed your order!')}
+                            {activeNotification.newStatus === 'acknowledged' && (language === 'th' ? '👨‍🍳 เชฟเริ่มทำการเตรียมท็อปปิ้งแป้งพิซซ่าแล้ว!' : '👨‍🍳 The kitchen team has started preparing your pizza dough!')}
+                            {activeNotification.newStatus === 'cooking' && (language === 'th' ? '🔥 พิซซ่าอบในเตาร้อนๆ กลิ่นเริ่มหอมแล้วค่ะ!' : '🔥 Pizza is inside the oven. It is smelling delicious!')}
+                            {activeNotification.newStatus === 'ready' && (language === 'th' ? '✨ อบเสร็จส่งตรงจากเตา! ออเดอร์ของคุณพร้อมจัดส่ง/เสิร์ฟแล้วค่ะ' : '✨ Out of the oven! Your pizza is package ready and hot!')}
+                            {activeNotification.newStatus === 'completed' && (language === 'th' ? '🎉 เสิร์ฟเรียบร้อย! ทานให้อร่อยนะคะ ขอบคุณที่อุดหนุนค่ะ' : '🎉 Delivered & Completed! Enjoy your meal, thank you!')}
+                            {activeNotification.newStatus === 'cancelled' && (language === 'th' ? '❌ คำสั่งซื้อนี้ถูกยกเลิกแล้ว หากมีข้อสงสัยโปรดติดต่อร้านค้า' : '❌ Your order has been cancelled. Please contact the store.')}
+                        </p>
+                    </div>
+
+                    <div className="flex gap-2 relative z-10">
+                        <button 
+                            onClick={() => {
+                                setLocalOrderId(activeNotification.orderId);
+                                setShowTracker(true);
+                                setActiveNotification(null);
+                            }}
+                            className="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-lg shadow-brand-600/20 border border-brand-500"
+                        >
+                            <Activity size={13} className="animate-pulse"/>
+                            {language === 'th' ? 'ดูสถานะแบบเรียลไทม์' : 'Track Status Real-time'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-orange-100">
            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">

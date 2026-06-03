@@ -6,6 +6,35 @@ import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye } from 'lucide-react';
 
+const convertGoogleDriveUrl = (url: string): string => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com')) {
+        let fileId = '';
+        const dMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{25,50})/);
+        const dShortMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{25,50})/);
+        const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{25,50})/);
+
+        if (dMatch && dMatch[1]) {
+            fileId = dMatch[1];
+        } else if (dShortMatch && dShortMatch[1]) {
+            fileId = dShortMatch[1];
+        } else if (idMatch && idMatch[1]) {
+            fileId = idMatch[1];
+        }
+
+        if (fileId) {
+            return `https://lh3.googleusercontent.com/d/${fileId}`;
+        }
+    }
+    return trimmed;
+};
+
+const isDriveUrl = (url: string): boolean => {
+    if (!url) return false;
+    return url.includes('lh3.googleusercontent.com/d/') || url.includes('drive.google.com') || url.includes('docs.google.com');
+};
+
 export const POSView: React.FC = () => {
     const { 
         menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder,
@@ -744,33 +773,63 @@ export const POSView: React.FC = () => {
                                 <tr>
                                     <td colSpan={4} className="text-center font-bold">-----------------------------</td>
                                 </tr>
-                                {(receiptData.items || []).map((item, i) => (
-                                    <React.Fragment key={i}>
-                                        <tr className="align-top">
-                                            <td className="pr-1 whitespace-pre-wrap">
-                                                {i + 1}. {item.name}
-                                                {((item.selectedToppings?.length || 0) > 0 || (item.subItems?.length || 0) > 0) && (
-                                                    <div className="pl-3 text-[10px] text-black">
-                                                        {item.selectedToppings?.map(t => `+ ${t.name}`).join(' ')}
-                                                        {item.subItems?.map(s => {
-                                                            let str = `+ ${s.name}`;
-                                                            if (s.toppings?.length) {
-                                                                str += ` (${s.toppings.map(t=>t.name).join(', ')})`;
-                                                            }
-                                                            return str;
-                                                        }).join('\n')}
-                                                    </div>
-                                                )}
-                                                {item.specialInstructions && ` [**${item.specialInstructions}**]`}
-                                            </td>
-                                            <td className="text-center">{item.quantity}</td>
-                                            <td className="text-right">{(item.totalPrice/item.quantity).toFixed(0)}.-</td>
-                                            <td className="text-right">{item.totalPrice.toFixed(0)}.-</td>
-                                        </tr>
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
+                                 {(receiptData.items || []).map((item, i) => {
+                                     const displayName = item.nameTh && item.nameTh !== item.name ? `${item.name} (${item.nameTh})` : item.name;
+                                     return (
+                                         <React.Fragment key={i}>
+                                             <tr className="align-top border-b border-gray-200">
+                                                 <td className="pr-1 whitespace-pre-wrap py-1">
+                                                     <div className="font-bold">{i + 1}. {displayName}</div>
+                                                     {((item.selectedToppings?.length || 0) > 0 || (item.subItems?.length || 0) > 0) && (
+                                                         <div className="pl-3.5 text-[9.5px] text-black mt-1 space-y-0.5">
+                                                             {item.selectedToppings?.map(t => {
+                                                                 const toppingName = t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name;
+                                                                 return (
+                                                                     <div key={t.id} className="font-black">
+                                                                         * [เพิ่ม/ADD] {toppingName} (+{t.price}.-)
+                                                                     </div>
+                                                                 );
+                                                             })}
+                                                             {item.subItems?.map((s, sIdx) => {
+                                                                 const comboItemName = s.nameTh && s.nameTh !== s.name ? `${s.name} (${s.nameTh})` : s.name;
+                                                                 return (
+                                                                     <div key={sIdx} className="pl-1 font-extrabold text-[9px]">
+                                                                         ↳ [เซ็ต/COMBO] {comboItemName}
+                                                                         {s.toppings?.length > 0 && (
+                                                                             <div className="pl-3.5 text-[8.5px] font-bold text-gray-750 italic">
+                                                                                 {s.toppings.map(t => {
+                                                                                     const toppingName = t.nameTh && t.nameTh !== t.name ? `${t.name} (${t.nameTh})` : t.name;
+                                                                                     return `+ ${toppingName}`;
+                                                                                 }).join(', ')}
+                                                                             </div>
+                                                                         )}
+                                                                     </div>
+                                                                 );
+                                                             })}
+                                                         </div>
+                                                     )}
+                                                     {item.specialInstructions && (
+                                                         <div className="mt-1 pl-2 border-l border-black text-[9.5px] font-black bg-gray-100 p-1">
+                                                             !!! [พิเศษ/REQUEST] : "{item.specialInstructions}" !!!
+                                                         </div>
+                                                     )}
+                                                 </td>
+                                                 <td className="text-center font-bold py-1">{item.quantity}</td>
+                                                 <td className="text-right py-1">{(item.totalPrice/item.quantity).toFixed(0)}.-</td>
+                                                 <td className="text-right font-bold py-1">{item.totalPrice.toFixed(0)}.-</td>
+                                             </tr>
+                                         </React.Fragment>
+                                     );
+                                 })}
+                             </tbody>
+                         </table>
+                         
+                         {receiptData.note && (
+                             <div className="my-2 p-1.5 border border-black text-black">
+                                 <div className="text-[9.5px] font-black">📝 หมายเหตุออเดอร์ (ORDER NOTE):</div>
+                                 <div className="text-[10px] font-bold mt-0.5">"{receiptData.note}"</div>
+                             </div>
+                         )}
                         
                         <div className="text-center font-bold">-----------------------------</div>
 
@@ -1230,10 +1289,49 @@ export const POSView: React.FC = () => {
                     </div>
                 )}
                 
-                <div>
-                     <label className="block text-xs font-bold text-gray-500 mb-1">Image URL</label>
-                     <input className="w-full border rounded-lg px-3 py-2 mb-2" value={itemForm.image || ''} onChange={e => setItemForm({...itemForm, image: e.target.value})}/>
-                     {itemForm.image && <img src={itemForm.image} className="w-32 h-32 object-cover rounded-lg border"/>}
+                <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-3">
+                     <div>
+                          <label className="block text-xs font-bold text-gray-750 mb-1">ตัวเลือกที่ 1: อัปโหลดไฟล์รูปภาพ (Upload File)</label>
+                          <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer" 
+                              onChange={handleImageUpload}
+                          />
+                     </div>
+                     <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold justify-center">
+                          <span className="h-[1px] bg-gray-200 flex-1"></span>
+                          <span>หรือ (OR)</span>
+                          <span className="h-[1px] bg-gray-200 flex-1"></span>
+                     </div>
+                     <div>
+                          <label className="block text-xs font-bold text-gray-750 mb-1 flex items-center justify-between">
+                             <span>ตัวเลือกที่ 2: ระบุลิงก์รูปภาพ (Image URL)</span>
+                             <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded font-semibold animate-pulse">รองรับ Google Drive!</span>
+                          </label>
+                          <input 
+                              type="text"
+                              placeholder="วางลิงก์รูปภาพทั่วไป หรือลิงก์แชร์จาก Google Drive..." 
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" 
+                              value={itemForm.image || ''} 
+                              onChange={e => {
+                                  const val = e.target.value;
+                                  const converted = convertGoogleDriveUrl(val);
+                                  setItemForm({...itemForm, image: converted});
+                              }}
+                          />
+                     </div>
+                     {itemForm.image && (
+                          <div className="flex flex-col items-center gap-2 pt-2 border-t border-gray-150">
+                              <span className="text-xs font-bold text-gray-500">ภาพตัวอย่าง (Preview)</span>
+                              {isDriveUrl(itemForm.image) && (
+                                  <div className="text-green-700 text-xs font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 w-full justify-center">
+                                      <span>✨ แปลงลิงก์ Google Drive สำเร็จ!</span>
+                                  </div>
+                              )}
+                              <img src={itemForm.image} className="w-36 h-36 object-cover rounded-xl border-2 border-brand-200 shadow-md bg-gray-100" />
+                          </div>
+                     )}
                 </div>
             </div>
             
