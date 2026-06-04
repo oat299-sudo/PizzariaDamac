@@ -1252,7 +1252,12 @@ export const POSView: React.FC = () => {
                                                             <span className="font-bold text-gray-700">ที่อยู่จัดส่ง:</span>
                                                             <button 
                                                                 onClick={() => {
-                                                                    navigator.clipboard.writeText(order.deliveryAddress || '');
+                                                                    const cleanAddress = (order.deliveryAddress || '')
+                                                                        .replace(/\[Phone: .*?\]/g, '')
+                                                                        .replace(/\[GPS Pin: .*?\]/g, '')
+                                                                        .replace(/\[Google Maps Link: .*?\]/g, '')
+                                                                        .trim();
+                                                                    navigator.clipboard.writeText(cleanAddress);
                                                                     alert('คัดลอกที่อยู่แล้ว!');
                                                                 }}
                                                                 className="text-brand-600 hover:text-brand-800 underline active:text-brand-500 whitespace-nowrap ml-2"
@@ -1260,7 +1265,14 @@ export const POSView: React.FC = () => {
                                                                 คัดลอก
                                                             </button>
                                                         </div>
-                                                        <p className="text-gray-600 leading-relaxed bg-white p-2 rounded border border-blue-100/50">{order.deliveryAddress}</p>
+                                                        <p className="text-gray-600 leading-relaxed bg-white p-2 rounded border border-blue-100/50">
+                                                            {(order.deliveryAddress || '')
+                                                                .replace(/\[Phone: .*?\]/g, '')
+                                                                .replace(/\[GPS Pin: .*?\]/g, '')
+                                                                .replace(/\[Google Maps Link: .*?\]/g, '')
+                                                                .trim()
+                                                            }
+                                                        </p>
                                                         
                                                         {parseDeliveryPhone(order.deliveryAddress) && (
                                                             <div className="flex items-center justify-between font-sans font-bold text-gray-700 border-t border-dashed border-blue-100 pt-2">

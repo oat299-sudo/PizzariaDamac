@@ -1705,9 +1705,16 @@ export const CustomerView: React.FC = () => {
                                                          {hasMapPin && (
                                                              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 mt-2">
                                                                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0"/> 
-                                                                 <div>
-                                                                     {language === 'th' ? `ระยะทางจัดส่ง: ดูรายละเอียดใน Google Maps (พิกัดถูกดึงแล้ว)` : `Coord Received`}
-                                                                     <div className="text-[10px] font-normal leading-tight mt-0.5 text-emerald-600/80">{language === 'th' ? 'ทางร้านจะตรวจสอบระยะทางและค่าส่งอีกครั้ง' : 'Delivery distance and fee will be checked by shop'}</div>
+                                                                 <div className="w-full">
+                                                                     <div className="flex justify-between items-center bg-white/50 px-2 py-1 rounded">
+                                                                         <span>{language === 'th' ? `ระยะทางจัดส่ง:` : `Distance:`}</span>
+                                                                         <span className="font-extrabold text-emerald-900 bg-white px-2 py-0.5 rounded shadow-sm">{deliveryDistanceKm.toFixed(2)} km</span>
+                                                                     </div>
+                                                                     <div className="text-[10px] font-normal leading-tight mt-1 text-emerald-600/90 text-center">
+                                                                         {deliveryDistanceKm <= (storeSettings.freeDeliveryRadiusKm || 5) 
+                                                                             ? (language === 'th' ? '✨ อยู่ในระยะจัดส่งฟรี!' : '✨ Within free delivery zone!')
+                                                                             : (language === 'th' ? 'เกินระยะส่งฟรี (คาดว่ามีค่าจัดส่ง)' : 'Outside free delivery zone')}
+                                                                     </div>
                                                                  </div>
                                                              </div>
                                                          )}

@@ -411,7 +411,14 @@ export const KitchenView: React.FC = () => {
                           <MapPin size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
                           <div>
                               <p className="text-xs font-bold text-blue-800 uppercase mb-0.5">{t('deliveryAddress')}:</p>
-                              <p className="text-sm text-gray-850 leading-snug">{order.deliveryAddress}</p>
+                              <p className="text-sm text-gray-850 leading-snug">
+                                  {(order.deliveryAddress || '')
+                                      .replace(/\[Phone: .*?\]/g, '')
+                                      .replace(/\[GPS Pin: .*?\]/g, '')
+                                      .replace(/\[Google Maps Link: .*?\]/g, '')
+                                      .trim()
+                                  }
+                              </p>
                           </div>
                       </div>
                       
