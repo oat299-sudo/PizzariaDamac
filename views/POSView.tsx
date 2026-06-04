@@ -4,6 +4,7 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
+import { calculateDistanceKm } from '../utils/geo';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
@@ -1239,26 +1240,53 @@ export const POSView: React.FC = () => {
                                                     </div>
                                                     
                                                     {/* Decoded delivery address annotations */}
-                                                    <div className="text-xs space-y-1.5 pt-1">
+                                                    <div className="text-xs space-y-2 pt-2 pb-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <span className="font-bold text-gray-700">ที่อยู่จัดส่ง:</span>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(order.deliveryAddress || '');
+                                                                    alert('คัดลอกที่อยู่แล้ว!');
+                                                                }}
+                                                                className="text-brand-600 hover:text-brand-800 underline active:text-brand-500 whitespace-nowrap ml-2"
+                                                            >
+                                                                คัดลอก
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-gray-600 leading-relaxed bg-white p-2 rounded border border-blue-100/50">{order.deliveryAddress}</p>
+                                                        
                                                         {parseDeliveryPhone(order.deliveryAddress) && (
-                                                            <div className="flex items-center gap-1.5 font-sans font-bold text-gray-700">
-                                                                <Phone size={13} className="text-blue-600 shrink-0"/>
-                                                                <span>เบอร์โทรจัดส่ง: {parseDeliveryPhone(order.deliveryAddress)}</span>
+                                                            <div className="flex items-center justify-between font-sans font-bold text-gray-700 border-t border-dashed border-blue-100 pt-2">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Phone size={13} className="text-blue-600 shrink-0"/>
+                                                                    <span>เบอร์โทร:</span>
+                                                                </div>
+                                                                <a href={`tel:${parseDeliveryPhone(order.deliveryAddress)}`} className="text-blue-600 underline">
+                                                                    {parseDeliveryPhone(order.deliveryAddress)}
+                                                                </a>
                                                             </div>
                                                         )}
                                                         {parseGPSCoordinates(order.deliveryAddress) && (
-                                                            <div className="flex items-center justify-between gap-1.5 font-bold pt-1 border-t border-dashed border-blue-100/60">
+                                                            <div className="flex items-center justify-between gap-1.5 font-bold pt-2 border-t border-dashed border-blue-100">
                                                                 <div className="flex items-center gap-1.5 text-gray-750">
                                                                     <MapPin size={13} className="text-red-500 animate-pulse shrink-0"/>
-                                                                    <span>บันทึกพิกัด GPS แล้ว</span>
+                                                                    <span>ระยะทาง: {
+                                                                        (() => {
+                                                                            const coords = parseGPSCoordinates(order.deliveryAddress);
+                                                                            if (!coords) return '?';
+                                                                            const storeGps = storeSettings.storeLocationGps || "13.8856,100.5222";
+                                                                            const [sLat, sLng] = storeGps.split(',').map(Number);
+                                                                            return calculateDistanceKm(sLat, sLng, coords.lat, coords.lng).toFixed(2);
+                                                                        })()
+                                                                    } กม.</span>
                                                                 </div>
                                                                 <a 
                                                                     href={parseGPSCoordinates(order.deliveryAddress)?.url} 
                                                                     target="_blank" 
                                                                     rel="noopener noreferrer" 
-                                                                    className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded font-extrabold flex items-center gap-1 shadow-xs transition"
+                                                                    className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded-lg font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95"
                                                                 >
-                                                                    <Globe size={10}/> ดูแผนที่ GPS
+                                                                    <Globe size={11}/> เปิด Google Maps
                                                                 </a>
                                                             </div>
                                                         )}

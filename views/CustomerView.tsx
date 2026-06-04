@@ -3,9 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw } from 'lucide-react';
+import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { generatePromptPayPayload } from '../utils/promptpay';
 
 // ... (VideoCard Component remains unchanged) ...
@@ -97,7 +97,7 @@ const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
 export const CustomerView: React.FC = () => {
   const { 
     menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
-    addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback,
+    addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback, updateOrderTypeToPickup,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
     toppings, fetchOrders, tableSession
@@ -263,6 +263,26 @@ export const CustomerView: React.FC = () => {
       }
       return () => { isMounted = false; };
   }, [hasMapPin, deliveryLat, deliveryLng, orderType, storeSettings]);
+
+  const handleDownloadQR = (id: string, refNo?: string) => {
+      const canvas = document.getElementById(id) as HTMLCanvasElement | null;
+      if (canvas) {
+          try {
+              const url = canvas.toDataURL('image/png');
+              const link = document.createElement('a');
+              link.download = `PromptPay_Order_${refNo || 'Payment'}.png`;
+              link.href = url;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+          } catch (err) {
+              console.error('Failed to save QR Code', err);
+              alert(language === 'th' ? 'ไม่สามารถบันทึกรูปภาพได้ในเบราว์เซอร์นี้' : 'Cannot save image in this browser.');
+          }
+      } else {
+          alert('QR Code element not found.');
+      }
+  };
 
   useEffect(() => {
       if (!activeNotification) return;
@@ -574,7 +594,7 @@ export const CustomerView: React.FC = () => {
         delivery: orderType === 'delivery' ? {
             address: finalDeliveryAddress,
             zoneName: deliveryLocationName || 'Standard',
-            fee: deliveryFee || 0 
+            fee: 'pending' // As per requirement: force staff to confirm fee
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,
@@ -597,10 +617,8 @@ export const CustomerView: React.FC = () => {
             });
         }
         if (paymentMethod === 'qr_transfer') {
-            const finalFee = orderType === 'delivery' ? (deliveryFee || 0) : 0;
-            setQrAmount(cartTotal + finalFee);
-            setShowQRModal(true);
-            setShowTracker(false);
+            setShowTracker(true);
+            setShowQRModal(false);
         } else {
             setShowTracker(true);
             setShowQRModal(false);
@@ -801,6 +819,16 @@ export const CustomerView: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-3">
+                 {storeSettings.lineUrl && (
+                     <a href={storeSettings.lineUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-[#00B900]/10 text-[#00B900] px-3 py-1.5 flex items-center gap-1 hover:bg-[#00B900]/20 transition text-xs font-bold shadow-sm border border-[#00B900]/20 hidden sm:flex">
+                        <MessageCircle size={14}/> Line
+                     </a>
+                 )}
+                 {storeSettings.contactPhone && (
+                     <a href={`tel:${storeSettings.contactPhone}`} className="rounded-full bg-emerald-50 text-emerald-700 px-3 py-1.5 flex items-center gap-1 hover:bg-emerald-100 transition text-xs font-bold shadow-sm border border-emerald-200 hidden sm:flex">
+                        <Phone size={14}/> Call Us
+                     </a>
+                 )}
                  <button onClick={toggleLanguage} className="w-9 h-9 rounded-full bg-orange-100 font-bold text-xs text-brand-700 hover:bg-orange-200 transition">{language.toUpperCase()}</button>
                  {/* TABLE QR BANNER */}
                  {tableSession ? (
@@ -1042,6 +1070,7 @@ export const CustomerView: React.FC = () => {
         )}
         
         {/* --- EVENTS & CATERING SECTION (DYNAMIC) --- */}
+        {activeCategory === 'promotion' && (
         <section className="bg-gray-900 text-white py-12">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="text-center mb-10">
@@ -1072,6 +1101,7 @@ export const CustomerView: React.FC = () => {
                 </div>
             </div>
         </section>
+        )}
         
         {/* --- FOOTER --- */}
         <footer className="bg-gray-900 text-white py-12 mt-auto">
@@ -1115,20 +1145,20 @@ export const CustomerView: React.FC = () => {
         )}
 
         {showTracker && activeOrder && (
-             <div className="fixed bottom-4 right-4 z-40 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in">
-                 <div className="bg-brand-600 p-3 text-white flex justify-between items-center">
-                     <h3 className="font-bold flex items-center gap-2"><Activity size={18}/> Status: {t(activeOrder.status as any)}</h3>
+             <div className="fixed bottom-4 right-4 z-40 w-80 max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-200 animate-fade-in custom-scrollbar">
+                 <div className="bg-brand-600 p-3 text-white sticky top-0 z-10 flex justify-between items-center shadow-sm">
+                     <h3 className="font-bold flex items-center gap-2"><Activity size={18}/> {language === 'th' ? 'สถานะ:' : 'Status:'} {t(activeOrder.status as any)}</h3>
                      <div className="flex gap-2">
                          <button onClick={handleManualRefresh} className={`p-1 hover:bg-white/20 rounded ${isRefreshing ? 'animate-spin' : ''}`}><RotateCw size={16}/></button>
                          <button onClick={() => setShowTracker(false)}><X size={18}/></button>
                      </div>
                  </div>
-                 <div className="p-4">
-                     <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs text-gray-500">Order #{activeOrder.id.slice(-4)}</span>
-                         <span className="text-xs font-bold text-brand-600">{activeOrder.status === 'cooking' ? 'Cooking...' : 'Updating...'}</span>
+                 <div className="p-4 space-y-4">
+                     <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                         <span className="text-xs text-gray-500 font-bold">{language === 'th' ? 'หมายเลขอ้างอิง' : 'Ref No:'}</span>
+                         <span className="text-sm font-mono font-bold text-gray-900 px-2 py-1 bg-white rounded border border-gray-200">#{activeOrder.id.slice(-4)}</span>
                      </div>
-                     <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-3">
+                     <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
                          <div className={`h-full transition-all duration-1000 ${
                              activeOrder.status === 'pending' ? 'w-1/6 bg-yellow-400' :
                              activeOrder.status === 'confirmed' ? 'w-2/6 bg-blue-500' :
@@ -1138,12 +1168,82 @@ export const CustomerView: React.FC = () => {
                              'w-full bg-green-600'
                          }`}></div>
                      </div>
-                     <p className="text-xs text-center text-gray-500 mb-3">
-                         {activeOrder.status === 'cooking' ? 'Your delicious pizza is in the oven!' : 'We are preparing your order.'}
+                     <p className="text-xs text-center text-gray-500">
+                          {activeOrder.status === 'cooking' ? 'Your delicious pizza is in the oven!' : 'We are preparing your order.'}
                      </p>
-                     
-                     {/* Rate Us Button (Shown here) */}
-                     <a href={storeSettings.reviewUrl} target="_blank" className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition">
+
+                     {/* Delivery Fee Info */}
+                     {activeOrder.type === 'delivery' && (
+                         <div className="bg-gray-50 p-2 rounded-lg text-xs space-y-1">
+                             <div className="flex justify-between text-gray-600">
+                                 <span>{language === 'th' ? 'ค่าจัดส่ง:' : 'Delivery Fee:'}</span>
+                                 <span className="font-bold">{activeOrder.deliveryFee === 'pending' ? (language === 'th' ? 'รอตรวจสอบ' : 'Pending') : `฿${activeOrder.deliveryFee}`}</span>
+                             </div>
+                             <div className="flex justify-between font-bold text-brand-700">
+                                 <span>{language === 'th' ? 'ยอดรวมสุทธิ:' : 'Net Total:'}</span>
+                                 <span className="text-base">฿{activeOrder.totalAmount}</span>
+                             </div>
+                             
+                             {activeOrder.status === 'pending' && (
+                                <button className="mt-2 text-brand-600 font-bold underline bg-brand-50 w-full rounded py-1 hover:bg-brand-100 transition"
+                                        onClick={async () => {
+                                            if (confirm(language === 'th' ? "ยืนยันการเปลี่ยนเป็น 'ไปรับเองที่ร้าน' (ค่าส่งจะเป็น 0 บาท)?" : "Switch to pickup in-store (Delivery free)?")) {
+                                                await updateOrderTypeToPickup(activeOrder.id);
+                                            }
+                                        }}
+                                >
+                                     {language === 'th' ? 'เปลี่ยนเป็น 🚶 มารับเอง (ไม่มีค่าส่ง)' : 'Switch to 🚶 Pickup (No fee)'}
+                                </button>
+                             )}
+                         </div>
+                     )}
+
+                     {/* QR Payment Code logic inside tracker */}
+                     {activeOrder.paymentMethod === 'qr_transfer' && activeOrder.status === 'pending' && (
+                         <div className="border border-brand-200 rounded-xl p-3 bg-white shadow-inner flex flex-col items-center">
+                              {activeOrder.deliveryFee === 'pending' ? (
+                                  <div className="text-center font-bold text-orange-500 text-xs py-4">
+                                      <Clock className="w-8 h-8 mx-auto mb-2 animate-bounce"/>
+                                      {language === 'th' ? 'กรุณารอสักครู่... ร้านกำลังตรวจสอบค่าจัดส่ง' : 'Please wait... Check delivery fee'}
+                                  </div>
+                              ) : (
+                                  <>
+                                      <h4 className="text-xs font-bold text-gray-600 mb-2">{language === 'th' ? 'สแกนเพื่อชำระเงิน' : 'Scan via Bank App'}</h4>
+                                      <div className="p-2 border border-gray-100 rounded-lg bg-white inline-block">
+                                        <QRCodeCanvas id="promptpay-qr-tracker" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, activeOrder.totalAmount)} size={150} level="M" />
+                                      </div>
+                                      <button 
+                                          type="button"
+                                          onClick={() => handleDownloadQR('promptpay-qr-tracker', activeOrder.id.slice(-4))}
+                                          className="mt-2 mb-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand-600 text-white hover:bg-brand-700 active:scale-95 text-[11px] font-bold rounded-lg transition shadow-xs w-full max-w-[160px]"
+                                      >
+                                          <Download size={12} className="text-white"/>
+                                          <span>{language === 'th' ? 'บันทึกรูป QR ลงเครื่อง' : 'Save QR Image'}</span>
+                                      </button>
+                                      <p className="text-brand-600 font-extrabold text-lg mt-1">฿{activeOrder.totalAmount}</p>
+                                      <p className="text-[10px] text-gray-400 text-center mt-2 leading-tight">
+                                          {language === 'th' ? 'ชำระแล้วให้ส่งสลิปมาที่ Line ร้าน' : 'After payment, send slip to our Line'}
+                                      </p>
+                                  </>
+                              )}
+                         </div>
+                     )}
+
+                     {/* Contact Options */}
+                     <div className="grid grid-cols-2 gap-2 text-xs">
+                          {storeSettings.contactPhone && (
+                              <a href={`tel:${storeSettings.contactPhone}`} className="flex flex-col items-center justify-center p-2 rounded-lg bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100">
+                                  <Phone size={16} className="mb-1"/> Call Store
+                              </a>
+                          )}
+                          {storeSettings.lineUrl && (
+                              <a href={storeSettings.lineUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center p-2 rounded-lg bg-[#00B900]/10 text-[#00B900] font-bold hover:bg-[#00B900]/20">
+                                  <MessageCircle size={16} className="mb-1"/> Line Us
+                              </a>
+                          )}
+                     </div>
+
+                     <a href={storeSettings.reviewUrl} target="_blank" rel="noopener noreferrer" className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1">
                          <Star size={12} fill="orange" className="text-orange-400"/> {t('reviewGoogle')}
                      </a>
                  </div>
@@ -2447,8 +2547,16 @@ export const CustomerView: React.FC = () => {
                     <h3 className="text-xl font-bold text-gray-900 mb-2">{language === 'th' ? 'สแกนเพื่อชำระเงิน' : 'Scan to Pay'}</h3>
                     <p className="text-gray-500 mb-6 text-sm">{language === 'th' ? 'กรุณาสแกน QR Code นี้ผ่านแอปธนาคาร' : 'Please scan this QR Code via your bank app'}</p>
                     
-                    <div className="flex justify-center p-4 bg-gray-50 rounded-xl mb-4 border-2 border-brand-100 mx-auto w-fit">
-                         <QRCodeSVG value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, qrAmount)} size={200} />
+                    <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl mb-4 border-2 border-brand-100 mx-auto w-fit">
+                         <QRCodeCanvas id="promptpay-qr-modal" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, qrAmount)} size={200} level="M" />
+                         <button 
+                             type="button"
+                             onClick={() => handleDownloadQR('promptpay-qr-modal', 'Payment')}
+                             className="mt-3 flex items-center justify-center gap-1.5 px-4 py-2 bg-brand-600 text-white hover:bg-brand-700 active:scale-95 text-xs font-bold rounded-lg transition shadow-md w-full"
+                         >
+                             <Download size={13} className="text-white"/>
+                             <span>{language === 'th' ? 'บันทึกรูป QR ลงเครื่อง' : 'Save QR Image'}</span>
+                         </button>
                     </div>
                     
                     <div className="text-3xl font-extrabold text-brand-600 mb-6">฿{qrAmount}</div>

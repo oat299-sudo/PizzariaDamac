@@ -74,6 +74,7 @@ interface StoreContextType {
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  updateOrderTypeToPickup: (orderId: string) => Promise<void>;
   updateOrderDeliveryFee: (orderId: string, fee: number) => Promise<void>;
   updateOrderNetAmount: (orderId: string, netAmount: number) => Promise<void>;
   completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
@@ -1037,6 +1038,32 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   };
+
+  const updateOrderTypeToPickup = async (orderId: string) => {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      
+      const currentDeliveryFee = order.deliveryFee === 'pending' ? 0 : (order.deliveryFee || 0);
+      const subtotal = order.totalAmount - currentDeliveryFee;
+      const newNet = subtotal * (1 - (GP_RATES[order.source] || 0));
+
+      if (isSupabaseConfigured) {
+          await supabase.from('orders').update({ 
+              type: 'pickup', 
+              delivery_fee: 0,
+              total_amount: subtotal,
+              net_amount: newNet
+          }).eq('id', orderId);
+      }
+      
+      setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          type: 'pickup', 
+          deliveryFee: 0,
+          totalAmount: subtotal,
+          netAmount: newNet
+      } : o));
+  };
   
   const updateOrderDeliveryFee = async (orderId: string, fee: number) => {
       const order = orders.find(o => o.id === orderId);
@@ -1251,7 +1278,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders, submitOrderFeedback,
+      orders, placeOrder, updateOrderStatus, updateOrderTypeToPickup, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders, submitOrderFeedback,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,
