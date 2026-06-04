@@ -202,6 +202,30 @@ export const CustomerView: React.FC = () => {
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [deliveryLocationName, setDeliveryLocationName] = useState<string>('');
   
+  const [addressSaveType, setAddressSaveType] = useState<'home' | 'work' | 'none'>('none');
+  const [savedProfiles, setSavedProfiles] = useState<{ [key: string]: { address: string, phone: string, mapSearch: string, lat: number, lng: number, hasPin: boolean } }>(() => {
+      try {
+          if (typeof window !== 'undefined') {
+              return JSON.parse(localStorage.getItem('damac_delivery_profiles') || '{}');
+          }
+      } catch (e) {}
+      return {};
+  });
+
+  const loadProfile = (type: 'home' | 'work') => {
+      const p = savedProfiles[type];
+      if (p) {
+          setDeliveryAddress(p.address || '');
+          setDeliveryPhone(p.phone || '');
+          setMapSearch(p.mapSearch || '');
+          if (p.hasPin) {
+              setDeliveryLat(p.lat || 13.8856);
+              setDeliveryLng(p.lng || 100.5222);
+              setHasMapPin(true);
+          }
+      }
+  };
+  
   const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(() => {
       if (isStoreOpen || canOrderForToday()) return 'today';
       return 'tomorrow';
@@ -586,6 +610,25 @@ export const CustomerView: React.FC = () => {
           }
           if (mapSearch && (mapSearch.includes('maps') || mapSearch.includes('goo.gl'))) {
               finalDeliveryAddress += ` [Google Maps Link: ${mapSearch.trim()}]`;
+         }
+
+         // Save profile if selected, limit to 2
+         if (addressSaveType === 'home' || addressSaveType === 'work') {
+             const updatedProfiles = {
+                 ...savedProfiles,
+                 [addressSaveType]: {
+                     address: deliveryAddress,
+                     phone: deliveryPhone,
+                     mapSearch: mapSearch,
+                     lat: deliveryLat,
+                     lng: deliveryLng,
+                     hasPin: hasMapPin
+                 }
+             };
+             setSavedProfiles(updatedProfiles);
+             try {
+                 localStorage.setItem('damac_delivery_profiles', JSON.stringify(updatedProfiles));
+             } catch(e) {}
          }
      }
 
@@ -1560,333 +1603,141 @@ export const CustomerView: React.FC = () => {
                                 <div className="space-y-4">
                                      {/* Address for Delivery with interactive pinning map */}
                                      {orderType === 'delivery' && (
-                                         <div className="space-y-4">
-                                             {/* Delivery Contact Phone Input */}
-                                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                                 <label className="text-xs font-bold text-gray-500 uppercase mb-2 block flex items-center gap-1">
-                                                     <Phone size={14} className="text-brand-500"/> {language === 'th' ? 'เบอร์โทรจัดส่ง' : 'Delivery Contact Phone'} <span className="text-red-500">*</span>
-                                                 </label>
-                                                 <input 
-                                                     type="tel"
-                                                     className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-bold"
-                                                     placeholder={language === 'th' ? 'เช่น 0891234567' : 'e.g. 0891234567'}
-                                                     value={deliveryPhone}
-                                                     onChange={e => setDeliveryPhone(e.target.value)}
-                                                 />
-                                             </div>
-
-                                             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
-                                                 <div className="flex justify-between items-center mb-1">
-                                                     <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
-                                                         <MapPin size={14} className="text-brand-600"/> {language === 'th' ? 'พิมพ์ที่อยู่และปักหมุดจัดส่ง' : 'Delivery Address & Location Pin'} <span className="text-red-500">*</span>
-                                                     </label>
-                                                     {customer?.savedAddresses && customer.savedAddresses.length > 0 && (
-                                                         <select 
-                                                             onChange={(e) => setDeliveryAddress(e.target.value)} 
-                                                             className="text-xs border rounded p-1 max-w-[150px]"
-                                                         >
-                                                             <option value="">{language === 'th' ? 'ที่อยู่บันทึกไว้...' : 'Saved...'}</option>
-                                                             {customer.savedAddresses.map((addr, i) => <option key={i} value={addr}>{addr.substring(0,15)}...</option>)} {/* SELECT_UNIQUE_SAVED_ADDR_ANCHOR */}
-                                                         </select>
-                                                     )}
+                                         <div className="space-y-5 animate-fade-in pb-4">
+                                             <div className="bg-brand-50 p-4 rounded-xl border border-brand-200">
+                                                 <h3 className="font-bold text-brand-800 flex items-center gap-2 mb-2"><Navigation size={18}/> {language === 'th' ? 'ข้อมูลการจัดส่ง' : 'Delivery Details'}</h3>
+                                                 <p className="text-xs text-brand-700 leading-relaxed mb-4">
+                                                     {language === 'th' 
+                                                         ? 'กรุณากรอกที่อยู่ให้ชัดเจน และใส่ลิงก์พิกัด Google Maps หากมี เพื่อให้พี่ไรเดอร์ไปส่งได้แม่นยำที่สุด'
+                                                         : 'Please provide a clear address and a Google Maps link if possible for accurate delivery.'}
+                                                 </p>
+                                                 
+                                                 {/* Profile Address Selection */}
+                                                 <div className="flex gap-2 mb-4">
+                                                     <button type="button" onClick={() => loadProfile('home')} disabled={!savedProfiles['home']} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 ${savedProfiles['home'] ? 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50 hover:border-gray-400' : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'}`}>
+                                                         {language === 'th' ? '🏠 ใช้ที่อยู่บ้าน' : '🏠 Use Home'}
+                                                     </button>
+                                                     <button type="button" onClick={() => loadProfile('work')} disabled={!savedProfiles['work']} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition flex items-center justify-center gap-1.5 ${savedProfiles['work'] ? 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50 hover:border-gray-400' : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'}`}>
+                                                         {language === 'th' ? '🏢 ใช้ที่อยู่ที่ทำงาน' : '🏢 Use Work'}
+                                                     </button>
                                                  </div>
 
-                                                 <textarea 
-                                                    className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none" 
-                                                    rows={2} 
-                                                    placeholder={language === 'th' ? "ระบุที่อยู่จัดส่งโดยละเอียด (บ้านเลขที่, ถนน, ซอย...)" : "Enter full detailed address (house no, street, sub-district)..."}
-                                                    value={deliveryAddress}
-                                                    onChange={e => setDeliveryAddress(e.target.value)}
-                                                 />
-
-                                                 {/* Interactive GPS Pin Map mockup */}
-                                                 <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                                                     <div className="p-2.5 bg-gray-100 border-b flex justify-between items-center">
-                                                         <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                                                             <Navigation size={12} className="text-brand-600 animate-pulse" />
-                                                             {language === 'th' ? 'ระบุพิกัดดาวเทียมแผนที่ในพื้นที่' : 'Interactive Location Pin Map'}
-                                                         </span>
-                                                         <button 
-                                                             type="button"
-                                                             onClick={() => {
-                                                                 setGpsLoading(true);
-                                                                if (navigator.geolocation) {
-                                                                    navigator.geolocation.getCurrentPosition(
-                                                                        (pos) => {
-                                                                            setDeliveryLat(pos.coords.latitude);
-                                                                            setDeliveryLng(pos.coords.longitude);
-                                                                            setHasMapPin(true);
-                                                                            setGpsLoading(false);
-                                                                        },
-                                                                        (error) => {
-                                                                            console.error(error);
-                                                                            setGpsLoading(false);
-                                                                            alert(language === 'th' ? 'ไม่สามารถดึงพิกัดได้ กรุณาตรวจสอบการอนุญาต Location หรือใช้การค้นหาพิกัดโดยการนำลิงก์ Google Maps มาวาง' : 'Cannot get location. Please check location permissions or paste a Google Maps link.');
-                                                                        },
-                                                                        { enableHighAccuracy: true, timeout: 8000 }
-                                                                    );
-                                                                } else {
-                                                                    alert(language === 'th' ? 'บราว์เซอร์ของคุณไม่รองรับการดึงพิกัด' : 'Your browser does not support geolocation.');
-                                                                    setGpsLoading(false);
-                                                                }
-
-                                                                 if (false) setTimeout(() => {
-                                                                     setGpsLoading(false);
-                                                                     const offsetLat = 13.8856 + (Math.random() - 0.5) * 0.02;
-                                                                     const offsetLng = 100.5222 + (Math.random() - 0.5) * 0.02;
-                                                                     setDeliveryLat(offsetLat);
-                                                                     setDeliveryLng(offsetLng);
-                                                                     setHasMapPin(true);
-                                                                 }, 800);
-                                                             }}
-                                                             disabled={gpsLoading}
-                                                             className="text-[11px] bg-brand-600 hover:bg-brand-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 disabled:opacity-50 transition shadow-sm"
-                                                         >
-                                                             {gpsLoading ? (
-                                                                 <RotateCw className="w-3 h-3 animate-spin"/>
-                                                             ) : (
-                                                                 <MapPin className="w-3 h-3"/>
-                                                             )}
-                                                             {language === 'th' ? 'ดึงพิกัดปัจจุบัน' : 'Use Live GPS'}
-                                                         </button>
-                                                     </div>
-
-                                                     {/* Interactive Visual Map stage */}
-                                                     <div 
-                                                         onClick={(e) => {
-                                                             const rect = e.currentTarget.getBoundingClientRect();
-                                                             const x = e.clientX - rect.left;
-                                                             const y = e.clientY - rect.top;
-                                                             const percentX = x / rect.width;
-                                                             const percentY = y / rect.height;
-                                                             const mappedLng = 100.5000 + percentX * 0.0500;
-                                                             const mappedLat = 13.9100 - percentY * 0.0600;
-                                                             setDeliveryLat(mappedLat);
-                                                             setDeliveryLng(mappedLng);
-                                                             setHasMapPin(true);
-                                                         }}
-                                                         className="relative h-[170px] bg-[#e5e9f0] cursor-crosshair overflow-hidden border-b border-gray-200 select-none duration-250 hover:brightness-95"
-                                                     >
-                                                         {/* SVG stylized grid roads and rivers */}
-                                                         <svg className="absolute inset-0 w-full h-full pointer-events-none text-sky-500" xmlns="http://www.w3.org/2500/svg">
-                                                             {/* River */}
-                                                             <path d="M -50 20 Q 150 140, 500 -10" fill="none" stroke="#add8e6" strokeWidth="44" opacity="0.75"/>
-                                                             <path d="M -50 20 Q 150 140, 500 -10" fill="none" stroke="#87ceeb" strokeWidth="12" opacity="0.45"/>
-                                                             {/* Roads */}
-                                                             <line x1="0" y1="85" x2="500" y2="85" stroke="#ffffff" strokeWidth="14" opacity="0.95" />
-                                                             <line x1="0" y1="85" x2="500" y2="85" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
-                                                             
-                                                             <line x1="140" y1="0" x2="140" y2="200" stroke="#ffffff" strokeWidth="10" opacity="0.95" />
-                                                             <line x1="130" y1="0" x2="130" y2="200" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3 3" />
-                                                             
-                                                             <line x1="340" y1="0" x2="340" y2="200" stroke="#ffffff" strokeWidth="12" opacity="0.95" />
-                                                             
-                                                             <line x1="0" y1="20" x2="500" y2="150" stroke="#fff" strokeWidth="8" opacity="0.8" />
-                                                         </svg>
-
-                                                         {/* Map landmarks */}
-                                                         <div className="absolute top-2 left-6 text-[9px] bg-sky-200/90 text-sky-800 font-bold px-1 rounded pointer-events-none shadow-sm font-sans">แม่น้ำเจ้าพระยา (Chao Phraya)</div>
-                                                         <div className="absolute top-[90px] left-[150px] text-[8.5px] bg-white border shadow-sm text-gray-500 font-bold px-1 rounded pointer-events-none font-sans font-sans">Chaeng Watthana Rd</div>
-                                                         <div className="absolute top-[40px] left-[220px] text-[8px] bg-[#ffe4e6] border border-[#fecdd3] text-[#9f1239] font-bold px-1 rounded pointer-events-none shadow-xs font-sans font-sans">Central Chaengwattana</div>
-                                                         <div className="absolute top-[130px] left-[348px] text-[9.5px] bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold px-1 rounded shadow-sm pointer-events-none flex items-center gap-0.5">
-                                                             <ChefHat size={10} className="text-emerald-600"/> Pizza Damac Hub
-                                                         </div>
-
-                                                         {/* Simulated pinned marker icon inside map */}
-                                                         {hasMapPin && (
-                                                             <div 
-                                                                 style={{
-                                                                     left: `${((deliveryLng - 100.5000) / 0.0500) * 100}%`,
-                                                                     top: `${((13.9100 - deliveryLat) / 0.0600) * 100}%`
-                                                                 }}
-                                                                 className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
-                                                             >
-                                                                 <div className="bg-red-600 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded shadow-lg animate-bounce flex items-center gap-1 whitespace-nowrap">
-                                                                     <MapPin size={10}/> {language === 'th' ? "ส่งพิกัดนี้" : "Deliver Here"}
-                                                                 </div>
-                                                                 <div className="w-3 h-3 bg-red-600 rounded-full border-2 border-white shadow-md -mt-1 flex items-center justify-center">
-                                                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                                                 </div>
-                                                                 <div className="w-4 h-4 bg-red-500/30 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 scale-150 animate-ping"></div>
-                                                             </div>
-                                                         )}
-                                                     </div>
-
-                                                     {/* Landmark helper selector inside Map box */}
-                                                     <div className="p-3 bg-white border-t space-y-2">
-                                                         <label className="text-[11px] font-bold text-gray-500 uppercase block">
-                                                             {language === 'th' ? 'หรือปักหมุดสถานที่สำคัญด่วน' : 'Or Quick Landmark Pin'}
+                                                 <div className="space-y-4">
+                                                     {/* 1. Address Text */}
+                                                     <div className="space-y-1.5">
+                                                         <label className="text-xs font-extrabold text-gray-700 uppercase flex items-center gap-1">
+                                                             <span className="w-5 h-5 rounded-full bg-brand-200 text-brand-700 flex items-center justify-center text-[10px]">1</span>
+                                                             {language === 'th' ? 'ตรวจสอบและพิมพ์ที่อยู่จัดส่งของคุณ' : 'Check & Enter Delivery Address'} <span className="text-red-500">*</span>
                                                          </label>
-                                                         <select 
-                                                             className="w-full bg-gray-50 p-2 border rounded text-xs font-bold text-gray-700 outline-none focus:border-brand-500"
-                                                             onChange={(e) => {
-                                                                 const val = e.target.value;
-                                                                 if (!val) return;
-                                                                 const [latS, lngS] = val.split(',');
-                                                                 setDeliveryLat(parseFloat(latS));
-                                                                 setDeliveryLng(parseFloat(lngS));
-                                                                 setHasMapPin(true);
-                                                             }}
-                                                         >
-                                                             <option value="">{language === 'th' ? '== เลือกสถานที่สำคัญเพื่อปักหมุด ==' : '== Select Landmark =='}</option>
-                                                             <option value="13.8856,100.5222">{language === 'th' ? '📍 ร้านคุณป้าพิซซ่าดาแมค (พิกัดร้าน)' : '📍 Pizza Damac Shop (Hub)'}</option>
-                                                             <option value="13.9034,100.5284">{language === 'th' ? '📍 ห้างเซ็นทรัลแจ้งวัฒนะ (Central Chaengwattana)' : '📍 Central Chaengwattana'}</option>
-                                                             <option value="13.8569,100.5422">{language === 'th' ? '📍 เดอะมอลล์ งามวงศ์วาน (The Mall Ngamwongwan)' : '📍 The Mall Ngamwongwan'}</option>
-                                                             <option value="13.8703,100.5478">{language === 'th' ? '📍 มหาวิทยาลัยธุรกิจบัณฑิตย์ (DPU)' : '📍 DPU University'}</option>
-                                                             <option value="13.8504,100.5288">{language === 'th' ? '📍 แถวกระทรวงสาธารณสุข' : '📍 Ministry of Public Health'}</option>
-                                                          </select>
+                                                         <textarea 
+                                                            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none min-h-[80px]" 
+                                                            placeholder={language === 'th' ? "เช่น 99/9 หมู่ 1 ซอยพหลโยธิน 2 แขวงสามเสนใน พญาไท กทม 10400" : "Enter house no, street, sub-district, etc..."}
+                                                            value={deliveryAddress}
+                                                            onChange={e => setDeliveryAddress(e.target.value)}
+                                                         />
+                                                     </div>
 
-                                                          {/* Coords / Link paste search */}
-                                                          <div className="space-y-1.5 pt-1 border-t border-gray-150 mt-2">
-                                                              <label className="text-[11px] font-extrabold text-brand-600 uppercase flex items-center gap-1">
-                                                                  <Globe size={11} className="text-brand-500"/>
-                                                                  {language === 'th' ? 'หรือ วางลิงก์แชร์ Google Maps / คัดลอกพิกัดมาวางที่นี่' : 'Or Paste Google Maps Share Link / GPS Coords'}
-                                                              </label>
-                                                              <div className="relative">
-                                                                  <input 
-                                                                      type="text"
-                                                                      className="w-full bg-blue-50/40 p-2.5 border border-blue-200 rounded-lg text-xs font-bold text-gray-800 outline-none focus:border-blue-500 pr-10 shadow-xs"
-                                                                      placeholder={language === 'th' ? 'วางพิกัด เช่น 13.88, 100.52 หรือวางลิงก์แชร์ตรงนี้...' : 'Paste maps link or coords here...'}
-                                                                      value={mapSearch}
-                                                                      onChange={(e) => {
-                                                                          const val = e.target.value;
-                                                                          setMapSearch(val);
-                                                                          
-                                                                          const trimmed = val.trim();
-                                                                          if (!trimmed) return;
+                                                     {/* Phone Number */}
+                                                     <div className="space-y-1.5">
+                                                         <label className="text-xs font-extrabold text-gray-700 uppercase flex items-center gap-1">
+                                                             <Phone size={14} className="text-brand-500 ml-1"/> {language === 'th' ? 'เบอร์โทรติดต่อลูกค้า' : 'Contact Phone'} <span className="text-red-500">*</span>
+                                                         </label>
+                                                         <input 
+                                                             type="tel"
+                                                             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none font-bold"
+                                                             placeholder={language === 'th' ? 'เช่น 0891234567' : 'e.g. 0891234567'}
+                                                             value={deliveryPhone}
+                                                             onChange={e => setDeliveryPhone(e.target.value)}
+                                                         />
+                                                     </div>
 
-                                                                          // Parse direct lat,lng coords (e.g. 13.8856, 100.5222)
-                                                                          const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
-                                                                          const coordMatch = trimmed.match(coordRegex);
-                                                                          if (coordMatch) {
-                                                                              setDeliveryLat(parseFloat(coordMatch[1]));
-                                                                              setDeliveryLng(parseFloat(coordMatch[2]));
-                                                                              setHasMapPin(true);
-                                                                              return;
-                                                                          }
-
-                                                                          // Parse lat,lng embedded in standard google maps URL
-                                                                          const longUrlMatch = trimmed.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
-                                                                                               trimmed.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-                                                                                               trimmed.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
-                                                                          if (longUrlMatch) {
-                                                                              setDeliveryLat(parseFloat(longUrlMatch[1]));
-                                                                              setDeliveryLng(parseFloat(longUrlMatch[2]));
-                                                                              setHasMapPin(true);
-                                                                              return;
-                                                                          }
-
-                                                                          if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
-                                                                              setHasMapPin(true);
-                                                                          }
-                                                                      }}
-                                                                  />
-                                                                  {mapSearch && (
-                                                                      <button 
-                                                                          type="button" 
-                                                                          onClick={() => setMapSearch('')} 
-                                                                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                                      >
-                                                                          <X size={14}/>
-                                                                      </button>
-                                                                  )}
-                                                              </div>
-                                                              <p className="text-[10px] text-gray-500 leading-normal">
-                                                                  {language === 'th' 
-                                                                      ? '💡 เปิดแอป Google Maps กดค้างที่ตำแหน่งของคุณเพื่อคัดลอกละติจูด ลองจิจูด นำมาวางได้ทันที หรือกดปุ่มดึงพิกัดปัจจุบันข้างบนเพื่อจับพิกัดจริง' 
-                                                                      : '💡 Drag simulated pin, click live GPS geolocation, or paste Google Maps address share link or coordinates.'}
-                                                              </p>
-                                                          </div>
-
-                                                          {/* Real Google Maps iframe embed */}
-                                                          {hasMapPin && (
-                                                              <div className="w-full h-[180px] rounded-xl overflow-hidden shadow-inner border-2 border-brand-500 mt-2 animate-fade-in relative">
-                                                                  <iframe
-                                                                      title="Google Maps Location Preview"
-                                                                      src={`https://maps.google.com/maps?q=${deliveryLat},${deliveryLng}&z=16&output=embed`}
-                                                                      className="w-full h-full border-0"
-                                                                      allowFullScreen
-                                                                      loading="lazy"
-                                                                      referrerPolicy="no-referrer"
-                                                                  ></iframe>
-                                                                  <div className="absolute top-2 right-2 bg-brand-600 text-white text-[9px] px-2 py-0.5 rounded-md font-bold shadow uppercase">
-                                                                      Google Maps LIVE PREVIEW
-                                                                  </div>
-                                                              </div>
-                                                          )}
-
-                                                          {/* Custom Address coordinate results */}
-                                                          {hasMapPin && (
-                                                              <div className="space-y-2 animate-fade-in pt-1">
-                                                                  <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-150 space-y-1.5 text-xs text-emerald-800 font-bold">
-                                                                      <div className="flex justify-between items-center bg-white p-1.5 rounded-lg border border-emerald-250">
-                                                                          <div className="flex items-center gap-1 font-mono text-[11px]">
-                                                                              <CheckCircle2 size={13} className="text-emerald-600 shrink-0 animate-bounce"/>
-                                                                              <span>พิกัด GPS: {deliveryLat.toFixed(5)}, {deliveryLng.toFixed(5)}</span>
-                                                                          </div>
-                                                                          <button 
-                                                                              type="button"
-                                                                              onClick={() => {
-                                                                                  setHasMapPin(false);
-                                                                                  setMapSearch('');
-                                                                              }}
-                                                                              className="text-red-500 hover:bg-red-50 hover:text-red-700 text-[10px] font-extrabold border border-red-200 bg-white rounded-md px-1.5 py-0.5 transition"
-                                                                          >
-                                                                              {language === 'th' ? 'ล้างพิกัด x' : 'Clear x'}
-                                                                          </button>
-                                                                      </div>
-                                                                      
-                                                                      {/* Live Distance & Estimate */}
-                                                                      <div className="pt-2 border-t border-emerald-200/50 flex flex-col gap-1 text-[11px] text-emerald-700 font-sans">
-                                                                          {deliveryLocationName && (
-                                                                              <div className="flex justify-between mb-1 pb-1 border-b border-emerald-200/30">
-                                                                                  <span>ชื่อสถานที่จัดส่ง:</span>
-                                                                                  <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded truncate max-w-[180px]" title={deliveryLocationName}>{deliveryLocationName}</span>
-                                                                              </div>
-                                                                          )}
-                                                                          <div className="flex justify-between">
-                                                                              <span>ระยะห่างจากร้านพิซซ่า:</span>
-                                                                              <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded">{deliveryDistanceKm.toFixed(2)} กม.</span>
-                                                                          </div>
-                                                                          <div className="flex justify-between">
-                                                                              <span>เวลาส่งอาหารประมาณ:</span>
-                                                                              <span className="font-extrabold text-emerald-950 bg-emerald-100 px-1.5 py-0.5 rounded">~ {Math.round(15 + deliveryDistanceKm * 3.5)} นาที</span>
-                                                                          </div>
-                                                                          <div className="mt-1 pt-1 border-t border-dashed border-emerald-200/50">
-                                                                              <a 
-                                                                                  href={`https://www.google.com/maps/dir/?api=1&origin=${storeSettings.storeLocationGps}&destination=${deliveryLat},${deliveryLng}&travelmode=driving`} 
-                                                                                  target="_blank" 
-                                                                                  rel="noopener noreferrer"
-                                                                                  className="text-brand-600 hover:text-brand-700 hover:underline inline-flex items-center gap-1 font-bold"
-                                                                              >
-                                                                                  <Navigation size={10} className="animate-pulse mr-0.5 text-brand-610"/> {language === 'th' ? 'เปิดแผนที่นำทาง Google Maps Navigation ↗' : 'Open Google Maps Directions ↗'}
-                                                                              </a>
-                                                                          </div>
-                                                                      </div>
-                                                                  </div>
-                                                              </div>
-                                                          )}
-
-
-                                                         {/* Address coordinate results */}
-                                                         {hasMapPin && (
-                                                             <div className="hidden bg-emerald-50 p-2 rounded border border-emerald-100 flex justify-between items-center text-xs text-emerald-800 font-bold animate-fade-in">
-                                                                 <div className="flex items-center gap-1">
-                                                                     <CheckCircle2 size={13} className="text-emerald-600 shrink-0"/>
-                                                                     <span>หมุดบันทึก: {deliveryLat.toFixed(5)}, {deliveryLng.toFixed(5)}</span>
-                                                                 </div>
-                                                                 <button 
-                                                                     type="button"
-                                                                     onClick={() => {
+                                                     {/* 2. Google Maps URL or Coordinates */}
+                                                     <div className="space-y-1.5 pt-2 border-t border-brand-200/50">
+                                                         <label className="text-xs font-extrabold text-gray-700 uppercase flex items-center gap-1">
+                                                             <span className="w-5 h-5 rounded-full bg-brand-200 text-brand-700 flex items-center justify-center text-[10px]">2</span>
+                                                             {language === 'th' ? 'ใส่ลิงก์พิกัดจาก Google Maps (ถ้ามี)' : 'Paste Google Maps Link (If Any)'}
+                                                         </label>
+                                                         <div className="relative">
+                                                             <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                                             <input 
+                                                                 type="text"
+                                                                 className="w-full border border-gray-300 rounded-lg pl-10 pt-3 pb-3 pr-8 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                                                                 placeholder={language === 'th' ? "วางลิงก์ https://maps.app.goo.gl/... หรือ 13.88, 100.52" : "Paste maps link or coords here..."}
+                                                                 value={mapSearch}
+                                                                 onChange={(e) => {
+                                                                     const val = e.target.value;
+                                                                     setMapSearch(val);
+                                                                     const trimmed = val.trim();
+                                                                     if (!trimmed) {
                                                                          setHasMapPin(false);
-                                                                     }}
-                                                                     className="text-red-500 hover:text-red-700 text-[10px] border border-red-200 bg-white rounded px-1"
-                                                                 >
-                                                                     {language === 'th' ? 'ล้างพิกัด' : 'Clear Pin'}
-                                                                 </button>
+                                                                         return;
+                                                                     }
+
+                                                                     const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
+                                                                     const coordMatch = trimmed.match(coordRegex);
+                                                                     if (coordMatch) {
+                                                                         setDeliveryLat(parseFloat(coordMatch[1]));
+                                                                         setDeliveryLng(parseFloat(coordMatch[2]));
+                                                                         setHasMapPin(true);
+                                                                         return;
+                                                                     }
+
+                                                                     const longUrlMatch = trimmed.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
+                                                                                          trimmed.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                                                                                          trimmed.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+                                                                     if (longUrlMatch) {
+                                                                         setDeliveryLat(parseFloat(longUrlMatch[1]));
+                                                                         setDeliveryLng(parseFloat(longUrlMatch[2]));
+                                                                         setHasMapPin(true);
+                                                                         return;
+                                                                     }
+
+                                                                     if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
+                                                                         setHasMapPin(true);
+                                                                     }
+                                                                 }}
+                                                             />
+                                                             {mapSearch && (
+                                                                 <button type="button" onClick={() => { setMapSearch(''); setHasMapPin(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={16}/></button>
+                                                             )}
+                                                         </div>
+                                                         
+                                                         {hasMapPin && (
+                                                             <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 mt-2">
+                                                                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0"/> 
+                                                                 <div>
+                                                                     {language === 'th' ? `ระยะทางจัดส่ง: ดูรายละเอียดใน Google Maps (พิกัดถูกดึงแล้ว)` : `Coord Received`}
+                                                                     <div className="text-[10px] font-normal leading-tight mt-0.5 text-emerald-600/80">{language === 'th' ? 'ทางร้านจะตรวจสอบระยะทางและค่าส่งอีกครั้ง' : 'Delivery distance and fee will be checked by shop'}</div>
+                                                                 </div>
                                                              </div>
                                                          )}
                                                      </div>
+
+                                                     {/* 3. Options to save address (Max 2) */}
+                                                     <div className="space-y-1.5 pt-2 border-t border-brand-200/50">
+                                                         <label className="text-xs font-extrabold text-gray-700 uppercase flex items-center gap-1">
+                                                             <span className="w-5 h-5 rounded-full bg-brand-200 text-brand-700 flex items-center justify-center text-[10px]">3</span>
+                                                             {language === 'th' ? 'บันทึกที่อยู่นี้ไว้ใช้ครั้งหน้าไหม?' : 'Save this address for next time?'}
+                                                         </label>
+                                                         <div className="flex gap-2">
+                                                             <label className={`flex-1 flex flex-col items-center justify-center border rounded-lg p-3 cursor-pointer transition ${addressSaveType === 'home' ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                                                 <input type="radio" name="addressSave" className="hidden" checked={addressSaveType === 'home'} onChange={() => setAddressSaveType('home')} />
+                                                                 <span className="text-sm">🏠</span>
+                                                                 <span className="text-xs font-bold mt-1">{language === 'th' ? 'ตั้งเป็นบ้าน' : 'Home'}</span>
+                                                             </label>
+                                                             <label className={`flex-1 flex flex-col items-center justify-center border rounded-lg p-3 cursor-pointer transition ${addressSaveType === 'work' ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                                                 <input type="radio" name="addressSave" className="hidden" checked={addressSaveType === 'work'} onChange={() => setAddressSaveType('work')} />
+                                                                 <span className="text-sm">🏢</span>
+                                                                 <span className="text-xs font-bold mt-1">{language === 'th' ? 'ตั้งเป็นที่ทำงาน' : 'Work'}</span>
+                                                             </label>
+                                                             <label className={`flex-1 flex flex-col items-center justify-center border rounded-lg p-3 cursor-pointer transition ${addressSaveType === 'none' ? 'bg-gray-700 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                                                 <input type="radio" name="addressSave" className="hidden" checked={addressSaveType === 'none'} onChange={() => setAddressSaveType('none')} />
+                                                                 <span className="text-sm">❌</span>
+                                                                 <span className="text-xs font-bold mt-1">{language === 'th' ? 'ไม่บันทึก' : 'Do not save'}</span>
+                                                             </label>
+                                                         </div>
+                                                     </div>
+                                                     
                                                  </div>
                                              </div>
                                          </div>
@@ -2019,10 +1870,12 @@ export const CustomerView: React.FC = () => {
                         <button 
                             onClick={handlePlaceOrderClick}
                             disabled={cart.length === 0 || isSubmitting}
-                            className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
+                            className="w-full bg-brand-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-0.5 transition"
                         >
-                            {isSubmitting ? 'Processing...' : t('placeOrder')}
-                            {!isSubmitting && <ArrowRight size={20}/>}
+                            <span className="flex items-center gap-2">
+                                {isSubmitting ? 'Processing...' : (orderType === 'delivery' ? (language === 'th' ? 'ส่งให้ร้านเช็คและแจ้งกลับ' : 'Send for Shop to Check') : t('placeOrder'))}
+                                {!isSubmitting && <ArrowRight size={20}/>}
+                            </span>
                         </button>
                     </div>
                 </div>
