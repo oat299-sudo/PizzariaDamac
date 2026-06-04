@@ -152,6 +152,12 @@ export interface StoreSettings {
   // Payment
   promptPayNumber?: string; // New: Mobile or Tax ID
 
+  // Delivery 
+  storeLocationGps?: string;
+  freeDeliveryRadiusKm?: number;
+  deliveryFeePerKm?: number;
+  baseDeliveryFee?: number;
+
   // Media Lists
   reviewLinks?: string[]; // Up to 5
   vibeLinks?: string[]; // Up to 5

@@ -470,6 +470,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   mapUrl: data.map_url || DEFAULT_STORE_SETTINGS.mapUrl,
                   contactPhone: data.contact_phone || DEFAULT_STORE_SETTINGS.contactPhone,
                   promptPayNumber: data.prompt_pay_number || DEFAULT_STORE_SETTINGS.promptPayNumber,
+                  
+                  // Delivery configuration (prefer DB, then local, then default)
+                  storeLocationGps: data.store_location_gps || localSettings.storeLocationGps || DEFAULT_STORE_SETTINGS.storeLocationGps,
+                  freeDeliveryRadiusKm: data.free_delivery_radius_km ?? localSettings.freeDeliveryRadiusKm ?? DEFAULT_STORE_SETTINGS.freeDeliveryRadiusKm,
+                  deliveryFeePerKm: data.delivery_fee_per_km ?? localSettings.deliveryFeePerKm ?? DEFAULT_STORE_SETTINGS.deliveryFeePerKm,
+                  baseDeliveryFee: data.base_delivery_fee ?? localSettings.baseDeliveryFee ?? DEFAULT_STORE_SETTINGS.baseDeliveryFee,
+
                   // JSON or Array columns
                   reviewLinks: data.review_links || [],
                   vibeLinks: data.vibe_links || [],
@@ -1157,6 +1164,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
           if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
           if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber;
+          
+          if (settings.storeLocationGps !== undefined) payload.store_location_gps = settings.storeLocationGps;
+          if (settings.freeDeliveryRadiusKm !== undefined) payload.free_delivery_radius_km = settings.freeDeliveryRadiusKm;
+          if (settings.deliveryFeePerKm !== undefined) payload.delivery_fee_per_km = settings.deliveryFeePerKm;
+          if (settings.baseDeliveryFee !== undefined) payload.base_delivery_fee = settings.baseDeliveryFee;
 
           if (Object.keys(payload).length > 0) {
              const { error } = await supabase.from('store_settings').update(payload).eq('id', 1);

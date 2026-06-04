@@ -18,6 +18,13 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     mapUrl: "https://share.google/AQcDarbUgO7xteLV3",
     contactPhone: "0994979199",
     promptPayNumber: "0994979199", // DEFAULT PROMPTPAY
+    
+    // Delivery Configuration
+    storeLocationGps: "13.8856,100.5222",
+    freeDeliveryRadiusKm: 5,
+    deliveryFeePerKm: 10,
+    baseDeliveryFee: 0,
+    
     promoContentType: 'image',
     promoBannerUrl: 'https://images.unsplash.com/photo-1579751626657-72bc17010498?auto=format&fit=crop&w=1200&q=80',
     reviewLinks: [

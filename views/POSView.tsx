@@ -286,6 +286,13 @@ export const POSView: React.FC = () => {
         contactPhone: '',
         promptPayNumber: '' 
     });
+
+    const [deliveryForm, setDeliveryForm] = useState({
+        storeLocationGps: '',
+        freeDeliveryRadiusKm: 5,
+        deliveryFeePerKm: 10,
+        baseDeliveryFee: 0
+    });
     
     // Robust Receipt Data Interface
     interface ReceiptData {
@@ -336,6 +343,12 @@ export const POSView: React.FC = () => {
                 lineUrl: storeSettings.lineUrl || '',
                 contactPhone: storeSettings.contactPhone || '',
                 promptPayNumber: storeSettings.promptPayNumber || ''
+            });
+            setDeliveryForm({
+                storeLocationGps: storeSettings.storeLocationGps || '13.8856,100.5222',
+                freeDeliveryRadiusKm: storeSettings.freeDeliveryRadiusKm ?? 5,
+                deliveryFeePerKm: storeSettings.deliveryFeePerKm ?? 10,
+                baseDeliveryFee: storeSettings.baseDeliveryFee ?? 0
             });
             setTempClosedMsg(storeSettings.closedMessage);
         }
@@ -1412,6 +1425,30 @@ export const POSView: React.FC = () => {
                                      </div>
                                 </div>
                                 <button onClick={() => { updateStoreSettings(contactForm); alert("Contact Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Contact Settings</button>
+                            </div>
+
+                            {/* Delivery Settings */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><MapPin size={20} className="text-brand-500"/> Delivery & Location Settings</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Store GPS Location (Lat,Lng)</label>
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.storeLocationGps} onChange={e => setDeliveryForm({...deliveryForm, storeLocationGps: e.target.value})} placeholder="e.g. 13.8856,100.5222" />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Free Delivery Radius (KM)</label>
+                                        <input type="number" step="0.1" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.freeDeliveryRadiusKm} onChange={e => setDeliveryForm({...deliveryForm, freeDeliveryRadiusKm: Number(e.target.value)})} />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Delivery Fee Per KM (฿)</label>
+                                        <input type="number" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.deliveryFeePerKm} onChange={e => setDeliveryForm({...deliveryForm, deliveryFeePerKm: Number(e.target.value)})} />
+                                     </div>
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Base Delivery Fee (฿)</label>
+                                        <input type="number" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.baseDeliveryFee} onChange={e => setDeliveryForm({...deliveryForm, baseDeliveryFee: Number(e.target.value)})} />
+                                     </div>
+                                </div>
+                                <button onClick={() => { updateStoreSettings(deliveryForm); alert("Delivery Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
                             </div>
 
                             {/* Printer Settings */}

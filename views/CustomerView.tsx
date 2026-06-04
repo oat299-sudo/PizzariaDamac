@@ -4,6 +4,9 @@ import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
 import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw } from 'lucide-react';
+import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
+import { QRCodeSVG } from 'qrcode.react';
+import { generatePromptPayPayload } from '../utils/promptpay';
 
 // ... (VideoCard Component remains unchanged) ...
 const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
@@ -195,6 +198,10 @@ export const CustomerView: React.FC = () => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [mapSearch, setMapSearch] = useState('');
   const [hasMapPin, setHasMapPin] = useState(false);
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number>(0);
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
+  const [deliveryLocationName, setDeliveryLocationName] = useState<string>('');
+  
   const [orderDate, setOrderDate] = useState<'today' | 'tomorrow'>(() => {
       if (isStoreOpen || canOrderForToday()) return 'today';
       return 'tomorrow';
@@ -225,6 +232,37 @@ export const CustomerView: React.FC = () => {
       newStatus: string;
       timestamp: number;
   } | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrAmount, setQrAmount] = useState(0);
+
+  useEffect(() => {
+      let isMounted = true;
+      if (hasMapPin && orderType === 'delivery') {
+          const storeGps = storeSettings.storeLocationGps || "13.8856,100.5222";
+          const [storeLat, storeLng] = storeGps.split(',').map(Number);
+          
+          if (!isNaN(storeLat) && !isNaN(storeLng)) {
+              const d = calculateDistanceKm(storeLat, storeLng, deliveryLat, deliveryLng);
+              setDeliveryDistanceKm(d);
+              
+              const freeKm = storeSettings.freeDeliveryRadiusKm ?? 5;
+              const rateKm = storeSettings.deliveryFeePerKm ?? 10;
+              const base = storeSettings.baseDeliveryFee ?? 0;
+              
+              const calculatedFee = d <= freeKm ? base : base + Math.ceil(d - freeKm) * rateKm;
+              setDeliveryFee(calculatedFee);
+          }
+          
+          reverseGeocode(deliveryLat, deliveryLng).then(name => {
+              if (isMounted && name) setDeliveryLocationName(name);
+          });
+      } else {
+          setDeliveryDistanceKm(0);
+          setDeliveryFee(null);
+          setDeliveryLocationName('');
+      }
+      return () => { isMounted = false; };
+  }, [hasMapPin, deliveryLat, deliveryLng, orderType, storeSettings]);
 
   useEffect(() => {
       if (!activeNotification) return;
@@ -503,6 +541,10 @@ export const CustomerView: React.FC = () => {
         return;
      }
      if (orderType === 'delivery') {
+        if (!hasMapPin) {
+           alert(language === 'th' ? 'กรุณากด "ดึงพิกัดปัจจุบัน" เพื่อคำนวณค่าส่ง' : 'Please tap "Use Live GPS" to calculate delivery fee.');
+           return;
+        }
         if (!deliveryAddress) {
            alert(t('addressMissing'));
            return;
@@ -531,8 +573,8 @@ export const CustomerView: React.FC = () => {
         note: '',
         delivery: orderType === 'delivery' ? {
             address: finalDeliveryAddress,
-            zoneName: 'TBD',
-            fee: 0 
+            zoneName: deliveryLocationName || 'Standard',
+            fee: deliveryFee || 0 
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,
@@ -554,7 +596,15 @@ export const CustomerView: React.FC = () => {
                 return updated;
             });
         }
-        setShowTracker(true);
+        if (paymentMethod === 'qr_transfer') {
+            const finalFee = orderType === 'delivery' ? (deliveryFee || 0) : 0;
+            setQrAmount(cartTotal + finalFee);
+            setShowQRModal(true);
+            setShowTracker(false);
+        } else {
+            setShowTracker(true);
+            setShowQRModal(false);
+        }
      }
   };
 
@@ -1694,44 +1744,23 @@ export const CustomerView: React.FC = () => {
                                                                       
                                                                       {/* Live Distance & Estimate */}
                                                                       <div className="pt-2 border-t border-emerald-200/50 flex flex-col gap-1 text-[11px] text-emerald-700 font-sans">
+                                                                          {deliveryLocationName && (
+                                                                              <div className="flex justify-between mb-1 pb-1 border-b border-emerald-200/30">
+                                                                                  <span>ชื่อสถานที่จัดส่ง:</span>
+                                                                                  <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded truncate max-w-[180px]" title={deliveryLocationName}>{deliveryLocationName}</span>
+                                                                              </div>
+                                                                          )}
                                                                           <div className="flex justify-between">
                                                                               <span>ระยะห่างจากร้านพิซซ่า:</span>
-                                                                              <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.2 rounded">{(
-                                                                                  (() => {
-                                                                                      const lat1 = 13.8856;
-                                                                                      const lon1 = 100.5222;
-                                                                                      const lat2 = deliveryLat;
-                                                                                      const lon2 = deliveryLng;
-                                                                                      const R = 6371;
-                                                                                      const dLat = (lat2 - lat1) * Math.PI / 180;
-                                                                                      const dLon = (lon2 - lon1) * Math.PI / 180;
-                                                                                      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                                                                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                                                                                      return R * c;
-                                                                                  })()
-                                                                              ).toFixed(2)} กม.</span>
+                                                                              <span className="font-extrabold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded">{deliveryDistanceKm.toFixed(2)} กม.</span>
                                                                           </div>
                                                                           <div className="flex justify-between">
                                                                               <span>เวลาส่งอาหารประมาณ:</span>
-                                                                              <span className="font-extrabold text-emerald-950 bg-emerald-100 px-1.5 py-0.2 rounded">~ {
-                                                                                  (() => {
-                                                                                      const lat1 = 13.8856;
-                                                                                      const lon1 = 100.5222;
-                                                                                      const lat2 = deliveryLat;
-                                                                                      const lon2 = deliveryLng;
-                                                                                      const R = 6371;
-                                                                                      const dLat = (lat2 - lat1) * Math.PI / 180;
-                                                                                      const dLon = (lon2 - lon1) * Math.PI / 180;
-                                                                                      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                                                                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                                                                                      const d = R * c;
-                                                                                      return Math.round(15 + d * 3.5);
-                                                                                  })()
-                                                                              } นาที</span>
+                                                                              <span className="font-extrabold text-emerald-950 bg-emerald-100 px-1.5 py-0.5 rounded">~ {Math.round(15 + deliveryDistanceKm * 3.5)} นาที</span>
                                                                           </div>
                                                                           <div className="mt-1 pt-1 border-t border-dashed border-emerald-200/50">
                                                                               <a 
-                                                                                  href={`https://www.google.com/maps/dir/?api=1&origin=13.8856,100.5222&destination=${deliveryLat},${deliveryLng}&travelmode=driving`} 
+                                                                                  href={`https://www.google.com/maps/dir/?api=1&origin=${storeSettings.storeLocationGps}&destination=${deliveryLat},${deliveryLng}&travelmode=driving`} 
                                                                                   target="_blank" 
                                                                                   rel="noopener noreferrer"
                                                                                   className="text-brand-600 hover:text-brand-700 hover:underline inline-flex items-center gap-1 font-bold"
@@ -1861,14 +1890,36 @@ export const CustomerView: React.FC = () => {
                     
                     {/* Footer */}
                     <div className="p-6 bg-white border-t shrink-0 pb-safe">
-                        <div className={`flex justify-between items-center ${orderType === 'delivery' ? 'mb-1' : 'mb-4'} text-xl font-bold text-gray-900`}>
-                            <span>Total</span>
-                            <span>฿{cartTotal}</span>
-                        </div>
-                        {orderType === 'delivery' && (
-                            <div className="flex justify-between items-center mb-4 text-sm text-orange-600 font-medium">
-                                <span>+ Delivery Fee</span>
-                                <span>{t('deliveryTBD')}</span>
+                        {orderType === 'delivery' && deliveryFee !== null ? (
+                            <>
+                                <div className="flex justify-between items-center mb-1 text-sm font-bold text-gray-500">
+                                    <span>Food Subtotal</span>
+                                    <span>฿{cartTotal}</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-2 text-sm text-brand-600 font-bold border-b border-gray-100 pb-2">
+                                    <span>+ Delivery Fee ({deliveryDistanceKm.toFixed(1)} km)</span>
+                                    <span>฿{deliveryFee}</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                                    <span>Total</span>
+                                    <span>฿{cartTotal + deliveryFee}</span>
+                                </div>
+                            </>
+                        ) : orderType === 'delivery' ? (
+                            <>
+                                <div className="flex justify-between items-center mb-1 text-sm font-bold text-gray-500">
+                                    <span>Food Subtotal</span>
+                                    <span>฿{cartTotal}</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-4 text-sm text-orange-600 font-bold border-b border-gray-100 pb-2">
+                                    <span>+ Delivery Fee</span>
+                                    <span>{hasMapPin ? 'Calculating...' : language === 'th' ? 'กรุณาระบุที่อยู่' : 'Pin location to calc'}</span>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                                <span>Total</span>
+                                <span>฿{cartTotal}</span>
                             </div>
                         )}
                         <button 
@@ -2385,6 +2436,32 @@ export const CustomerView: React.FC = () => {
                             </button>
                         </div>
                     )}
+                </div>
+            </div>
+        )}
+
+        {/* QR Code Payment Modal */}
+        {showQRModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center shadow-brand-500/10">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{language === 'th' ? 'สแกนเพื่อชำระเงิน' : 'Scan to Pay'}</h3>
+                    <p className="text-gray-500 mb-6 text-sm">{language === 'th' ? 'กรุณาสแกน QR Code นี้ผ่านแอปธนาคาร' : 'Please scan this QR Code via your bank app'}</p>
+                    
+                    <div className="flex justify-center p-4 bg-gray-50 rounded-xl mb-4 border-2 border-brand-100 mx-auto w-fit">
+                         <QRCodeSVG value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, qrAmount)} size={200} />
+                    </div>
+                    
+                    <div className="text-3xl font-extrabold text-brand-600 mb-6">฿{qrAmount}</div>
+                    
+                    <p className="text-xs text-gray-400 mb-6">
+                        {language === 'th' ? 'กรุณาแสดงหน้าจอนี้ต่อพนักงาน หรือแนบสลิปผ่านทาง Line Official ของร้าน หากสั่งออนไลน์' : 'Please show this to staff, or send the slip to our Line OA'}
+                    </p>
+                    <button 
+                        onClick={() => { setShowQRModal(false); setShowTracker(true); }}
+                        className="w-full bg-brand-600 active:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg transition"
+                    >
+                        {language === 'th' ? 'ชำระเงินเรียบร้อยแแล้ว' : 'I have paid'}
+                    </button>
                 </div>
             </div>
         )}
