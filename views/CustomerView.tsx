@@ -1621,18 +1621,12 @@ export const CustomerView: React.FC = () => {
                                                                         (error) => {
                                                                             console.error(error);
                                                                             setGpsLoading(false);
-                                                                            const offsetLat = 13.8856 + (Math.random() - 0.5) * 0.01;
-                                                                            const offsetLng = 100.5222 + (Math.random() - 0.5) * 0.01;
-                                                                            setDeliveryLat(offsetLat);
-                                                                            setDeliveryLng(offsetLng);
-                                                                            setHasMapPin(true);
+                                                                            alert(language === 'th' ? 'ไม่สามารถดึงพิกัดได้ กรุณาตรวจสอบการอนุญาต Location หรือใช้การค้นหาพิกัดโดยการนำลิงก์ Google Maps มาวาง' : 'Cannot get location. Please check location permissions or paste a Google Maps link.');
                                                                         },
                                                                         { enableHighAccuracy: true, timeout: 8000 }
                                                                     );
                                                                 } else {
-                                                                    setDeliveryLat(13.8856);
-                                                                    setDeliveryLng(100.5222);
-                                                                    setHasMapPin(true);
+                                                                    alert(language === 'th' ? 'บราว์เซอร์ของคุณไม่รองรับการดึงพิกัด' : 'Your browser does not support geolocation.');
                                                                     setGpsLoading(false);
                                                                 }
 

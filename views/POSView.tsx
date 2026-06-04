@@ -570,6 +570,13 @@ export const POSView: React.FC = () => {
         }
     }
     
+    const handleConfirmPaymentAndCook = async (orderId: string) => {
+        if(confirm(language === 'th' ? "ยืนยันว่าได้รับเงินแล้วและส่งออเดอร์ให้ครัวเริ่มทำ?" : "Confirm payment received and start cooking?")) {
+            playSuccessFeedback();
+            await updateOrderStatus(orderId, 'cooking');
+        }
+    }
+    
     const handleCancelTable = async (orderId: string) => {
         if(confirm("Force Cancel/Delete this table order?")) {
             playAlertSound();
@@ -1301,6 +1308,11 @@ export const POSView: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="p-4 border-t bg-gray-50 space-y-2.5">
+                                            {(order.status === 'pending' || order.status === 'confirmed') && (
+                                                <button onClick={() => handleConfirmPaymentAndCook(order.id)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base">
+                                                    <CheckCircle size={18}/> {language === 'th' ? 'ยืนยันรับเงิน & เริ่มทำเลย' : 'Confirm Payment & Cook'}
+                                                </button>
+                                            )}
                                             <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
                                             <div className="grid grid-cols-3 gap-2">
                                                 <button onClick={() => handleReprintOrder(order)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Print Receipt">
