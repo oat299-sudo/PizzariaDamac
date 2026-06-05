@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone, parseAnyMapLink } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
@@ -346,7 +346,7 @@ export const POSView: React.FC = () => {
                 promptPayNumber: storeSettings.promptPayNumber || ''
             });
             setDeliveryForm({
-                storeLocationGps: storeSettings.storeLocationGps || '13.8856,100.5222',
+                storeLocationGps: storeSettings.storeLocationGps || '13.9239103,100.5220632',
                 freeDeliveryRadiusKm: storeSettings.freeDeliveryRadiusKm ?? 5,
                 deliveryFeePerKm: storeSettings.deliveryFeePerKm ?? 10,
                 baseDeliveryFee: storeSettings.baseDeliveryFee ?? 0
@@ -1315,8 +1315,10 @@ export const POSView: React.FC = () => {
                                                                         (() => {
                                                                             const coords = parseGPSCoordinates(order.deliveryAddress);
                                                                             if (!coords) return '?';
-                                                                            const storeGps = storeSettings.storeLocationGps || "13.8856,100.5222";
-                                                                            const [sLat, sLng] = storeGps.split(',').map(Number);
+                                                                            const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
+                                                                            const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
+                                                                            const sLat = storeCoords.lat;
+                                                                            const sLng = storeCoords.lng;
                                                                             return calculateDistanceKm(sLat, sLng, coords.lat, coords.lng).toFixed(2);
                                                                         })()
                                                                     } กม.</span>
@@ -1507,7 +1509,7 @@ export const POSView: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                      <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Store GPS Location (Lat,Lng)</label>
-                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.storeLocationGps} onChange={e => setDeliveryForm({...deliveryForm, storeLocationGps: e.target.value})} placeholder="e.g. 13.8856,100.5222" />
+                                        <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.storeLocationGps} onChange={e => setDeliveryForm({...deliveryForm, storeLocationGps: e.target.value})} placeholder="e.g. 13.9239103,100.5220632" />
                                      </div>
                                      <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Free Delivery Radius (KM)</label>

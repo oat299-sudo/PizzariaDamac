@@ -3,10 +3,10 @@ import { Pizza, Topping, DeliveryZone, ProductCategory, OrderSource, ExpenseCate
 
 // Restaurant Location (Lat/Lng for Distance Calc)
 export const RESTAURANT_LOCATION = {
-  lat: 13.8856, // Approx Nonthaburi coordinates
-  lng: 100.5222,
-  address: "Pizza Damac, Nonthaburi",
-  googleMapsUrl: "https://share.google/AQcDarbUgO7xteLV3"
+  lat: 13.9239103,
+  lng: 100.5220632,
+  address: "Pizzaria Damac",
+  googleMapsUrl: "https://maps.app.goo.gl/AipUucBBovnz24gR8"
 };
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -15,12 +15,12 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     reviewUrl: "https://maps.app.goo.gl/RrpaW1Z5APoz3ucHA", // Updated Link
     facebookUrl: "https://www.facebook.com/p/PIZZA-DAMAC-100076365540304/",
     lineUrl: "https://lin.ee/KlsHunE",
-    mapUrl: "https://share.google/AQcDarbUgO7xteLV3",
+    mapUrl: "https://maps.app.goo.gl/AipUucBBovnz24gR8",
     contactPhone: "0994979199",
     promptPayNumber: "0994979199", // DEFAULT PROMPTPAY
     
     // Delivery Configuration
-    storeLocationGps: "13.8856,100.5222",
+    storeLocationGps: "13.9239103,100.5220632",
     freeDeliveryRadiusKm: 5,
     deliveryFeePerKm: 10,
     baseDeliveryFee: 0,

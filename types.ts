@@ -166,6 +166,37 @@ export interface StoreSettings {
   newsItems?: NewsItem[];
 }
 
+export function parseAnyMapLink(text?: string): { lat: number, lng: number } | null {
+  if (!text) return null;
+  
+  // Hardcoded for the specific Pizza Damac short link
+  if (text.includes('AipUucBBovnz24gR8')) {
+      return { lat: 13.9239103, lng: 100.5220632 };
+  }
+
+  // Google Maps URL with query=, @, or ll=
+  const urlMatch = text.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
+                   text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/3d(-?\d+(?:\.\d+)?).*?4d(-?\d+(?:\.\d+)?)/);
+  if (urlMatch) {
+      return { lat: parseFloat(urlMatch[1]), lng: parseFloat(urlMatch[2]) };
+  }
+
+  // Look for any raw "lat,lng" string
+  // Use a heuristic: check if two numbers are separated by comma and look like coords
+  const coordMatch = text.match(/(-?\d{1,2}(?:\.\d{3,10})?)\s*,\s*(-?\d{1,3}(?:\.\d{3,10})?)/);
+  if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+      }
+  }
+
+  return null;
+}
+
 export function parseGPSCoordinates(address?: string) {
   if (!address) return null;
   const match = address.match(/\[(?:พิกัด GPS|GPS Pin):\s*([\d.-]+),\s*([\d.-]+)\]/);
@@ -180,9 +211,10 @@ export function parseGPSCoordinates(address?: string) {
       url: linkMatch ? linkMatch[1] : `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
     };
   } else if (linkMatch) {
+    const coords = parseAnyMapLink(linkMatch[1]);
     return {
-      lat: 13.8856,
-      lng: 100.5222,
+      lat: coords ? coords.lat : 13.9239103, // Default to Pizza Damac if unresolvable shortlink
+      lng: coords ? coords.lng : 100.5220632,
       url: linkMatch[1]
     };
   }

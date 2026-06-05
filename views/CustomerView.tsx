@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite } from '../types';
+import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite, parseAnyMapLink } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
 import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
@@ -193,8 +193,8 @@ export const CustomerView: React.FC = () => {
   const [pickupTime, setPickupTime] = useState('');
   const [asapOrder, setAsapOrder] = useState(true);
   const [deliveryPhone, setDeliveryPhone] = useState(customer?.phone || '');
-  const [deliveryLat, setDeliveryLat] = useState<number>(13.8856);
-  const [deliveryLng, setDeliveryLng] = useState<number>(100.5222);
+  const [deliveryLat, setDeliveryLat] = useState<number>(13.9239103);
+  const [deliveryLng, setDeliveryLng] = useState<number>(100.5220632);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [mapSearch, setMapSearch] = useState('');
   const [hasMapPin, setHasMapPin] = useState(false);
@@ -219,8 +219,8 @@ export const CustomerView: React.FC = () => {
           setDeliveryPhone(p.phone || '');
           setMapSearch(p.mapSearch || '');
           if (p.hasPin) {
-              setDeliveryLat(p.lat || 13.8856);
-              setDeliveryLng(p.lng || 100.5222);
+              setDeliveryLat(p.lat || 13.9239103);
+              setDeliveryLng(p.lng || 100.5220632);
               setHasMapPin(true);
           }
       }
@@ -262,8 +262,10 @@ export const CustomerView: React.FC = () => {
   useEffect(() => {
       let isMounted = true;
       if (hasMapPin && orderType === 'delivery') {
-          const storeGps = storeSettings.storeLocationGps || "13.8856,100.5222";
-          const [storeLat, storeLng] = storeGps.split(',').map(Number);
+          const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
+          const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
+          const storeLat = storeCoords.lat;
+          const storeLng = storeCoords.lng;
           
           if (!isNaN(storeLat) && !isNaN(storeLng)) {
               const d = calculateDistanceKm(storeLat, storeLng, deliveryLat, deliveryLng);
@@ -1701,27 +1703,16 @@ export const CustomerView: React.FC = () => {
                                                                          return;
                                                                      }
 
-                                                                     const coordRegex = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
-                                                                     const coordMatch = trimmed.match(coordRegex);
-                                                                     if (coordMatch) {
-                                                                         setDeliveryLat(parseFloat(coordMatch[1]));
-                                                                         setDeliveryLng(parseFloat(coordMatch[2]));
+                                                                     const coords = parseAnyMapLink(trimmed);
+                                                                     if (coords) {
+                                                                         setDeliveryLat(coords.lat);
+                                                                         setDeliveryLng(coords.lng);
                                                                          setHasMapPin(true);
-                                                                         return;
-                                                                     }
-
-                                                                     const longUrlMatch = trimmed.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
-                                                                                          trimmed.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-                                                                                          trimmed.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
-                                                                     if (longUrlMatch) {
-                                                                         setDeliveryLat(parseFloat(longUrlMatch[1]));
-                                                                         setDeliveryLng(parseFloat(longUrlMatch[2]));
+                                                                     } else if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
+                                                                         // If it's a map link but we couldn't parse it fully yet
                                                                          setHasMapPin(true);
-                                                                         return;
-                                                                     }
-
-                                                                     if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
-                                                                         setHasMapPin(true);
+                                                                     } else {
+                                                                         setHasMapPin(false);
                                                                      }
                                                                  }}
                                                              />
