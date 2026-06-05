@@ -1294,25 +1294,9 @@ export const CustomerView: React.FC = () => {
 
                              <div className="text-[10.5px] text-gray-600 leading-normal font-sans font-medium space-y-1 text-left w-full border-t border-sky-100 pt-2.5">
                                  <p className="font-extrabold text-sky-950 mb-1">{language === 'th' ? '👉 แนะนำขั้นตอนถัดไป' : '👉 Next Steps'}</p>
-                                 <p>{language === 'th' ? '1. รอทีมงานส่งไฟล์รูปภาพ QR Code ถุงเงิน โครงการ ผ่านทาง LINE' : '1. Wait for staff to send the project QR code to you via LINE.'}</p>
-                                 <p>{language === 'th' ? '2. เปิดแอปเป๋าตัง เลือกสแกนจ่ายด้วยรูปภาพคิวอาร์โค้ดถุงเงิน' : '2. Open the Paotang app and choose scan from Photo Library / Camera.'}</p>
+                                 <p>{language === 'th' ? '1. เตรียมแอปพลิเคชัน "เป๋าตัง" ของท่านให้พร้อม' : '1. Prepare your Paotang app.'}</p>
+                                 <p>{language === 'th' ? '2. ทำการสแกน QR Code โครงการกับทางร้านค้าเพื่อชำระเงิน' : '2. Scan the project QR code directly at the store to pay.'}</p>
                              </div>
-
-                             {storeSettings.lineUrl && (
-                                 <a 
-                                     href={`${storeSettings.lineUrl}?text=${encodeURIComponent(
-                                         language === 'th' 
-                                             ? `ขอรับ QR Code สแกนจ่ายโครงการไทยช่วยไทย สำหรับออเดอร์ #${activeOrder.id.slice(-6)} ยอดชำระ ฿${activeOrder.totalAmount} ครับ`
-                                             : `Please send Tungngern QR for project Thai Chuay Thai. Order #${activeOrder.id.slice(-6)}: ฿${activeOrder.totalAmount}.`
-                                     )}`}
-                                     target="_blank" 
-                                     rel="noopener noreferrer"
-                                     className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#06C755] hover:bg-[#05B14B] active:scale-95 text-white font-extrabold text-xs rounded-xl transition shadow-xs"
-                                 >
-                                     <MessageCircle size={14}/>
-                                     <span>{language === 'th' ? 'ทัก LINE เพื่อรับ QR โครงการถุงเงิน ↗' : 'LINE chat for Tungngern QR ↗'}</span>
-                                 </a>
-                             )}
                          </div>
                      )}
 
@@ -1828,8 +1812,8 @@ export const CustomerView: React.FC = () => {
                                                  </p>
                                                  <p>
                                                      {language === 'th' 
-                                                         ? 'หลังจากกดสั่งซื้อเสร็จสิ้น ทางร้านจะส่งรูป QR Code สัญลักษณ์ถุงเงินสแกนสิทธิ์โครงการ ไปให้ท่านทาง LINE ของร้าน เพื่อให้คุณเปิดแอปเป๋าตังเพื่อสแกนสิทธิ์จ่ายได้สะดวก!' 
-                                                         : 'After purchasing, the store will send the government subsidy Tungngern QR image to you via LINE so you can scan/pay within the Paotang app.'}
+                                                         ? 'เตรียมแอปเป๋าตังของท่านให้พร้อมเพื่อสแกนสิทธิ์เข้าร่วมโครงการชำระเงินกับทางร้าน' 
+                                                         : 'Please prepare your Paotang app to scan and pay at the store.'}
                                                  </p>
                                              </div>
                                          )}

@@ -1927,7 +1927,7 @@ export const POSView: React.FC = () => {
                                             <p className="font-extrabold text-sky-950">📋 คู่มือสำหรับแคชเชียร์:</p>
                                             <p>1. เปิดแอป <strong className="text-sky-850 font-bold">"ถุงเงิน"</strong> บนโทรศัพท์ของร้านค้า</p>
                                             <p>2. กดสร้างคิวอาร์โค้ดรับชำระเงินสิทธิ์ <strong className="font-bold text-sky-800">"ไทยช่วยไทย"</strong></p>
-                                            <p>3. กรอกยอดเงิน <strong className="font-bold text-sky-800">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</strong> แล้วส่งต่อให้ลูกค้าทางแชท LINE หรือสแกนหน้าร้าน</p>
+                                            <p>3. กรอกยอดเงิน <strong className="font-bold text-sky-800">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</strong> แล้วให้ลูกค้าสแกนชำระที่หน้าร้าน</p>
                                             <p>4. เมื่อยอดและสิทธิ์ชำระเรียบร้อยในแอปหน้าร้านแล้ว ให้กดปุ่ม <strong>CONFIRM</strong> หน้าจอนี้เพื่อปิดบิล</p>
                                         </div>
                                     </div>
