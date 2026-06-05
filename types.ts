@@ -174,11 +174,11 @@ export function parseAnyMapLink(text?: string): { lat: number, lng: number } | n
       return { lat: 13.9239103, lng: 100.5220632 };
   }
 
-  // Google Maps URL with query=, @, or ll=
-  const urlMatch = text.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) || 
+  // Google Maps URL with 3d...4d, query=, @, or ll=
+  const urlMatch = text.match(/3d(-?\d+(?:\.\d+)?).*?4d(-?\d+(?:\.\d+)?)/) || 
+                   text.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
                    text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-                   text.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-                   text.match(/3d(-?\d+(?:\.\d+)?).*?4d(-?\d+(?:\.\d+)?)/);
+                   text.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   if (urlMatch) {
       return { lat: parseFloat(urlMatch[1]), lng: parseFloat(urlMatch[2]) };
   }

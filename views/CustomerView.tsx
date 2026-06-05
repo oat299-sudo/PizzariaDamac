@@ -1694,33 +1694,41 @@ export const CustomerView: React.FC = () => {
                                                                  className="w-full border border-gray-300 rounded-lg pl-10 pt-3 pb-3 pr-8 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                                                                  placeholder={language === 'th' ? "วางลิงก์ https://maps.app.goo.gl/... หรือ 13.88, 100.52" : "Paste maps link or coords here..."}
                                                                  value={mapSearch}
-                                                                 onChange={(e) => {
-                                                                     const val = e.target.value;
-                                                                     setMapSearch(val);
-                                                                     const trimmed = val.trim();
-                                                                     if (!trimmed) {
-                                                                         setHasMapPin(false);
-                                                                         return;
-                                                                     }
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setMapSearch(val);
+                                                                    const trimmed = val.trim();
+                                                                    if (!trimmed) {
+                                                                        setHasMapPin(false);
+                                                                        return;
+                                                                    }
 
-                                                                     const coords = parseAnyMapLink(trimmed);
-                                                                     if (coords) {
-                                                                         setDeliveryLat(coords.lat);
-                                                                         setDeliveryLng(coords.lng);
-                                                                         setHasMapPin(true);
-                                                                     } else if (trimmed.includes('google.com/maps') || trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
-                                                                         // If it's a map link but we couldn't parse it fully yet
-                                                                         setHasMapPin(true);
-                                                                     } else {
-                                                                         setHasMapPin(false);
-                                                                     }
-                                                                 }}
+                                                                    const coords = parseAnyMapLink(trimmed);
+                                                                    if (coords) {
+                                                                        setDeliveryLat(coords.lat);
+                                                                        setDeliveryLng(coords.lng);
+                                                                        setHasMapPin(true);
+                                                                    } else {
+                                                                        setHasMapPin(false);
+                                                                    }
+                                                                }}
                                                              />
                                                              {mapSearch && (
                                                                  <button type="button" onClick={() => { setMapSearch(''); setHasMapPin(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={16}/></button>
                                                              )}
                                                          </div>
                                                          
+                                                         {mapSearch && !hasMapPin && (
+                                                             <div className="bg-orange-50 border border-orange-200 text-orange-800 px-3 py-2 rounded-lg text-xs font-bold flex items-start gap-2 mt-2">
+                                                                 <AlertTriangle size={16} className="text-orange-600 shrink-0 mt-0.5"/> 
+                                                                 <div className="leading-relaxed">
+                                                                     {language === 'th' 
+                                                                         ? 'ไม่สามารถอ่านพิกัดจากลิงก์สั้น (maps.app.goo.gl) ได้อัตโนมัติ กรุณากดเข้าลิงก์ไปบนกูเกิลแมพแล้วก็อปลิงก์ในบราวเซอร์หรือพิมพ์พิกัดโดยตรง (เช่น 13.88, 100.52)' 
+                                                                         : 'Unable to parse coordinates from this short link automatically. Please open the link in a browser and copy the full URL, or paste direct coordinates.'}
+                                                                 </div>
+                                                             </div>
+                                                         )}
+
                                                          {hasMapPin && (
                                                              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 mt-2">
                                                                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0"/> 
