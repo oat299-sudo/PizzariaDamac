@@ -396,7 +396,7 @@ export const KitchenView: React.FC = () => {
                       )}
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}</div>
                       {order.pickupTime && (
                            <div className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded mt-1 font-bold">
                                {language === 'th' ? 'เวลารับสินค้า' : 'Pickup'}: {order.pickupTime}
@@ -637,11 +637,11 @@ export const KitchenView: React.FC = () => {
                 <div className="mt-1 mb-1 px-1 font-bold">
                     <div className="flex justify-between">
                         <span>บิล: #{printOrder.id.slice(-4)}</span>
-                        <span>วันที่: {new Date(printOrder.createdAt).toLocaleDateString('th-TH')}</span>
+                        <span>วันที่: {new Date(printOrder.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</span>
                     </div>
                     <div className="flex justify-between">
                         <span>ช่องทาง: {printOrder.source.toUpperCase()}</span>
-                        <span>เวลา: {new Date(printOrder.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <span>เวลา: {new Date(printOrder.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}</span>
                     </div>
                     {printOrder.pickupTime && (
                         <div className="font-bold">

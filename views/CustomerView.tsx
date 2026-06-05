@@ -1060,7 +1060,7 @@ export const CustomerView: React.FC = () => {
                                     <h3 className="font-bold text-gray-800">{news.title}</h3>
                                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{news.summary}</p>
                                     <div className="flex justify-between items-center mt-2">
-                                        <span className="text-xs text-gray-400">{new Date(news.date).toLocaleDateString()}</span>
+                                        <span className="text-xs text-gray-400">{new Date(news.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</span>
                                         {news.linkUrl && (
                                             <a href={news.linkUrl} target="_blank" className="text-brand-600 text-xs font-bold flex items-center gap-1 hover:underline">
                                                 Read More <ArrowRight size={12}/>
@@ -1763,6 +1763,10 @@ export const CustomerView: React.FC = () => {
                                                                          {deliveryDistanceKm <= (storeSettings.freeDeliveryRadiusKm || 5) 
                                                                              ? (language === 'th' ? '✨ อยู่ในระยะจัดส่งฟรี!' : '✨ Within free delivery zone!')
                                                                              : (language === 'th' ? 'เกินระยะส่งฟรี (คาดว่ามีค่าจัดส่ง)' : 'Outside free delivery zone')}
+                                                                         <div className="text-emerald-800 font-medium mt-1.5 leading-tight flex items-start gap-1 text-left bg-emerald-100/50 p-2 rounded">
+                                                                             <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500"/>
+                                                                             <span>{language === 'th' ? 'ระยะทางที่แสดงผลนี้อาจจะไม่ถูกต้อง 100% ทางร้านจะตรวจเช็คระยะทางจริงจาก Google Map และแจ้งค่าจัดส่งที่แน่ชัดอีกครั้ง' : 'Distance shown is estimated. The store will verify the exact distance via Google Maps and confirm the final fee.'}</span>
+                                                                         </div>
                                                                      </div>
                                                                  </div>
                                                              </div>
@@ -1917,9 +1921,15 @@ export const CustomerView: React.FC = () => {
                                     <span>Food Subtotal</span>
                                     <span>฿{cartTotal}</span>
                                 </div>
-                                <div className="flex justify-between items-center mb-2 text-sm text-brand-600 font-bold border-b border-gray-100 pb-2">
-                                    <span>+ Delivery Fee ({deliveryDistanceKm.toFixed(1)} km)</span>
-                                    <span>฿{deliveryFee}</span>
+                                <div className="flex flex-col mb-2 text-sm text-brand-600 font-bold border-b border-gray-100 pb-2 gap-1.5">
+                                    <div className="flex justify-between items-center w-full">
+                                        <span>+ Delivery Fee ({deliveryDistanceKm.toFixed(1)} km)</span>
+                                        <span>฿{deliveryFee}</span>
+                                    </div>
+                                    <div className="text-[10px] font-normal leading-tight text-brand-500 bg-brand-50 p-1.5 rounded flex items-start gap-1 w-full">
+                                        <AlertTriangle size={12} className="shrink-0 mt-px text-brand-500/80"/>
+                                        <span>{language === 'th' ? 'ค่าจัดส่งนี้เป็นการประเมินเบื้องต้น ทางร้านจะตรวจสอบเส้นทางจริงจาก Google Map และแจ้งค่าขนส่งที่ถูกต้องอีกครั้ง' : 'Fee is estimated. The exact delivery fee will be confirmed after checking Google Maps.'}</span>
+                                    </div>
                                 </div>
                                 <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
                                     <span>Total</span>
@@ -2123,7 +2133,7 @@ export const CustomerView: React.FC = () => {
                                          {/* Card Header */}
                                          <div className="bg-gray-50 p-3 border-b border-gray-100 flex justify-between items-center">
                                               <div>
-                                                  <div className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString()} • {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                                  <div className="text-xs font-bold text-gray-500">{new Date(order.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })} • {new Date(order.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}</div>
                                                   <div className={`text-[10px] font-bold uppercase mt-1 inline-block ${order.status === 'completed' ? 'text-green-600' : 'text-gray-500'}`}>{order.status}</div>
                                               </div>
                                               <div className="font-bold text-gray-900 text-lg">
@@ -2267,7 +2277,7 @@ export const CustomerView: React.FC = () => {
                                                      #{order.id}
                                                  </div>
                                                  <p className="text-[11px] text-gray-500 font-medium mt-1">
-                                                     {new Date(order.createdAt).toLocaleDateString()} • {new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                     {new Date(order.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })} • {new Date(order.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}
                                                  </p>
                                              </div>
                                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold uppercase shrink-0 ${getStatusColor(order.status)}`}>

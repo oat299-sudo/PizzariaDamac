@@ -79,6 +79,7 @@ interface StoreContextType {
   updateOrderNetAmount: (orderId: string, netAmount: number) => Promise<void>;
   completeOrder: (orderId: string, paymentDetails: { paymentMethod: PaymentMethod, note?: string }) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
+  updateOrderFields: (orderId: string, fields: Partial<Order>) => Promise<void>;
   reorderItem: (orderId: string) => void;
   fetchOrders: () => Promise<void>;
   submitOrderFeedback: (orderId: string, rating: number, comment: string) => Promise<void>;
@@ -1124,6 +1125,38 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setOrders(prev => prev.filter(o => o.id !== orderId));
   };
 
+  const updateOrderFields = async (orderId: string, fields: Partial<Order>) => {
+      if (isSupabaseConfigured) {
+          const payload: any = {};
+          if (fields.customerName !== undefined) payload.customer_name = fields.customerName;
+          if (fields.customerPhone !== undefined) payload.customer_phone = fields.customerPhone;
+          if (fields.type !== undefined) payload.type = fields.type;
+          if (fields.source !== undefined) payload.source = fields.source;
+          if (fields.status !== undefined) payload.status = fields.status;
+          if (fields.items !== undefined) payload.items = fields.items;
+          if (fields.totalAmount !== undefined) payload.total_amount = fields.totalAmount;
+          if (fields.netAmount !== undefined) payload.net_amount = fields.netAmount;
+          if (fields.createdAt !== undefined) payload.created_at = fields.createdAt;
+          if (fields.note !== undefined) payload.note = fields.note;
+          if (fields.deliveryAddress !== undefined) payload.delivery_address = fields.deliveryAddress;
+          if (fields.deliveryZone !== undefined) payload.delivery_zone = fields.deliveryZone;
+          if (fields.deliveryFee !== undefined) payload.delivery_fee = fields.deliveryFee === 'pending' ? null : fields.deliveryFee;
+          if (fields.paymentMethod !== undefined) payload.payment_method = fields.paymentMethod;
+          if (fields.pickupTime !== undefined) payload.pickup_time = fields.pickupTime;
+          if (fields.tableNumber !== undefined) payload.table_number = fields.tableNumber;
+          if (fields.rating !== undefined) payload.rating = fields.rating;
+          if (fields.comment !== undefined) payload.comment = fields.comment;
+
+          try {
+              const { error } = await supabase.from('orders').update(payload).eq('id', orderId);
+              if (error) console.error("Supabase order update error:", error);
+          } catch(e) {
+              console.error("Failed to update order in Supabase:", e);
+          }
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...fields } : o));
+  };
+
   const reorderItem = (orderId: string) => {
       const order = orders.find(o => o.id === orderId);
       if (order) {
@@ -1278,7 +1311,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
       customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
-      orders, placeOrder, updateOrderStatus, updateOrderTypeToPickup, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, reorderItem, fetchOrders, submitOrderFeedback,
+      orders, placeOrder, updateOrderStatus, updateOrderTypeToPickup, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, updateOrderFields, reorderItem, fetchOrders, submitOrderFeedback,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,

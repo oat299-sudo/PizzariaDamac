@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, SubItem, parseGPSCoordinates, parseDeliveryPhone, parseAnyMapLink } from '../types';
+import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory, PaymentMethod, Order, OrderStatus, SubItem, parseGPSCoordinates, parseDeliveryPhone, parseAnyMapLink } from '../types';
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
@@ -47,7 +47,7 @@ const isPhotosUrl = (url: string): boolean => {
 
 export const POSView: React.FC = () => {
     const { 
-        menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder,
+        menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder, updateOrderFields,
         updatePizzaPrice, togglePizzaAvailability, addPizza, deletePizza, updatePizza, toggleBestSeller, reorderMenu,
         toppings, addTopping, updateTopping, deleteTopping, updateCartItemQuantity, updateCartItem,
         adminLogout, shopLogo, updateShopLogo,
@@ -73,6 +73,86 @@ export const POSView: React.FC = () => {
             } else {
                 alert("Invalid deduction amount.");
             }
+        }
+    };
+
+    const isoToDatetimeLocal = (isoStr: string) => {
+        try {
+            if (!isoStr) return '';
+            const date = new Date(isoStr);
+            const pad = (num: number) => String(num).padStart(2, '0');
+            const year = date.getFullYear();
+            const month = pad(date.getMonth() + 1);
+            const day = pad(date.getDate());
+            const hours = pad(date.getHours());
+            const minutes = pad(date.getMinutes());
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        } catch (e) {
+            return '';
+        }
+    };
+
+    const datetimeLocalToIso = (localStr: string) => {
+        try {
+            if (!localStr) return new Date().toISOString();
+            const date = new Date(localStr);
+            return date.toISOString();
+        } catch (e) {
+            return new Date().toISOString();
+        }
+    };
+
+    const handleDeleteOrderPrompt = async (order: Order) => {
+        const confirmMsg = language === 'th' 
+            ? `คุณแน่ใจหรือไม่ว่าต้องการลบออเดอร์ #${order.id.slice(-4)} ของคุณ ${order.customerName}? (การลบนี้จะไม่สามารถย้อนกลับได้และข้อมูลในฐานข้อมูลจะถูกลบถาวร)` 
+            : `Are you sure you want to delete order #${order.id.slice(-4)} for ${order.customerName}? (This action cannot be undone and data will be permanently removed from database)`;
+        if (confirm(confirmMsg)) {
+            try {
+                await deleteOrder(order.id);
+                alert(language === 'th' ? "ลบออเดอร์สำเร็จแล้ว!" : "Order deleted successfully!");
+            } catch (e: any) {
+                alert("Error deleting order: " + e.message);
+            }
+        }
+    };
+
+    const handleStartEditOrder = (order: Order) => {
+        setEditingOrder(order);
+        setEditOrderForm({
+            customerName: order.customerName || '',
+            customerPhone: order.customerPhone || '',
+            status: order.status,
+            source: order.source,
+            paymentMethod: order.paymentMethod || 'cash',
+            totalAmount: order.totalAmount,
+            netAmount: order.netAmount || order.totalAmount,
+            createdAt: order.createdAt,
+            tableNumber: order.tableNumber || '',
+            note: order.note || ''
+        });
+        setShowEditOrderModal(true);
+    };
+
+    const handleSaveOrderEdit = async () => {
+        if (!editingOrder) return;
+        try {
+            await updateOrderFields(editingOrder.id, {
+                customerName: editOrderForm.customerName,
+                customerPhone: editOrderForm.customerPhone,
+                status: editOrderForm.status,
+                source: editOrderForm.source,
+                paymentMethod: editOrderForm.paymentMethod,
+                totalAmount: Number(editOrderForm.totalAmount),
+                netAmount: Number(editOrderForm.netAmount),
+                createdAt: editOrderForm.createdAt,
+                tableNumber: editOrderForm.tableNumber,
+                note: editOrderForm.note
+            });
+            setShowEditOrderModal(false);
+            setEditingOrder(null);
+            alert(language === 'th' ? "บันทึกการแก้ไขออเดอร์สำเร็จแล้ว!" : "Order details saved successfully!");
+        } catch (e: any) {
+            alert("Error updating order: " + e.message);
         }
     };
     const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
@@ -136,6 +216,33 @@ export const POSView: React.FC = () => {
     const [taxInvoice, setTaxInvoice] = useState({ isRequested: false, companyName: '', taxId: '', address: '' });
     const [change, setChange] = useState<number>(0);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+    // --- EDIT ORDER STATE ---
+    const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+    const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+    const [editOrderForm, setEditOrderForm] = useState<{
+        customerName: string;
+        customerPhone: string;
+        status: OrderStatus;
+        source: OrderSource;
+        paymentMethod: PaymentMethod;
+        totalAmount: number;
+        netAmount: number;
+        createdAt: string;
+        tableNumber: string;
+        note: string;
+    }>({
+        customerName: '',
+        customerPhone: '',
+        status: 'pending',
+        source: 'store',
+        paymentMethod: 'cash',
+        totalAmount: 0,
+        netAmount: 0,
+        createdAt: '',
+        tableNumber: '',
+        note: ''
+    });
 
     // --- POS AUDIO ALERTS AND SYSTEM SOUND FEEDBACK ---
     const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -670,7 +777,7 @@ export const POSView: React.FC = () => {
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9", // Use PromptPay as placeholder Tax ID
             phone: storeSettings.contactPhone || "099-497-9199",
             orderId: selectedOrder ? selectedOrder.id.slice(-4) : 'NEW',
-            date: new Date().toLocaleString('th-TH'),
+            date: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
             tableOrType: tableOrType,
             source: selectedOrder ? selectedOrder.source.toUpperCase() : orderSource.toUpperCase(),
             customerName: selectedOrder?.customerName || 'Guest',
@@ -715,7 +822,7 @@ export const POSView: React.FC = () => {
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9",
             phone: storeSettings.contactPhone || "099-497-9199",
             orderId: order.id.slice(-4),
-            date: new Date(order.createdAt).toLocaleString('th-TH'),
+            date: new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
             tableOrType: order.tableNumber ? `Table ${order.tableNumber}` : order.type.toUpperCase(),
             source: order.source.toUpperCase(),
             customerName: order.customerName,
@@ -904,7 +1011,7 @@ export const POSView: React.FC = () => {
         if (filteredOrders.length === 0) { alert("No sales data to export"); return; }
         const data = filteredOrders.map(o => ({
             ID: o.id,
-            Date: new Date(o.createdAt).toLocaleString(),
+            Date: new Date(o.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
             Customer: o.customerName,
             Type: o.type,
             Source: o.source,
@@ -919,7 +1026,7 @@ export const POSView: React.FC = () => {
     const handleExportExpenses = () => {
         if (filteredExpenses.length === 0) { alert("No expense data to export"); return; }
         const data = filteredExpenses.map(e => ({
-            Date: new Date(e.date).toLocaleDateString(),
+            Date: new Date(e.date).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' }),
             Description: e.description,
             Category: e.category,
             Amount: e.amount,
@@ -1407,12 +1514,14 @@ export const POSView: React.FC = () => {
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs border-b border-gray-100">
-                                                <tr><th className="p-4">Time</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount(Total)</th><th className="p-4 text-orange-500">Net(After GP)</th><th className="p-4 text-right">Actions</th></tr>
+                                                <tr><th className="p-4">Date & Time (เวลาไทย)</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount(Total)</th><th className="p-4 text-orange-500">Net(After GP)</th><th className="p-4 text-right">Actions</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {filteredOrders.reverse().map(order => (
                                                     <tr key={order.id} className="hover:bg-gray-50">
-                                                        <td className="p-4 text-gray-600">{new Date(order.createdAt).toLocaleTimeString()}</td>
+                                                        <td className="p-4 text-gray-600 font-medium">
+                                                            {new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' })}
+                                                        </td>
                                                         <td className="p-4 font-bold text-gray-800">#{order.id.slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
                                                         <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
                                                         <td className="p-4">
@@ -1422,12 +1531,14 @@ export const POSView: React.FC = () => {
                                                         </td>
                                                         <td className="p-4 font-bold text-gray-600">฿{order.totalAmount}</td>
                                                         <td className="p-4 font-bold text-brand-600">฿{order.netAmount || order.totalAmount}</td>
-                                                        <td className="p-4 text-right flex justify-end gap-2">
+                                                        <td className="p-4 text-right flex justify-end gap-1.5 flex-wrap">
+                                                            <button onClick={() => handleStartEditOrder(order)} className="text-blue-700 hover:underline font-bold text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition">แก้ไข (Edit)</button>
+                                                            <button onClick={() => handleDeleteOrderPrompt(order)} className="text-red-700 hover:underline font-bold text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition">ลบ (Delete)</button>
                                                             {order.source !== 'store' && (
-                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 px-3 py-1 rounded">Edit GP</button>
+                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition">Edit GP</button>
                                                             )}
-                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 px-3 py-1 rounded flex items-center gap-1"><Printer size={12}/> Print</button>
-                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 px-3 py-1 rounded">Receipt</button>
+                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded flex items-center gap-1 transition"><Printer size={12}/> Print</button>
+                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded transition">Receipt</button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -1992,6 +2103,152 @@ export const POSView: React.FC = () => {
                                     {paymentMethod === 'cash' ? 'PAID' : 'CONFIRM'} <CheckCircle size={24}/>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- EDIT ORDER MODAL --- */}
+            {showEditOrderModal && editingOrder && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 print:hidden">
+                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fade-in text-gray-800">
+                        <div className="bg-gray-905 px-6 py-4 flex items-center justify-between text-white border-b border-gray-805 bg-brand-650" style={{backgroundColor: '#b91c1c'}}>
+                            <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                🍕 แก้ไขออเดอร์ #{editingOrder.id.slice(-4)}
+                            </h3>
+                            <button onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} className="text-gray-200 hover:text-white font-bold text-2xl p-1 leading-none">&times;</button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-4 max-h-[70vh] text-left">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Customer Name (ชื่อลูกค้า)</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                    value={editOrderForm.customerName}
+                                    onChange={e => setEditOrderForm({...editOrderForm, customerName: e.target.value})}
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Customer Phone (เบอร์โทร)</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                    value={editOrderForm.customerPhone}
+                                    onChange={e => setEditOrderForm({...editOrderForm, customerPhone: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Table Number (เลขโต๊ะ)</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                        placeholder="เช่น 5"
+                                        value={editOrderForm.tableNumber}
+                                        onChange={e => setEditOrderForm({...editOrderForm, tableNumber: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Order Source (ช่องทาง)</label>
+                                    <select 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500 bg-white"
+                                        value={editOrderForm.source}
+                                        onChange={e => setEditOrderForm({...editOrderForm, source: e.target.value as OrderSource})}
+                                    >
+                                        <option value="store">Store (หน้าร้าน)</option>
+                                        <option value="grab">Grab</option>
+                                        <option value="lineman">LineMan</option>
+                                        <option value="foodpanda">FoodPanda</option>
+                                        <option value="robinhood">Robinhood</option>
+                                        <option value="shopeefood">ShopeeFood</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Total (ยอดขายรวม ฿)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                        value={editOrderForm.totalAmount}
+                                        onChange={e => setEditOrderForm({...editOrderForm, totalAmount: Number(e.target.value)})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Net (รายรับหลังหัก GP ฿)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                        value={editOrderForm.netAmount}
+                                        onChange={e => setEditOrderForm({...editOrderForm, netAmount: Number(e.target.value)})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Order Status (สถานะคิว)</label>
+                                    <select 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500 bg-white"
+                                        value={editOrderForm.status}
+                                        onChange={e => setEditOrderForm({...editOrderForm, status: e.target.value as OrderStatus})}
+                                    >
+                                        <option value="pending">Pending (รอชำระ/รอทำ)</option>
+                                        <option value="completed">Completed (เสร็จสิ้น)</option>
+                                        <option value="cancelled">Cancelled (ยกเลิก)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment (วิธีจ่ายเงิน)</label>
+                                    <select 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500 bg-white"
+                                        value={editOrderForm.paymentMethod}
+                                        onChange={e => setEditOrderForm({...editOrderForm, paymentMethod: e.target.value as PaymentMethod})}
+                                    >
+                                        <option value="cash">Cash (เงินสด)</option>
+                                        <option value="promptpay">PromptPay (พร้อมเพย์)</option>
+                                        <option value="thaihelpthai">โครงการไทยช่วยไทย</option>
+                                        <option value="delivery_app">แอปคู่เดลิเวอรี่</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Order Time (วันเวลาไทยของออเดอร์)</label>
+                                <input 
+                                    type="datetime-local" 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500"
+                                    value={isoToDatetimeLocal(editOrderForm.createdAt)}
+                                    onChange={e => setEditOrderForm({...editOrderForm, createdAt: datetimeLocalToIso(e.target.value)})}
+                                />
+                                <span className="text-[10px] text-gray-400 block mt-1">เวลาในระบบจะถูกบันทึกเป็น UTC และแปลงตามเวลาไทย (GMT+7) เสมอ</span>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Notes (หมายเหตุออเดอร์)</label>
+                                <textarea 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-brand-500 h-16"
+                                    value={editOrderForm.note}
+                                    onChange={e => setEditOrderForm({...editOrderForm, note: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-4 flex gap-3 border-t border-gray-200">
+                            <button 
+                                onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} 
+                                className="flex-1 py-3 rounded-xl font-bold border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition"
+                            >
+                                Cancel (ยกเลิก)
+                            </button>
+                            <button 
+                                onClick={handleSaveOrderEdit} 
+                                className="flex-1 py-3 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow transition"
+                            >
+                                Save (บันทึกแก้ไข)
+                            </button>
                         </div>
                     </div>
                 </div>
