@@ -1272,6 +1272,50 @@ export const CustomerView: React.FC = () => {
                          </div>
                      )}
 
+                     {/* Thai Chuay Thai Payment inside tracker */}
+                     {activeOrder.paymentMethod === 'thai_chuay_thai' && activeOrder.status === 'pending' && (
+                         <div className="border border-sky-300 rounded-xl p-4 bg-sky-50 shadow-xs flex flex-col items-center text-center space-y-3">
+                             <div className="w-12 h-12 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 animate-bounce shrink-0">
+                                 <Sparkles size={24}/>
+                             </div>
+                             <div>
+                                 <h4 className="text-xs font-black text-sky-950 uppercase">{language === 'th' ? 'ชำระผ่านโครงการไทยช่วยไทย (เป๋าตัง)' : 'Paid via Thai Chuay Thai (Paotang)'}</h4>
+                                 <p className="text-[10px] text-sky-700 font-medium mt-1 leading-normal">
+                                     {language === 'th' 
+                                         ? 'ร้านค้าต้องสร้าง QR Code แบบระบุยอดเงินด้วยแอป "ถุงเงิน" เพื่อเปิดให้สแกนจ่ายและตัดสิทธิ์รับการช่วยเหลือ' 
+                                         : 'Store needs to generate an order QR Code from their "Tungngern" app.'}
+                                 </p>
+                             </div>
+
+                             <div className="bg-white p-2.5 rounded-lg border border-sky-200.5 w-full font-bold">
+                                 <p className="text-[9px] text-gray-400 uppercase font-black">{language === 'th' ? 'ยอดที่ต้องการสแกนสิทธิ์' : 'Amount to scan'}</p>
+                                 <p className="text-lg font-black text-sky-600">฿{activeOrder.totalAmount}</p>
+                             </div>
+
+                             <div className="text-[10.5px] text-gray-600 leading-normal font-sans font-medium space-y-1 text-left w-full border-t border-sky-100 pt-2.5">
+                                 <p className="font-extrabold text-sky-950 mb-1">{language === 'th' ? '👉 แนะนำขั้นตอนถัดไป' : '👉 Next Steps'}</p>
+                                 <p>{language === 'th' ? '1. รอทีมงานส่งไฟล์รูปภาพ QR Code ถุงเงิน โครงการ ผ่านทาง LINE' : '1. Wait for staff to send the project QR code to you via LINE.'}</p>
+                                 <p>{language === 'th' ? '2. เปิดแอปเป๋าตัง เลือกสแกนจ่ายด้วยรูปภาพคิวอาร์โค้ดถุงเงิน' : '2. Open the Paotang app and choose scan from Photo Library / Camera.'}</p>
+                             </div>
+
+                             {storeSettings.lineUrl && (
+                                 <a 
+                                     href={`${storeSettings.lineUrl}?text=${encodeURIComponent(
+                                         language === 'th' 
+                                             ? `ขอรับ QR Code สแกนจ่ายโครงการไทยช่วยไทย สำหรับออเดอร์ #${activeOrder.id.slice(-6)} ยอดชำระ ฿${activeOrder.totalAmount} ครับ`
+                                             : `Please send Tungngern QR for project Thai Chuay Thai. Order #${activeOrder.id.slice(-6)}: ฿${activeOrder.totalAmount}.`
+                                     )}`}
+                                     target="_blank" 
+                                     rel="noopener noreferrer"
+                                     className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#06C755] hover:bg-[#05B14B] active:scale-95 text-white font-extrabold text-xs rounded-xl transition shadow-xs"
+                                 >
+                                     <MessageCircle size={14}/>
+                                     <span>{language === 'th' ? 'ทัก LINE เพื่อรับ QR โครงการถุงเงิน ↗' : 'LINE chat for Tungngern QR ↗'}</span>
+                                 </a>
+                             )}
+                         </div>
+                     )}
+
                      {/* Contact Options */}
                      <div className="grid grid-cols-2 gap-2 text-xs">
                           {storeSettings.contactPhone && (
@@ -1753,22 +1797,42 @@ export const CustomerView: React.FC = () => {
                                      {/* Payment Method */}
                                      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                                          <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">{t('paymentMethod')}</label>
-                                         <div className="grid grid-cols-2 gap-3">
+                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                              <button 
                                                  type="button"
                                                  onClick={() => setPaymentMethod('qr_transfer')}
-                                                 className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                 className={`p-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
                                              >
                                                  <QrCode size={16}/> {t('qrTransfer')}
                                              </button>
                                              <button 
                                                  type="button"
                                                  onClick={() => setPaymentMethod('cash')}
-                                                 className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                 className={`p-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
                                              >
                                                  <Banknote size={16}/> {t('cash')}
                                              </button>
+                                             <button 
+                                                 type="button"
+                                                 onClick={() => setPaymentMethod('thai_chuay_thai')}
+                                                 className={`p-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 transition ${paymentMethod === 'thai_chuay_thai' ? 'border-sky-500 bg-sky-50 text-sky-700 font-extrabold shadow-sm' : 'border-gray-200 text-gray-600'}`}
+                                             >
+                                                 <Sparkles size={16} className={paymentMethod === 'thai_chuay_thai' ? 'text-sky-600 animate-pulse' : 'text-gray-400'}/> {t('thaiChuayThai')}
+                                             </button>
                                          </div>
+                                         
+                                         {paymentMethod === 'thai_chuay_thai' && (
+                                             <div className="mt-3 p-3 bg-sky-50 border border-sky-100 rounded-lg text-xs text-sky-800 leading-relaxed animate-fade-in font-medium">
+                                                 <p className="font-extrabold text-sky-950 flex items-center gap-1 mb-1">
+                                                     <span>💡 {language === 'th' ? 'ชำระด้วยสิทธิ์ไทยช่วยไทย' : 'Thai Chuay Thai Discount'}</span>
+                                                 </p>
+                                                 <p>
+                                                     {language === 'th' 
+                                                         ? 'หลังจากกดสั่งซื้อเสร็จสิ้น ทางร้านจะส่งรูป QR Code สัญลักษณ์ถุงเงินสแกนสิทธิ์โครงการ ไปให้ท่านทาง LINE ของร้าน เพื่อให้คุณเปิดแอปเป๋าตังเพื่อสแกนสิทธิ์จ่ายได้สะดวก!' 
+                                                         : 'After purchasing, the store will send the government subsidy Tungngern QR image to you via LINE so you can scan/pay within the Paotang app.'}
+                                                 </p>
+                                             </div>
+                                         )}
                                      </div>
 
                                      {/* Scheduling Pre-order Box (Dine-in, Takeaway, and Delivery) */}

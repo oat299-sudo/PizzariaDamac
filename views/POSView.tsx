@@ -603,18 +603,40 @@ export const POSView: React.FC = () => {
         }
         const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
         if (paymentMethod === 'cash' && parseFloat(cashReceived || '0') < currentTotal) { alert("Insufficient cash!"); return; }
-        const note = paymentMethod === 'cash' ? `Cash: ${cashReceived}, Change: ${change}` : 'Paid via QR';
+        const note = paymentMethod === 'cash' 
+            ? `Cash: ${cashReceived}, Change: ${change}` 
+            : paymentMethod === 'thai_chuay_thai'
+                ? 'Paid via Thai Chuay Thai (Tungngern QR)'
+                : 'Paid via QR';
         
         if (selectedOrder) {
             playSuccessFeedback();
             await completeOrder(selectedOrder.id, { paymentMethod: paymentMethod, note: note });
-             alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Order Paid via QR!");
+            alert(
+                paymentMethod === 'cash' 
+                    ? `Paid! Change: ฿${change}` 
+                    : paymentMethod === 'thai_chuay_thai'
+                        ? "Paid via Thai Chuay Thai Project!"
+                        : "Order Paid via QR!"
+            );
         } else {
             playSuccessFeedback();
             const success = await placeOrder('dine-in', {
                 tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef
             });
-            if (success) { alert(paymentMethod === 'cash' ? `Paid! Change: ฿${change}` : "Paid via QR!"); setTableNumber(''); setDeliveryPlatformRef(''); setOrderSource('store'); setShowMobileCart(false); }
+            if (success) { 
+                alert(
+                    paymentMethod === 'cash' 
+                        ? `Paid! Change: ฿${change}` 
+                        : paymentMethod === 'thai_chuay_thai'
+                            ? "Paid via Thai Chuay Thai Project!"
+                            : "Paid via QR!"
+                ); 
+                setTableNumber(''); 
+                setDeliveryPlatformRef(''); 
+                setOrderSource('store'); 
+                setShowMobileCart(false); 
+            }
         }
         setShowPaymentModal(false);
     };
@@ -662,7 +684,7 @@ export const POSView: React.FC = () => {
             subtotal: subtotal,
             vat: vatAmount,
             total: currentTotal,
-            paymentMethod: payMethod === 'cash' ? 'CASH' : 'QR / TRANSFER',
+            paymentMethod: payMethod === 'cash' ? 'CASH' : payMethod === 'thai_chuay_thai' ? 'THAI CHUAY THAI' : 'QR / TRANSFER',
             received: received,
             change: changeAmt,
             taxInvoice: taxInvoice
@@ -707,7 +729,7 @@ export const POSView: React.FC = () => {
             subtotal: subtotal,
             vat: vatAmount,
             total: order.totalAmount,
-            paymentMethod: order.paymentMethod === 'cash' ? 'CASH' : 'QR / TRANSFER',
+            paymentMethod: order.paymentMethod === 'cash' ? 'CASH' : order.paymentMethod === 'thai_chuay_thai' ? 'THAI CHUAY THAI' : 'QR / TRANSFER',
             received: order.totalAmount, // Assumed exact for history
             change: 0,
         });
@@ -1839,19 +1861,23 @@ export const POSView: React.FC = () => {
                             </div>
 
                             {/* Method Selector */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <button onClick={() => setPaymentMethod('cash')} className={`p-4 lg:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 lg:gap-3 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <Banknote size={28} className="lg:w-8 lg:h-8"/>
-                                    <span className="font-bold text-base lg:text-lg">CASH</span>
+                            <div className="grid grid-cols-3 gap-2 mb-6">
+                                <button onClick={() => setPaymentMethod('cash')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
+                                    <Banknote size={24} className="lg:w-7 lg:h-7"/>
+                                    <span className="font-bold text-xs lg:text-sm">CASH</span>
                                 </button>
-                                <button onClick={() => setPaymentMethod('qr_transfer')} className={`p-4 lg:p-6 rounded-2xl border-2 flex flex-col items-center gap-2 lg:gap-3 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <QrCode size={28} className="lg:w-8 lg:h-8"/>
-                                    <span className="font-bold text-base lg:text-lg">SCAN QR</span>
+                                <button onClick={() => setPaymentMethod('qr_transfer')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
+                                    <QrCode size={24} className="lg:w-7 lg:h-7"/>
+                                    <span className="font-bold text-xs lg:text-sm">SCAN QR</span>
+                                </button>
+                                <button onClick={() => setPaymentMethod('thai_chuay_thai')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'thai_chuay_thai' ? 'border-sky-500 bg-sky-50 text-sky-750 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
+                                    <Sparkles size={24} className={`lg:w-7 lg:h-7 ${paymentMethod === 'thai_chuay_thai' ? 'text-sky-600 animate-pulse' : 'text-gray-400'}`}/>
+                                    <span className="font-bold text-xs lg:text-sm whitespace-nowrap">ไทยช่วยไทย</span>
                                 </button>
                             </div>
 
                             {/* Content Area */}
-                            <div className="flex-1 flex flex-col justify-center mb-4">
+                            <div className="flex-1 flex flex-col justify-center mb-4 min-h-[220px]">
                                 {paymentMethod === 'cash' ? (
                                     <div className="space-y-4 animate-fade-in">
                                         <div>
@@ -1872,13 +1898,38 @@ export const POSView: React.FC = () => {
                                             <button onClick={() => setCashReceived(String(selectedOrder ? selectedOrder.totalAmount : cartTotal))} className="py-3 bg-brand-100 rounded-lg font-bold text-brand-600 hover:bg-brand-200 text-sm">Exact</button>
                                         </div>
                                     </div>
-                                ) : (
+                                ) : paymentMethod === 'qr_transfer' ? (
                                     <div className="flex flex-col items-center animate-fade-in justify-center h-full">
                                         <div className="bg-white p-4 rounded-xl border-2 border-brand-500 shadow-lg mb-4">
                                             <img src={promptPayQRUrl} className="w-56 h-56 lg:w-64 lg:h-64 mix-blend-multiply" />
                                         </div>
                                         <p className="text-center text-gray-500 text-sm font-bold">Scan with any Banking App</p>
                                         <div className="mt-2 text-3xl font-bold text-brand-600">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col animate-fade-in justify-center bg-sky-50 border border-sky-100 rounded-2xl p-4 lg:p-5 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-650 font-extrabold shrink-0 animate-bounce">
+                                                <Sparkles size={20}/>
+                                            </div>
+                                            <div>
+                                                <p className="font-extrabold text-sky-950 text-xs md:text-sm">บันทึกผ่าน "โครงการไทยช่วยไทย"</p>
+                                                <p className="text-[10px] text-sky-700 font-medium leading-none">โครงการช่วยเหลือสวัสดิการสิทธิ์หลัก (แอปถุงเงิน)</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white p-3 rounded-xl border border-sky-200 flex justify-between items-center w-full shadow-sm">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase">ยอดระบุชำระสิทธิ์</span>
+                                            <span className="text-xl font-black text-sky-605">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
+                                        </div>
+
+                                        <div className="text-[10.5px] text-gray-650 space-y-1 bg-white/50 p-2.5 rounded-xl border leading-relaxed font-medium">
+                                            <p className="font-extrabold text-sky-950">📋 คู่มือสำหรับแคชเชียร์:</p>
+                                            <p>1. เปิดแอป <strong className="text-sky-850 font-bold">"ถุงเงิน"</strong> บนโทรศัพท์ของร้านค้า</p>
+                                            <p>2. กดสร้างคิวอาร์โค้ดรับชำระเงินสิทธิ์ <strong className="font-bold text-sky-800">"ไทยช่วยไทย"</strong></p>
+                                            <p>3. กรอกยอดเงิน <strong className="font-bold text-sky-800">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</strong> แล้วส่งต่อให้ลูกค้าทางแชท LINE หรือสแกนหน้าร้าน</p>
+                                            <p>4. เมื่อยอดและสิทธิ์ชำระเรียบร้อยในแอปหน้าร้านแล้ว ให้กดปุ่ม <strong>CONFIRM</strong> หน้าจอนี้เพื่อปิดบิล</p>
+                                        </div>
                                     </div>
                                 )}
                             </div>

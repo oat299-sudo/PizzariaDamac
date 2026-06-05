@@ -81,7 +81,7 @@ export interface CustomerProfile {
 export type OrderType = 'dine-in' | 'online' | 'delivery';
 export type OrderSource = 'store' | 'grab' | 'lineman' | 'robinhood' | 'foodpanda' | 'shopeefood' | 'other';
 export type OrderStatus = 'pending' | 'confirmed' | 'acknowledged' | 'cooking' | 'ready' | 'completed' | 'cancelled';
-export type PaymentMethod = 'cash' | 'qr_transfer';
+export type PaymentMethod = 'cash' | 'qr_transfer' | 'thai_chuay_thai';
 export type AppView = 'customer' | 'kitchen' | 'pos';
 export type Language = 'en' | 'th';
 
