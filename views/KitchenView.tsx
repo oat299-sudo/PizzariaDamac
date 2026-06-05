@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer, Phone, Globe } from 'lucide-react';
@@ -365,8 +366,17 @@ export const KitchenView: React.FC = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <AnimatePresence>
         {displayOrders.map(order => (
-           <div key={order.id} className={`bg-white rounded-xl shadow-lg border-l-8 flex flex-col overflow-hidden text-gray-900 ${order.status === 'completed' ? 'border-gray-400 opacity-60' : 'border-brand-500'}`}>
+           <motion.div 
+             key={order.id} 
+             layout
+             initial={{ opacity: 0, y: 20, scale: 0.95 }}
+             animate={{ opacity: 1, y: 0, scale: 1 }}
+             exit={{ opacity: 0, scale: 0.9 }}
+             transition={{ duration: 0.3 }}
+             className={`bg-white rounded-xl shadow-lg border-l-8 flex flex-col overflow-hidden text-gray-900 ${order.status === 'completed' ? 'border-gray-400 opacity-60' : 'border-brand-500'}`}
+           >
               {/* Header */}
               <div className={`p-4 border-b flex justify-between items-start ${order.status === 'pending' ? 'bg-red-50' : 'bg-white'}`}>
                   <div>
@@ -582,8 +592,9 @@ export const KitchenView: React.FC = () => {
                     )}
                 </div>
               </div>
-           </div>
+           </motion.div>
         ))}
+        </AnimatePresence>
       </div>
     </div>
 
