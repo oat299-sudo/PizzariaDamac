@@ -1694,7 +1694,7 @@ export const CustomerView: React.FC = () => {
                                                                  className="w-full border border-gray-300 rounded-lg pl-10 pt-3 pb-3 pr-8 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
                                                                  placeholder={language === 'th' ? "วางลิงก์ https://maps.app.goo.gl/... หรือ 13.88, 100.52" : "Paste maps link or coords here..."}
                                                                  value={mapSearch}
-                                                                onChange={(e) => {
+                                                                 onChange={(e) => {
                                                                     const val = e.target.value;
                                                                     setMapSearch(val);
                                                                     const trimmed = val.trim();
@@ -1710,6 +1710,28 @@ export const CustomerView: React.FC = () => {
                                                                         setHasMapPin(true);
                                                                     } else {
                                                                         setHasMapPin(false);
+                                                                        // Check if it's a shortlink
+                                                                        if (trimmed.includes('maps.app.goo.gl') || trimmed.includes('goo.gl/maps')) {
+                                                                            setGpsLoading(true);
+                                                                            fetch('/api/resolve-link', {
+                                                                                method: 'POST',
+                                                                                headers: { 'Content-Type': 'application/json' },
+                                                                                body: JSON.stringify({ url: trimmed })
+                                                                            })
+                                                                            .then(res => res.json())
+                                                                            .then(data => {
+                                                                                if (data && data.targetUrl) {
+                                                                                    const resolvedCoords = parseAnyMapLink(data.targetUrl);
+                                                                                    if (resolvedCoords) {
+                                                                                        setDeliveryLat(resolvedCoords.lat);
+                                                                                        setDeliveryLng(resolvedCoords.lng);
+                                                                                        setHasMapPin(true);
+                                                                                    }
+                                                                                }
+                                                                            })
+                                                                            .catch(err => console.error("Failed to resolve link:", err))
+                                                                            .finally(() => setGpsLoading(false));
+                                                                        }
                                                                     }
                                                                 }}
                                                              />

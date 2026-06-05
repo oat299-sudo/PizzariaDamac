@@ -1524,7 +1524,33 @@ export const POSView: React.FC = () => {
                                         <input type="number" className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" value={deliveryForm.baseDeliveryFee} onChange={e => setDeliveryForm({...deliveryForm, baseDeliveryFee: Number(e.target.value)})} />
                                      </div>
                                 </div>
-                                <button onClick={() => { updateStoreSettings(deliveryForm); alert("Delivery Settings Saved!"); }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
+                                <button onClick={async () => { 
+                                    let resolvedGps = deliveryForm.storeLocationGps;
+                                    if (resolvedGps.includes('maps.app.goo.gl') || resolvedGps.includes('goo.gl/maps')) {
+                                        try {
+                                            const res = await fetch('/api/resolve-link', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ url: resolvedGps })
+                                            });
+                                            const data = await res.json();
+                                            if (data && data.targetUrl) {
+                                                resolvedGps = data.targetUrl;
+                                            }
+                                        } catch (e) {
+                                            console.error(e);
+                                        }
+                                    }
+                                    // Parse to exact lat/lng string if it's a URL
+                                    const coords = parseAnyMapLink(resolvedGps);
+                                    if (coords) {
+                                        resolvedGps = `${coords.lat},${coords.lng}`;
+                                        setDeliveryForm({...deliveryForm, storeLocationGps: resolvedGps});
+                                    }
+                                    
+                                    await updateStoreSettings({...deliveryForm, storeLocationGps: resolvedGps}); 
+                                    alert("Delivery Settings Saved!"); 
+                                }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
                             </div>
 
                             {/* Printer Settings */}
