@@ -294,13 +294,38 @@ export const CustomerView: React.FC = () => {
       const canvas = document.getElementById(id) as HTMLCanvasElement | null;
       if (canvas) {
           try {
-              const url = canvas.toDataURL('image/png');
-              const link = document.createElement('a');
-              link.download = `PromptPay_Order_${refNo || 'Payment'}.png`;
-              link.href = url;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              // Create offscreen canvas for a reliable scan experience with bank apps
+              const padding = 32;
+              const offCanvas = document.createElement('canvas');
+              const qrSize = canvas.width;
+              offCanvas.width = qrSize + padding * 2;
+              offCanvas.height = qrSize + padding * 2;
+              
+              const ctx = offCanvas.getContext('2d');
+              if (ctx) {
+                  // 1. Fill background with absolute solid white
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+                  
+                  // 2. Draw outer border to help camera scanners detect boundaries easily
+                  ctx.strokeStyle = '#e2e8f0';
+                  ctx.lineWidth = 1;
+                  ctx.strokeRect(4, 4, offCanvas.width - 8, offCanvas.height - 8);
+                  
+                  // 3. Draw the original QR code in the center
+                  ctx.drawImage(canvas, padding, padding, qrSize, qrSize);
+                  
+                  // 4. Export as a high-contrast, non-transparent solid JPEG image
+                  const url = offCanvas.toDataURL('image/jpeg', 1.0);
+                  const link = document.createElement('a');
+                  link.download = `PromptPay_Order_${refNo || 'Payment'}.jpg`;
+                  link.href = url;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+              } else {
+                  throw new Error("Could not construct 2D context");
+              }
           } catch (err) {
               console.error('Failed to save QR Code', err);
               alert(language === 'th' ? 'ไม่สามารถบันทึกรูปภาพได้ในเบราว์เซอร์นี้' : 'Cannot save image in this browser.');
@@ -1255,7 +1280,7 @@ export const CustomerView: React.FC = () => {
                                   <>
                                       <h4 className="text-xs font-bold text-gray-600 mb-2">{language === 'th' ? 'สแกนเพื่อชำระเงิน' : 'Scan via Bank App'}</h4>
                                       <div className="p-2 border border-gray-100 rounded-lg bg-white inline-block">
-                                        <QRCodeCanvas id="promptpay-qr-tracker" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, activeOrder.totalAmount)} size={150} level="M" />
+                                        <QRCodeCanvas id="promptpay-qr-tracker" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, activeOrder.totalAmount)} size={150} level="M" includeMargin={true} />
                                       </div>
                                       <button 
                                           type="button"
@@ -2481,7 +2506,7 @@ export const CustomerView: React.FC = () => {
                     <p className="text-gray-500 mb-6 text-sm">{language === 'th' ? 'กรุณาสแกน QR Code นี้ผ่านแอปธนาคาร' : 'Please scan this QR Code via your bank app'}</p>
                     
                     <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl mb-4 border-2 border-brand-100 mx-auto w-fit">
-                         <QRCodeCanvas id="promptpay-qr-modal" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, qrAmount)} size={200} level="M" />
+                         <QRCodeCanvas id="promptpay-qr-modal" value={generatePromptPayPayload(storeSettings.promptPayNumber || DEFAULT_STORE_SETTINGS.promptPayNumber!, qrAmount)} size={200} level="M" includeMargin={true} />
                          <button 
                              type="button"
                              onClick={() => handleDownloadQR('promptpay-qr-modal', 'Payment')}
