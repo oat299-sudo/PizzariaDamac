@@ -576,6 +576,30 @@ export const CustomerView: React.FC = () => {
     setSpecialInstructions('');
   };
 
+  const handleDirectAddToCart = (e: React.MouseEvent, item: Pizza) => {
+    e.stopPropagation();
+    if (!item.available) return;
+
+    if (item.id === 'custom_base' || item.id === 'p_half_half' || (item.category === 'promotion' && (item.comboCount || 0) > 0)) {
+        handleCustomize(item);
+        return;
+    }
+
+    const localizedPizza = getLocalizedItem(item);
+    const cartItem: CartItem = {
+      id: Date.now().toString() + Math.random().toString(),
+      pizzaId: item.id,
+      name: localizedPizza.name,
+      nameTh: language === 'th' ? localizedPizza.name : undefined, 
+      basePrice: item.basePrice,
+      selectedToppings: [],
+      quantity: 1,
+      totalPrice: item.basePrice,
+      specialInstructions: ''
+    };
+    addToCart(cartItem);
+  };
+
   const handleOpenComboSlot = (index: number) => setCurrentComboSlot(index);
   const handleSelectComboPizza = (pizza: Pizza) => {
       if (currentComboSlot === null) return;
@@ -1058,9 +1082,13 @@ export const CustomerView: React.FC = () => {
                                 <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
                                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">{t('soldOut')}</div>}
-                                    <div className="absolute bottom-1 right-1 bg-white/90 p-1.5 rounded-full shadow-sm text-brand-600">
+                                    <button 
+                                        onClick={(e) => handleDirectAddToCart(e, item)}
+                                        className="absolute bottom-1 right-1 bg-white hover:bg-brand-600 hover:text-white p-1.5 rounded-full shadow-sm text-brand-600 transition cursor-pointer z-10"
+                                        title={language === 'th' ? 'สั่งตรง' : 'Quick Add'}
+                                    >
                                         <Plus size={14}/>
-                                    </div>
+                                    </button>
                                 </div>
                                 <h3 className="font-bold text-sm text-gray-800 truncate">{localized.name}</h3>
                                 <div className="flex justify-between items-center mt-1">
@@ -1105,7 +1133,13 @@ export const CustomerView: React.FC = () => {
                                     <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
                                         <span className="text-base md:text-lg font-bold text-brand-600">฿{item.basePrice}</span>
-                                        <button className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={16}/></button>
+                                        <button 
+                                            onClick={(e) => handleDirectAddToCart(e, item)}
+                                            className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition cursor-pointer"
+                                            title={language === 'th' ? 'สั่งทันที' : 'Add Direct'}
+                                        >
+                                            <Plus size={16}/>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1214,7 +1248,13 @@ export const CustomerView: React.FC = () => {
                                         <span className="text-base md:text-md font-bold text-brand-600">
                                             {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${item.basePrice}`}
                                         </span>
-                                        <button className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={16}/></button>
+                                        <button 
+                                            onClick={(e) => handleDirectAddToCart(e, item)}
+                                            className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition cursor-pointer"
+                                            title={language === 'th' ? 'สั่งทันที' : 'Add Direct'}
+                                        >
+                                            <Plus size={16}/>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

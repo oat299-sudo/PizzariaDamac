@@ -676,6 +676,31 @@ export const POSView: React.FC = () => {
         setSelectedPizza(null); setSelectedToppings([]); setEditingCartItem(null); setSpecialInstructions(''); setQuantity(1);
         if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
     };
+
+    const handleDirectAddToCart = (e: React.MouseEvent, item: Pizza) => {
+        e.stopPropagation();
+        if (!item.available) return;
+        
+        if (item.id === 'custom_base' || item.id === 'p_half_half' || (item.category === 'promotion' && (item.comboCount || 0) > 0)) {
+            handleCustomize(item);
+            return;
+        }
+
+        playSuccessFeedback();
+        const localized = getLocalizedItem(item);
+        const cartItem: CartItem = {
+            id: Date.now().toString() + Math.random().toString(),
+            pizzaId: item.id,
+            name: localized.name,
+            nameTh: item.nameTh,
+            basePrice: item.basePrice,
+            selectedToppings: [],
+            quantity: 1,
+            totalPrice: item.basePrice,
+            specialInstructions: ''
+        };
+        addToCart(cartItem);
+    };
     
     // Combo Logic
     const handleComboSlotClick = (index: number) => setActiveComboSlot(index);
@@ -1402,7 +1427,15 @@ export const POSView: React.FC = () => {
                                                         <span className="font-bold text-brand-600 text-base md:text-lg">
                                                             {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${item.basePrice}`}
                                                         </span>
-                                                        {!isEditMode && <div className="bg-brand-50 text-brand-600 p-2 rounded-lg"><Plus size={24}/></div>}
+                                                        {!isEditMode && (
+                                                            <button 
+                                                                onClick={(e) => handleDirectAddToCart(e, item)}
+                                                                className="bg-brand-50 text-brand-600 p-2 rounded-lg hover:bg-brand-600 hover:text-white transition cursor-pointer"
+                                                                title={language === 'th' ? 'สั่งทันที' : 'Add Direct'}
+                                                            >
+                                                                <Plus size={24}/>
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
