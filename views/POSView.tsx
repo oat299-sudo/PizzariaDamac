@@ -2252,7 +2252,7 @@ export const POSView: React.FC = () => {
                 <p className="text-sm text-gray-500 mb-6">{getLocalizedItem(selectedPizza).description}</p>
                 
                 {/* Combo Selector */}
-                {selectedPizza.comboCount ? (
+                {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
                     <div className="mb-6">
                         <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Utensils size={18}/> Select Your Items</h3>
                         <div className="grid grid-cols-2 gap-3 mb-4">
@@ -2328,7 +2328,7 @@ export const POSView: React.FC = () => {
                 )}
 
                 {/* Toppings (Only for non-combo items, though you can adapt logic as needed) */}
-                {!selectedPizza.comboCount && (
+                {!(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) && (
                     <div className="mb-6">
                         <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Layers size={18}/> Extra Options</h3>
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
@@ -2364,8 +2364,8 @@ export const POSView: React.FC = () => {
                     <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition"><Plus size={18}/></button>
                 </div>
                 <button 
-                    onClick={selectedPizza.comboCount ? confirmAddComboToCart : confirmAddToCart} 
-                    disabled={selectedPizza.comboCount ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
+                    onClick={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? confirmAddComboToCart : confirmAddToCart} 
+                    disabled={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
                     className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
                     {editingCartItem ? 'Update Order' : 'Add to Order'} • ฿{
                         ((selectedPizza.id === 'p_half_half' 
