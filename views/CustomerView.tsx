@@ -294,26 +294,27 @@ export const CustomerView: React.FC = () => {
       const canvas = document.getElementById(id) as HTMLCanvasElement | null;
       if (canvas) {
           try {
-              // Create offscreen canvas for a reliable scan experience with bank apps
-              const padding = 32;
+              // Create high-resolution offscreen canvas (800x800 px) for a pristine scan experience on bank apps
               const offCanvas = document.createElement('canvas');
-              const qrSize = canvas.width;
-              offCanvas.width = qrSize + padding * 2;
-              offCanvas.height = qrSize + padding * 2;
+              offCanvas.width = 800;
+              offCanvas.height = 800;
               
               const ctx = offCanvas.getContext('2d');
               if (ctx) {
+                  // Disable image smoothing to maintain ultra-sharp QR pixels when resizing
+                  ctx.imageSmoothingEnabled = false;
+                  
                   // 1. Fill background with absolute solid white
                   ctx.fillStyle = '#ffffff';
-                  ctx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+                  ctx.fillRect(0, 0, 800, 800);
                   
                   // 2. Draw outer border to help camera scanners detect boundaries easily
-                  ctx.strokeStyle = '#e2e8f0';
-                  ctx.lineWidth = 1;
-                  ctx.strokeRect(4, 4, offCanvas.width - 8, offCanvas.height - 8);
+                  ctx.strokeStyle = '#f1f5f9';
+                  ctx.lineWidth = 12;
+                  ctx.strokeRect(20, 20, 760, 760);
                   
-                  // 3. Draw the original QR code in the center
-                  ctx.drawImage(canvas, padding, padding, qrSize, qrSize);
+                  // 3. Draw the original QR code in the center (scaled beautifully to 640x640 px with 80px quiet zones)
+                  ctx.drawImage(canvas, 80, 80, 640, 640);
                   
                   // 4. Export as a high-contrast, non-transparent solid JPEG image
                   const url = offCanvas.toDataURL('image/jpeg', 1.0);
@@ -325,7 +326,7 @@ export const CustomerView: React.FC = () => {
                   document.body.removeChild(link);
               } else {
                   throw new Error("Could not construct 2D context");
-              }
+               }
           } catch (err) {
               console.error('Failed to save QR Code', err);
               alert(language === 'th' ? 'ไม่สามารถบันทึกรูปภาพได้ในเบราว์เซอร์นี้' : 'Cannot save image in this browser.');

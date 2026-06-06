@@ -1759,8 +1759,8 @@ export const POSView: React.FC = () => {
                                                     type="button"
                                                     onClick={() => {
                                                         alert(language === 'th' 
-                                                            ? `💾 บันทึกค่าการเชื่อมต่อเครื่องปริ้นเตอร์ ${printerIpAddress}:${printerPort} (โหมด: ${printerType}) ลงบราว์เซอร์ของท่าน เรียบร้อยแล้ว!` 
-                                                            : `💾 Wi-Fi Printer configuration saved to local storage! Target: ${printerIpAddress}:${printerPort}`);
+                                                            ? `💾 บันทึกค่าการเชื่อมต่อเครื่องพิมพ์ ${printerIpAddress}:${printerPort} (โหมด: ${printerType}) เรียบร้อยแล้ว!` 
+                                                            : `💾 Wi-Fi Printer configuration saved! Target: ${printerIpAddress}:${printerPort}`);
                                                     }}
                                                     className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-xl shadow transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 text-xs h-10"
                                                 >
@@ -1770,45 +1770,79 @@ export const POSView: React.FC = () => {
                                         </div>
 
                                         {/* Dynamic System Instructions Guide Box */}
-                                        <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 text-xs text-sky-850 space-y-2.5">
-                                            <h5 className="font-extrabold text-sky-900 flex items-center gap-1">
-                                                💡 {language === 'th' ? 'คู่มือตั้งค่าและเชื่อมต่อเครื่องพิมพ์ Wi-Fi ของทางร้าน:' : 'How to connect your Wi-Fi Printer Easy Setup:'}
+                                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-xs text-amber-900 space-y-3.5">
+                                            <h5 className="font-black text-amber-950 text-sm flex items-center gap-1.5">
+                                                🖨️ {language === 'th' ? 'คู่มือตั้งค่าและเชื่อมต่อเครื่องพิมพ์ Welltech รุ่น Wi-Fi' : 'How to Setup Welltech Wi-Fi Printer'}
                                             </h5>
                                             
                                             {language === 'th' ? (
-                                                <div className="space-y-2 text-[11px] leading-relaxed">
-                                                    <p>
-                                                        เนื่องจากเว็บแอปพลิเคชันรันออนไลน์จาก Cloud Server และไม่สามารถส่งสัญญาณ IP ตรงไปยังเราเตอร์ส่วนตัวหลังบ้านท่านแบบ Raw TCP ได้โดยตรง ความปลอดภัยเบราว์เซอร์จึงแนะนำให้เชื่อมต่อด้วยวิธีดังนี้:
+                                                <div className="space-y-3 text-[11.5px] leading-relaxed">
+                                                    <p className="font-medium text-amber-900">
+                                                        เครื่องพิมพ์ความร้อนแบรนด์ <strong className="font-extrabold text-[#d97706]">Welltech</strong> ใช้การเชื่อมต่อแบบมาตรฐาน ESC/POS ผ่านพอร์ต <strong className="font-extrabold text-blue-700">9100</strong> หากท่านยังเชื่อมต่อไม่ได้ กรุณาทำตาม 4 ขั้นตอนสำคัญนี้ครับ:
                                                     </p>
-                                                    <ul className="list-decimal list-inside space-y-1.5 text-gray-700 font-medium">
-                                                        <li>
-                                                            <strong className="text-sky-900">เชื่อมต่อผ่านระบบเครื่องพิมพ์มาตรฐาน (System Print):</strong> 
-                                                            เชื่อมต่อคอมพิวเตอร์ แท็บเล็ต หรือมือถือให้อยู่บนวงเครือข่าย Wi-Fi เดียวกันกับเครื่องพิมพ์ความร้อนของคุณ จากนั้นแชร์เครื่องพิมพ์ในระบบ OS Settings โดยใส่ IP <span className="font-mono bg-sky-100 px-1.5 py-0.5 rounded font-black text-brand-600">{printerIpAddress}</span> แล้วกดสั่งพิมพ์ใบเสร็จผ่านปุ่มในโปรแกรมตามปกติ ใบเสร็จจะออกมาสมบูรณ์แบบโดยไม่ต้องตั้งค่าพอร์ตตัวอื่นเพิ่มเลยครับ!
-                                                        </li>
-                                                        <li>
-                                                            <strong className="text-sky-900">สำหรับเครื่อง Windows (แชร์ผ่าน TCP/IP):</strong> 
-                                                            ไปที่ <span className="font-semibold">Devices and Printers</span> → <span className="font-semibold">Add a printer</span> → เลือก "The printer that I want isn't listed" → เลือก "Add a printer using TCP/IP address" → กรอกไอพี <span className="font-mono font-bold bg-sky-100 px-1.5 rounded">{printerIpAddress}</span> → ติ๊กถูกค้นหาไดรเวอร์ แล้วตั้งค่า Generic / Text Only หรือไดรเวอร์ที่ท่านมี
-                                                        </li>
-                                                        <li>
-                                                            <strong className="text-sky-900">สำหรับอุปกรณ์ Android (ใช้โปรโตคอล RawBT):</strong> 
-                                                            ดาวน์โหลดแอปชื่อ <strong className="text-brand-600 font-extrabold">"RawBT Print Service"</strong> ได้ฟรีจาก Google Play Store และเปลี่ยนหมวดในตั้งค่าด้านบนเป็น RawBT เพื่อสตรีมบิลผ่านโปรโตคอลโดยตรงได้อย่างรวดเร็วทันใจ
-                                                        </li>
-                                                    </ul>
+                                                    
+                                                    <div className="space-y-2.5">
+                                                        <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+                                                            <strong className="text-amber-950 font-black block mb-1">ขั้นตอนที่ 1: ตรวจหาไอพีจริงของ Welltech (พิมพ์ใบทดสอบ Self-Test)</strong>
+                                                            <p className="text-gray-650 text-[11px]">
+                                                                หมายเลข <span className="font-bold underline text-red-600">192.168.1.255</span> เป็นเพียงไอพีบรอดแคสต์ (Broadcast Address) เครื่องจริงของท่านจะมีไอพีเฉพาะของมันเอง ให้หาวิธีพิมพ์ใบข้อมูลดังนี้:
+                                                            </p>
+                                                            <ol className="list-decimal list-inside mt-1.5 space-y-0.5 text-gray-700">
+                                                                <li><span className="font-bold">ปิดสวิตช์เครื่องปริ้นเตอร์</span>ด้านหลังหรือด้านข้าง</li>
+                                                                <li>ใช้มือกดปุ่ม <span className="font-bold bg-gray-100 px-1 rounded border">FEED</span> ค้างไว้ (ห้ามปล่อยมือ)</li>
+                                                                <li><span className="font-bold">เปิดสวิตช์เปิดเครื่อง</span> ในขณะที่ยังกดปุ่ม FEED ค้างอยู่</li>
+                                                                <li>ค้างไว้ 3 วินาทีจนเครื่องดังสั้นๆ หรือเริ่มดึงกระดาษ แล้วจึง<span className="font-bold text-brand-600">ปล่อยปุ่ม FEED</span></li>
+                                                                <li>เครื่องพิมพ์จะพิมพ์กระดาษรายงานออกมาเป็นภาษาอังกฤษ ให้มองหาคำว่า <strong className="text-blue-700 font-mono">"IP Address: 192.168.1.xxx"</strong> (ตัวเลข 3 ตัวหลังจะไม่ใช่ 255 เช่น 192.168.1.100 หรือ 192.168.1.199)</li>
+                                                            </ol>
+                                                        </div>
+
+                                                        <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+                                                            <strong className="text-amber-950 font-black block mb-1">ขั้นตอนที่ 2: ตั้งค่าเชื่อมต่อ Wi-Fi ในอุปกรณ์</strong>
+                                                            <p className="text-gray-650 text-[11px]">
+                                                                อุปกรณ์ที่เปิดโปรแกรมนี้ (เช่น คอมพิวเตอร์ โทรศัพท์มือถือ แท็บเล็ต หรือ iPad ที่ใช้กดสั่งออเดอร์) <strong className="text-[#9a3412]">จะต้องเชื่อมต่อสัญญาณ Wi-Fi ตัวเดียวกันกับที่ต่อกับเครื่องพิมพ์ Welltech</strong> หากต่อคนละตัวกัน จะไม่สามารถพิมพ์สลิปและค้นหากันเจอได้ครับ
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+                                                            <strong className="text-amber-950 font-black block mb-1">ขั้นตอนที่ 3: กรอกไอพีและบันทึกค่าลงระบบ</strong>
+                                                            <p className="text-gray-650 text-[11px]">
+                                                                นำหมายเลข IP จริงที่ได้จากขั้นตอนที่ 1 (เช่น 192.168.1.199) มากอกลงในช่อง <strong className="text-brand-600">"หมายเลข IP เครื่องพิมพ์"</strong> ด้านข้างบนนี้ แล้วกด <span className="font-bold text-gray-800">"บันทึกการตั้งค่าเครื่องปริ้นเตอร์"</span>
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+                                                            <strong className="text-amber-950 font-black block mb-1">ขั้นตอนที่ 4: สั่งพิมพ์ออเดอร์ผ่านแอปคู่ใจตามระบบปฏิบัติการ</strong>
+                                                            <ul className="list-disc list-inside mt-1 space-y-1 text-gray-750">
+                                                                <li>
+                                                                    <strong className="text-blue-700">ระบบแอนดรอยด์ (Android Phone/Tablet):</strong> แนะนำให้ใช้ <strong className="text-brand-600">RawBT Print Service</strong> บน Google Play Store ตั้งค่าในแอป RawBT ให้เชื่อมต่อแบบ "Network/WiFi" ใส่ IP ของเครื่อง Welltech แล้วลองสั่งพิมพ์ตามเมนูด้านบน จะดึงเข้าเครื่องปริ้นสดๆ ทันที
+                                                                </li>
+                                                                <li>
+                                                                    <strong className="text-blue-700">ระบบวินโดวส์ (Windows PC):</strong> ไปที่ Devices and Printers → Add Printer → Add using TCP/IP address → กรอกไอพีของ Welltech แล้วเลือกไดรเวอร์ผู้ผลิต Welltech หรือเลือก "Generic / Text Only" จากนั้นกดสั่งพิมพ์ใบเสร็จในระบบได้ทันที
+                                                                </li>
+                                                                <li>
+                                                                    <strong className="text-blue-700">ระบบ iOS (iPad/iPhone):</strong> หากเครื่องพิมพ์ไม่รองรับ AirPrint ให้ใช้แอปใน App Store เช่น "ESC/POS WiFi Print" ช่วยทำหน้าที่ส่ง IP ตรง
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-2 leading-relaxed">
-                                                    <p>
-                                                        Because web browsers restrict direct TCP/IP sockets to private LAN addresses (e.g. 192.168.1.x) due to browser sandbox security, please use one of these standard methods below:
+                                                <div className="space-y-3 leading-relaxed">
+                                                    <p className="font-medium text-amber-900">
+                                                        <strong className="font-extrabold text-[#d97706]">Welltech</strong> receipt printers are standard ESC/POS devices performing on Port <strong className="font-extrabold text-blue-700">9100</strong>. Follow these 4 easy steps to check your setup:
                                                     </p>
-                                                    <ul className="list-decimal list-inside space-y-1.5 text-gray-705">
+                                                    <ul className="list-decimal list-inside space-y-2 text-gray-705">
                                                         <li>
-                                                            <strong className="text-sky-900">System Spooler (Highly Recommend):</strong> Ensure your tablet, iPad, or laptop is on the same local Wi-Fi router. Connect the printer directly as a System Printer using IP <span className="font-mono bg-sky-100 px-1 py-0.5 rounded text-brand-600 font-bold">{printerIpAddress}</span>. Clicking print in POSView will immediately format and send to it with pristine Thai font scaling.
+                                                            <strong className="text-amber-950 font-black">Find Welltech Real IP (Self-Test Slip):</strong> Turn off Welltech power switch. Press and hold physical <span className="font-mono bg-white inline-block px-1 rounded shadow-sm border text-[10px]">FEED</span> button, turn back on switch and hold <span className="font-mono bg-white inline-block px-1 rounded shadow-sm border text-[10px]">FEED</span> for 3 seconds until it prints. Read <span className="font-mono font-bold text-blue-700">"IP Address: 192.168.1.xxx"</span>. (Do not confuse it with broadcasts like .255).
                                                         </li>
                                                         <li>
-                                                            <strong className="text-sky-900">Windows Printers Setup:</strong> Control Panel → Devices and Printers → Add Printer → TCP/IP port → Host IP: <span className="font-mono font-bold bg-sky-105 px-1 rounded">{printerIpAddress}</span> → Driver: Choose Generic Text / your direct thermal printer driver.
+                                                            <strong className="text-amber-950 font-black">Same Wi-Fi Network Required:</strong> Verify that your POS tablet/device is on the same local network subnet name.
                                                         </li>
                                                         <li>
-                                                            <strong className="text-sky-900">Android Integration (RawBT):</strong> Download the <strong className="text-brand-600">RawBT</strong> free app from Google Play, map it to raw IP printing port, select "RawBT" above, and billing jobs will automatically trigger direct print commands.
+                                                            <strong className="text-amber-950 font-black">Enter IP & Port:</strong> Save the acquired IP into the configuration bar above.
+                                                        </li>
+                                                        <li>
+                                                            <strong className="text-amber-950 font-black">Device Spoolers:</strong> Install the standard <strong className="text-brand-650">RawBT Print Service</strong> (Android Play Store) or create a TCP/IP computer port pointing to Welltech inside Windows configurations for flawless automatic ticket output.
                                                         </li>
                                                     </ul>
                                                 </div>
