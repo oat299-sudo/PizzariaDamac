@@ -243,6 +243,7 @@ export const CustomerView: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customName, setCustomName] = useState('');
+  const [orderNote, setOrderNote] = useState('');
   const [isComboBuilderOpen, setIsComboBuilderOpen] = useState(false);
   const [comboSelections, setComboSelections] = useState<SubItem[]>([]);
   const [currentComboSlot, setCurrentComboSlot] = useState<number | null>(null);
@@ -731,7 +732,7 @@ export const CustomerView: React.FC = () => {
      }
 
      const success = await placeOrder(orderType, {
-        note: '',
+        note: orderNote,
         delivery: orderType === 'delivery' ? {
             address: finalDeliveryAddress,
             zoneName: deliveryLocationName || 'Standard',
@@ -746,6 +747,7 @@ export const CustomerView: React.FC = () => {
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
+        setOrderNote('');
         const lastId = localStorage.getItem('damac_last_order');
         setLocalOrderId(lastId);
         if (lastId) {
@@ -2138,6 +2140,20 @@ export const CustomerView: React.FC = () => {
                                              )}
                                          </div>
                                      )}
+
+                                     {/* General Order Special Requests */}
+                                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                         <label className="text-xs font-bold text-gray-500 uppercase mb-2.5 block flex items-center gap-1.5 align-middle">
+                                             <MessageCircle size={14} className="text-brand-600 shrink-0"/> 
+                                             <span>{language === 'th' ? 'หมายเหตุเพิ่มเติมถึงร้าน (เช่น ไม่ใส่หอมใหญ่, เผ็ดมาก)' : 'Special Requests / Order Notes (e.g., no onions, extra spicy)'}</span>
+                                         </label>
+                                         <textarea 
+                                             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none min-h-[75px] resize-none" 
+                                             placeholder={language === 'th' ? "เช่น ไม่ใส่พริก/หัวหอม, ขอซอสมะเขือเทศเพิ่ม..." : "e.g., no onions, extra spicy, extra tomato sauce..."}
+                                             value={orderNote}
+                                             onChange={e => setOrderNote(e.target.value)}
+                                         />
+                                     </div>
                                 </div>
                             </>
                         )}

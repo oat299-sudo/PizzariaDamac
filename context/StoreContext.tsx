@@ -1087,6 +1087,149 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       partnerId?: string;
     }
   ) => {
+      // Check for an existing active order (same table for dine-in, or same customer phone)
+      const tableNumberToMatch = details?.tableNumber;
+      const phoneToMatch = customer ? customer.phone : '';
+
+      let existingOrder: Order | undefined = undefined;
+
+      if (tableNumberToMatch && tableNumberToMatch !== 'Walk-in') {
+          // Search for any active (not completed, not cancelled) dine-in order for this table
+          existingOrder = orders.find(o => 
+              o.tableNumber === tableNumberToMatch && 
+              o.status !== 'completed' && 
+              o.status !== 'cancelled'
+          );
+      } else if (phoneToMatch) {
+          // Search for any active (not completed, not cancelled) order of the same type for this customer
+          existingOrder = orders.find(o => 
+              o.customerPhone === phoneToMatch && 
+              o.type === type &&
+              o.status !== 'completed' && 
+              o.status !== 'cancelled'
+          );
+      }
+
+      if (existingOrder) {
+          // Merge items
+          const mergedItems = [...existingOrder.items];
+          for (const newItem of cart) {
+              const existingItemIndex = mergedItems.findIndex(existingItem => {
+                  if (existingItem.pizzaId !== newItem.pizzaId) return false;
+                  if ((existingItem.specialInstructions || '') !== (newItem.specialInstructions || '')) return false;
+                  
+                  // Compare Toppings
+                  const oldToppings = existingItem.selectedToppings || [];
+                  const newToppings = newItem.selectedToppings || [];
+                  if (oldToppings.length !== newToppings.length) return false;
+                  const allToppingsMatch = oldToppings.every(ot => newToppings.some(nt => nt.id === ot.id));
+                  if (!allToppingsMatch) return false;
+
+                  // Compare SubItems (combos)
+                  const oldSub = existingItem.subItems || [];
+                  const newSub = newItem.subItems || [];
+                  if (oldSub.length !== newSub.length) return false;
+                  const allSubMatch = oldSub.every((os, idx) => {
+                      const ns = newSub[idx];
+                      if (!os && !ns) return true;
+                      if (!os || !ns) return false;
+                      if (os.pizzaId !== ns.pizzaId) return false;
+                      
+                      const osT = os.toppings || [];
+                      const nsT = ns.toppings || [];
+                      if (osT.length !== nsT.length) return false;
+                      return osT.every(ot => nsT.some(nt => nt.id === ot.id));
+                  });
+                  if (!allSubMatch) return false;
+
+                  return true;
+              });
+
+              if (existingItemIndex > -1) {
+                  // Merge quantities & update price
+                  const existingItem = mergedItems[existingItemIndex];
+                  const newQty = existingItem.quantity + newItem.quantity;
+                  const itemUnitPrice = existingItem.totalPrice / existingItem.quantity;
+                  mergedItems[existingItemIndex] = {
+                      ...existingItem,
+                      quantity: newQty,
+                      totalPrice: Math.round(itemUnitPrice * newQty)
+                  };
+              } else {
+                  // Append new item
+                  mergedItems.push({ ...newItem });
+              }
+          }
+
+          // Recalculate total amount for the merged order
+          const newSubtotal = mergedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+          const deliveryFee = existingOrder.deliveryFee === 'pending' ? 0 : (existingOrder.deliveryFee || 0);
+          const newTotalAmount = newSubtotal + deliveryFee;
+
+          // Calculate Net (GP Deduction)
+          const gpRate = GP_RATES[existingOrder.source] || 0;
+          const newNetAmount = newTotalAmount * (1 - gpRate);
+
+          // Append to note if there is a new note
+          let newNote = existingOrder.note || '';
+          if (details?.note) {
+              newNote = newNote ? `${newNote} | Add: ${details.note}` : `Add: ${details.note}`;
+          }
+
+          // Build updated order object
+          const updatedOrder: Order = {
+              ...existingOrder,
+              items: mergedItems,
+              totalAmount: newTotalAmount,
+              netAmount: newNetAmount,
+              note: newNote,
+          };
+
+          // Save to Supabase
+          if (isSupabaseConfigured) {
+              try {
+                  const { error } = await supabase
+                      .from('orders')
+                      .update({
+                          items: updatedOrder.items,
+                          total_amount: updatedOrder.totalAmount,
+                          net_amount: updatedOrder.netAmount,
+                          note: updatedOrder.note
+                      })
+                      .eq('id', existingOrder.id);
+                  if (error) throw error;
+              } catch (e: any) {
+                  console.error("Failed to update and merge order in Supabase:", e);
+                  alert("Failed to update order: " + (e?.message || String(e)));
+                  return false;
+              }
+          }
+
+          // Update local state
+          setOrders(prev => prev.map(o => o.id === existingOrder.id ? updatedOrder : o));
+
+          // Loyalty calculations: 1 point per newly added pizza item
+          if (customer) {
+              const addedPizzas = cart.filter(i => {
+                   const itemDef = menu.find(m => m.id === i.pizzaId);
+                   return itemDef?.category === 'pizza' || itemDef?.category === 'promotion';
+              }).reduce((sum, i) => sum + i.quantity, 0);
+
+              if (addedPizzas > 0) {
+                  const newPoints = customer.loyaltyPoints + addedPizzas;
+                  const updatedCustomer = { 
+                      ...customer, 
+                      loyaltyPoints: newPoints
+                  };
+                  await setCustomer(updatedCustomer);
+              }
+          }
+
+          // Clear cart
+          clearCart();
+          return true;
+      }
+
       // Calculate Total
       const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
       const deliveryFee = details?.delivery?.fee === 'pending' ? 0 : (details?.delivery?.fee || 0);
