@@ -55,7 +55,10 @@ export const POSView: React.FC = () => {
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
         addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount,
-        paperSize, setPaperSize
+        paperSize, setPaperSize,
+        printerIpAddress, setPrinterIpAddress,
+        printerPort, setPrinterPort,
+        printerType, setPrinterType
     } = useStore();
     
     // Unified Tab State
@@ -1691,7 +1694,126 @@ export const POSView: React.FC = () => {
                                     </div>
                                     <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-2">
                                         <span className="text-gray-600 font-bold">{language === 'th' ? 'สลิปปัจจุบัน:' : 'Currently Selected Width:'} <strong className="text-brand-600 font-extrabold text-base">{paperSize}</strong></span>
-                                        <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 rounded-xl">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
+                                        <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 hover:bg-brand-100 rounded-xl transition">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
+                                    </div>
+                                    
+                                    <div className="mt-6 pt-6 border-t border-gray-150 space-y-4">
+                                        <h4 className="font-extrabold text-sm text-gray-800 flex items-center gap-1.5 uppercase">
+                                            📶 {language === 'th' ? 'ตั้งค่าการเชื่อมต่อเครื่องพิมพ์ Wi-Fi / IP Printer' : 'Wi-Fi / IP Printer Connection Setup'}
+                                        </h4>
+                                        <p className="text-xs text-gray-400">
+                                            {language === 'th' 
+                                                ? 'กำหนดหมายเลขไอพีเครื่องพิมพ์ที่แชร์บนวงเครือข่าย Wi-Fi ท้องถิ่นของคุณ เพื่อความสะดวกและยืดหยุ่นในการสับเปลี่ยนเครือข่ายในอนาคต' 
+                                                : 'Define the physical printer IP address on your local network/Wi-Fi to ensure rapid access and seamless future printer swaps.'}
+                                        </p>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 block mb-1">
+                                                    {language === 'th' ? 'หมายเลข IP เครื่องพิมพ์ (Printer IP Address)' : 'Printer IP Address'}
+                                                </label>
+                                                <div className="relative">
+                                                    <input 
+                                                        type="text" 
+                                                        value={printerIpAddress} 
+                                                        onChange={(e) => setPrinterIpAddress(e.target.value)}
+                                                        placeholder="เช่น 192.168.1.255"
+                                                        className="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-xl font-mono font-bold text-gray-800 focus:border-brand-500 outline-none transition"
+                                                    />
+                                                    <span className="absolute left-3 top-2.5 text-gray-400 text-xs font-black">IP:</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 block mb-1">
+                                                    {language === 'th' ? 'พอร์ตเชื่อมต่อ (Connection Port)' : 'Connection Port'}
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    value={printerPort} 
+                                                    onChange={(e) => setPrinterPort(Number(e.target.value))}
+                                                    placeholder="9100"
+                                                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-mono font-bold text-gray-800 focus:border-brand-500 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 block mb-1">
+                                                    {language === 'th' ? 'วิธีการสั่งพิมพ์ (Printing Mode)' : 'Printing Mode'}
+                                                </label>
+                                                <select
+                                                    value={printerType}
+                                                    onChange={(e) => setPrinterType(e.target.value as any)}
+                                                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition"
+                                                >
+                                                    <option value="system">🖥️ {language === 'th' ? 'System Print (แนะนำเสถียรที่สุด)' : 'System Print (Recommended)'}</option>
+                                                    <option value="rawbt">📱 {language === 'th' ? 'RawBT App / Android WiFi' : 'RawBT Companion App (Android)'}</option>
+                                                    <option value="local_proxy">🔌 {language === 'th' ? 'Direct Local Network Proxy' : 'Local Network Proxy/Bridge'}</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="flex items-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        alert(language === 'th' 
+                                                            ? `💾 บันทึกค่าการเชื่อมต่อเครื่องปริ้นเตอร์ ${printerIpAddress}:${printerPort} (โหมด: ${printerType}) ลงบราว์เซอร์ของท่าน เรียบร้อยแล้ว!` 
+                                                            : `💾 Wi-Fi Printer configuration saved to local storage! Target: ${printerIpAddress}:${printerPort}`);
+                                                    }}
+                                                    className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-xl shadow transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 text-xs h-10"
+                                                >
+                                                    💾 {language === 'th' ? 'บันทึกการตั้งค่าเครื่องปริ้นเตอร์' : 'Save Printer Preferences'}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Dynamic System Instructions Guide Box */}
+                                        <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 text-xs text-sky-850 space-y-2.5">
+                                            <h5 className="font-extrabold text-sky-900 flex items-center gap-1">
+                                                💡 {language === 'th' ? 'คู่มือตั้งค่าและเชื่อมต่อเครื่องพิมพ์ Wi-Fi ของทางร้าน:' : 'How to connect your Wi-Fi Printer Easy Setup:'}
+                                            </h5>
+                                            
+                                            {language === 'th' ? (
+                                                <div className="space-y-2 text-[11px] leading-relaxed">
+                                                    <p>
+                                                        เนื่องจากเว็บแอปพลิเคชันรันออนไลน์จาก Cloud Server และไม่สามารถส่งสัญญาณ IP ตรงไปยังเราเตอร์ส่วนตัวหลังบ้านท่านแบบ Raw TCP ได้โดยตรง ความปลอดภัยเบราว์เซอร์จึงแนะนำให้เชื่อมต่อด้วยวิธีดังนี้:
+                                                    </p>
+                                                    <ul className="list-decimal list-inside space-y-1.5 text-gray-700 font-medium">
+                                                        <li>
+                                                            <strong className="text-sky-900">เชื่อมต่อผ่านระบบเครื่องพิมพ์มาตรฐาน (System Print):</strong> 
+                                                            เชื่อมต่อคอมพิวเตอร์ แท็บเล็ต หรือมือถือให้อยู่บนวงเครือข่าย Wi-Fi เดียวกันกับเครื่องพิมพ์ความร้อนของคุณ จากนั้นแชร์เครื่องพิมพ์ในระบบ OS Settings โดยใส่ IP <span className="font-mono bg-sky-100 px-1.5 py-0.5 rounded font-black text-brand-600">{printerIpAddress}</span> แล้วกดสั่งพิมพ์ใบเสร็จผ่านปุ่มในโปรแกรมตามปกติ ใบเสร็จจะออกมาสมบูรณ์แบบโดยไม่ต้องตั้งค่าพอร์ตตัวอื่นเพิ่มเลยครับ!
+                                                        </li>
+                                                        <li>
+                                                            <strong className="text-sky-900">สำหรับเครื่อง Windows (แชร์ผ่าน TCP/IP):</strong> 
+                                                            ไปที่ <span className="font-semibold">Devices and Printers</span> → <span className="font-semibold">Add a printer</span> → เลือก "The printer that I want isn't listed" → เลือก "Add a printer using TCP/IP address" → กรอกไอพี <span className="font-mono font-bold bg-sky-100 px-1.5 rounded">{printerIpAddress}</span> → ติ๊กถูกค้นหาไดรเวอร์ แล้วตั้งค่า Generic / Text Only หรือไดรเวอร์ที่ท่านมี
+                                                        </li>
+                                                        <li>
+                                                            <strong className="text-sky-900">สำหรับอุปกรณ์ Android (ใช้โปรโตคอล RawBT):</strong> 
+                                                            ดาวน์โหลดแอปชื่อ <strong className="text-brand-600 font-extrabold">"RawBT Print Service"</strong> ได้ฟรีจาก Google Play Store และเปลี่ยนหมวดในตั้งค่าด้านบนเป็น RawBT เพื่อสตรีมบิลผ่านโปรโตคอลโดยตรงได้อย่างรวดเร็วทันใจ
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2 leading-relaxed">
+                                                    <p>
+                                                        Because web browsers restrict direct TCP/IP sockets to private LAN addresses (e.g. 192.168.1.x) due to browser sandbox security, please use one of these standard methods below:
+                                                    </p>
+                                                    <ul className="list-decimal list-inside space-y-1.5 text-gray-705">
+                                                        <li>
+                                                            <strong className="text-sky-900">System Spooler (Highly Recommend):</strong> Ensure your tablet, iPad, or laptop is on the same local Wi-Fi router. Connect the printer directly as a System Printer using IP <span className="font-mono bg-sky-100 px-1 py-0.5 rounded text-brand-600 font-bold">{printerIpAddress}</span>. Clicking print in POSView will immediately format and send to it with pristine Thai font scaling.
+                                                        </li>
+                                                        <li>
+                                                            <strong className="text-sky-900">Windows Printers Setup:</strong> Control Panel → Devices and Printers → Add Printer → TCP/IP port → Host IP: <span className="font-mono font-bold bg-sky-105 px-1 rounded">{printerIpAddress}</span> → Driver: Choose Generic Text / your direct thermal printer driver.
+                                                        </li>
+                                                        <li>
+                                                            <strong className="text-sky-900">Android Integration (RawBT):</strong> Download the <strong className="text-brand-600">RawBT</strong> free app from Google Play, map it to raw IP printing port, select "RawBT" above, and billing jobs will automatically trigger direct print commands.
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

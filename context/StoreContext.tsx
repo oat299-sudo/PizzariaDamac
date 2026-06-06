@@ -103,6 +103,12 @@ interface StoreContextType {
   tableSession: string | null;
   paperSize: '58mm' | '80mm';
   setPaperSize: (size: '58mm' | '80mm') => void;
+  printerIpAddress: string;
+  setPrinterIpAddress: (ip: string) => void;
+  printerPort: number;
+  setPrinterPort: (port: number) => void;
+  printerType: 'system' | 'rawbt' | 'local_proxy';
+  setPrinterType: (type: 'system' | 'rawbt' | 'local_proxy') => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -133,6 +139,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setPaperSizeState(size);
       try {
           localStorage.setItem('damac_paper_size', size);
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  // --- Printer Setting Preferences (Wifi Printer) ---
+  const [printerIpAddress, setPrinterIpAddressState] = useState<string>(() => {
+      if (typeof window !== 'undefined') {
+          return localStorage.getItem('damac_printer_ip') || '192.168.1.255';
+      }
+      return '192.168.1.255';
+  });
+  const setPrinterIpAddress = (ip: string) => {
+      setPrinterIpAddressState(ip);
+      try {
+          localStorage.setItem('damac_printer_ip', ip);
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  const [printerPort, setPrinterPortState] = useState<number>(() => {
+      if (typeof window !== 'undefined') {
+          const portVal = localStorage.getItem('damac_printer_port');
+          return portVal ? parseInt(portVal, 10) : 9100;
+      }
+      return 9100;
+  });
+  const setPrinterPort = (port: number) => {
+      setPrinterPortState(port);
+      try {
+          localStorage.setItem('damac_printer_port', String(port));
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  const [printerType, setPrinterTypeState] = useState<'system' | 'rawbt' | 'local_proxy'>(() => {
+      if (typeof window !== 'undefined') {
+          return (localStorage.getItem('damac_printer_type') as 'system' | 'rawbt' | 'local_proxy') || 'system';
+      }
+      return 'system';
+  });
+  const setPrinterType = (type: 'system' | 'rawbt' | 'local_proxy') => {
+      setPrinterTypeState(type);
+      try {
+          localStorage.setItem('damac_printer_type', type);
       } catch(e) { console.error("Storage Error", e); }
   };
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
@@ -1316,7 +1363,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,
       tableSession,
-      paperSize, setPaperSize
+      paperSize, setPaperSize,
+      printerIpAddress, setPrinterIpAddress,
+      printerPort, setPrinterPort,
+      printerType, setPrinterType
   };
 
   return (
