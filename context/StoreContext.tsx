@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { 
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
   PaymentMethod, CustomerProfile, Expense, StoreSettings, NewsItem, 
-  SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory
+  SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory, Partner
 } from '../types';
 import { 
   INITIAL_MENU, INITIAL_TOPPINGS, DEFAULT_STORE_SETTINGS, 
@@ -71,6 +71,7 @@ interface StoreContextType {
       source?: OrderSource;
       status?: OrderStatus;
       deliveryPlatformRef?: string;
+      partnerId?: string;
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -101,6 +102,8 @@ interface StoreContextType {
   deleteNewsItem: (id: string) => Promise<void>;
 
   tableSession: string | null;
+  partnerSession: string | null;
+  setPartnerSession: (partnerId: string | null) => void;
   paperSize: '58mm' | '80mm';
   setPaperSize: (size: '58mm' | '80mm') => void;
   printerIpAddress: string;
@@ -109,6 +112,15 @@ interface StoreContextType {
   setPrinterPort: (port: number) => void;
   printerType: 'system' | 'rawbt' | 'local_proxy';
   setPrinterType: (type: 'system' | 'rawbt' | 'local_proxy') => void;
+  receiptFontSize: number;
+  setReceiptFontSize: (size: number) => void;
+  receiptPadding: number;
+  setReceiptPadding: (padding: number) => void;
+
+  partners: Partner[];
+  addPartner: (partner: Partner) => void;
+  updatePartner: (partner: Partner) => void;
+  deletePartner: (id: string) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -182,6 +194,34 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           localStorage.setItem('damac_printer_type', type);
       } catch(e) { console.error("Storage Error", e); }
   };
+
+  const [receiptFontSize, setReceiptFontSizeState] = useState<number>(() => {
+      if (typeof window !== 'undefined') {
+          const fs = localStorage.getItem('damac_receipt_font_size');
+          return fs ? parseInt(fs, 10) : 12;
+      }
+      return 12;
+  });
+  const setReceiptFontSize = (size: number) => {
+      setReceiptFontSizeState(size);
+      try {
+          localStorage.setItem('damac_receipt_font_size', String(size));
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  const [receiptPadding, setReceiptPaddingState] = useState<number>(() => {
+      if (typeof window !== 'undefined') {
+          const pad = localStorage.getItem('damac_receipt_padding');
+          return pad ? parseInt(pad, 10) : 2;
+      }
+      return 2;
+  });
+  const setReceiptPadding = (padding: number) => {
+      setReceiptPaddingState(padding);
+      try {
+          localStorage.setItem('damac_receipt_padding', String(padding));
+      } catch(e) { console.error("Storage Error", e); }
+  };
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
       let text = TRANSLATIONS[language][key] || TRANSLATIONS['en'][key] || key;
       if (params) {
@@ -219,13 +259,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return null;
   });
 
+  // Check for Partner Param (QR Code Scan)
+  const [partnerSession, setPartnerSessionState] = useState<string | null>(() => {
+      if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const partner = params.get('partner');
+          if (partner) {
+              localStorage.setItem('damac_partner_session', partner);
+              return partner;
+          }
+          return localStorage.getItem('damac_partner_session');
+      }
+      return null;
+  });
+
+  const setPartnerSession = (partnerId: string | null) => {
+      setPartnerSessionState(partnerId);
+      if (typeof window !== 'undefined') {
+          if (partnerId) {
+              localStorage.setItem('damac_partner_session', partnerId);
+          } else {
+              localStorage.removeItem('damac_partner_session');
+          }
+      }
+  };
+
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const view = params.get('view');
       const table = params.get('table');
+      const partner = params.get('partner');
       setCurrentView((view === 'kitchen' || view === 'pos') ? view : 'customer');
       if (table) setTableSession(table);
+      if (partner) setPartnerSession(partner);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -314,6 +381,45 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+
+  // Partners State
+  const [partners, setPartners] = useState<Partner[]>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_partners');
+          if (saved) {
+              try { return JSON.parse(saved); } catch(e) {}
+          }
+      }
+      return [
+        {
+          id: 'partner_bella_cafe',
+          name: 'Bella Cafe',
+          nameTh: 'ร้านเบลล่า คาเฟ่',
+          commissionPercent: 10,
+          createdAt: new Date().toISOString(),
+          note: 'สแกนสั่งจากร้านกาแฟเบลล่า ส่วนแบ่ง 10%'
+        }
+      ];
+  });
+
+  useEffect(() => {
+      try {
+        localStorage.setItem('damac_partners', JSON.stringify(partners));
+      } catch(e) {}
+  }, [partners]);
+
+  const addPartner = (partner: Partner) => {
+    setPartners(prev => [partner, ...prev]);
+  };
+
+  const updatePartner = (updated: Partner) => {
+    setPartners(prev => prev.map(p => p.id === updated.id ? updated : p));
+  };
+
+  const deletePartner = (id: string) => {
+    setPartners(prev => prev.filter(p => p.id !== id));
+  };
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustState] = useState<CustomerProfile | null>(() => {
     const saved = localStorage.getItem('damac_customer');
@@ -978,6 +1084,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       source?: OrderSource;
       status?: OrderStatus;
       deliveryPlatformRef?: string;
+      partnerId?: string;
     }
   ) => {
       // Calculate Total
@@ -989,6 +1096,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const source = details?.source || 'store';
       const gpRate = GP_RATES[source] || 0;
       const netAmount = totalAmount * (1 - gpRate);
+
+      // Partner Commission calculation
+      let partnerCommissionAmount = 0;
+      if (details?.partnerId) {
+          const foundPartner = partners.find(p => p.id === details.partnerId);
+          if (foundPartner) {
+              partnerCommissionAmount = Math.round(totalAmount * (foundPartner.commissionPercent / 100));
+          }
+      }
 
       let computedNote = details?.note || '';
       if (details?.deliveryPlatformRef) {
@@ -1013,7 +1129,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           paymentMethod: details?.paymentMethod,
           pickupTime: details?.pickupTime,
           tableNumber: details?.tableNumber,
-          deliveryPlatformRef: details?.deliveryPlatformRef
+          deliveryPlatformRef: details?.deliveryPlatformRef,
+          partnerId: details?.partnerId,
+          partnerCommissionAmount: partnerCommissionAmount
       };
 
       if (isSupabaseConfigured) {
@@ -1363,10 +1481,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
       addNewsItem, deleteNewsItem,
       tableSession,
+      partnerSession,
+      setPartnerSession,
       paperSize, setPaperSize,
       printerIpAddress, setPrinterIpAddress,
       printerPort, setPrinterPort,
-      printerType, setPrinterType
+      printerType, setPrinterType,
+      receiptFontSize, setReceiptFontSize,
+      receiptPadding, setReceiptPadding,
+      partners, addPartner, updatePartner, deletePartner
   };
 
   return (

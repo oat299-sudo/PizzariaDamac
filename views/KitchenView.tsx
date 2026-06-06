@@ -6,7 +6,7 @@ import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer, Phone, Globe } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize } = useStore();
+  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
@@ -612,20 +612,37 @@ export const KitchenView: React.FC = () => {
             }
             .printable-area {
                 width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
-                padding: ${paperSize === '58mm' ? '1mm' : '2mm'} !important;
+                padding: ${receiptPadding}mm !important;
+            }
+            .printable-area, .printable-area * {
+                font-size: ${receiptFontSize}px !important;
+            }
+            .printable-area .ticket-title {
+                font-size: ${receiptFontSize + 3}px !important;
             }
         }
     ` }} />
 
-    <div className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm]' : 'print:w-[80mm]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}>
+    <div 
+        className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm]' : 'print:w-[80mm]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}
+        style={{ fontSize: `${receiptFontSize}px` }}
+    >
         {printOrder && (
-            <div className={`${paperSize === '58mm' ? 'w-[58mm] text-[10.5px]' : 'w-[80mm] text-[12px]'} overflow-hidden`}>
+            <div className={`${paperSize === '58mm' ? 'w-[58mm]' : 'w-[80mm]'} overflow-hidden`}>
                 <div className="text-center font-bold">
                     <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
-                    <div className={`${paperSize === '58mm' ? 'text-[11px]' : 'text-[12px]'} font-black uppercase my-1`}>KITCHEN TICKET</div>
+                    <div 
+                        className="font-black uppercase my-1 ticket-title"
+                        style={{ fontSize: `${receiptFontSize + 1}px` }}
+                    >
+                        KITCHEN TICKET
+                    </div>
                     <div>ใบสั่งอาหาร / ครัว</div>
                     <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
-                    <div className={`${paperSize === '58mm' ? 'text-[13px]' : 'text-[15px]'} font-black my-1`}>
+                    <div 
+                        className="font-black my-1 ticket-title"
+                        style={{ fontSize: `${receiptFontSize + 3}px` }}
+                    >
                         {printOrder.tableNumber ? (language === 'th' ? `โต๊ะ ${printOrder.tableNumber}` : `Table ${printOrder.tableNumber}`) : (printOrder.type === 'delivery' ? `DELIVERY` : `TAKE AWAY`)}
                     </div>
                     {printOrder.customerName && !printOrder.tableNumber && (

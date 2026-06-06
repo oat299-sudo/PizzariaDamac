@@ -100,7 +100,7 @@ export const CustomerView: React.FC = () => {
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback, updateOrderTypeToPickup,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
-    toppings, fetchOrders, tableSession
+    toppings, fetchOrders, tableSession, partnerSession, setPartnerSession, partners
   } = useStore();
   
   // Feedback Modal States
@@ -111,6 +111,17 @@ export const CustomerView: React.FC = () => {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
   const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
+  
+  // Half-Half customizer states
+  const [halfA, setHalfA] = useState<Pizza | null>(null);
+  const [halfB, setHalfB] = useState<Pizza | null>(null);
+
+  useEffect(() => {
+    if (selectedPizza?.id === 'p_half_half') {
+        setHalfA(null);
+        setHalfB(null);
+    }
+  }, [selectedPizza]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -500,6 +511,42 @@ export const CustomerView: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!selectedPizza) return;
+    const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
+
+    if (selectedPizza.id === 'p_half_half') {
+        if (!halfA || !halfB) {
+            alert(language === 'th' ? 'กรุณาเลือกหน้าพิซซ่าให้ครบทั้งสองครึ่ง' : 'Please select both halves of the pizza.');
+            return;
+        }
+        const calculatedBasePrice = Math.round((halfA.basePrice / 2) + (halfB.basePrice / 2) + 20);
+        const total = calculatedBasePrice + toppingsPrice;
+        const nameEn = `Half-Half Pizza (${halfA.name} / ${halfB.name})`;
+        const nameTh = `พิซซ่าครึ่ง-ครึ่ง (${halfA.nameTh || halfA.name} / ${halfB.nameTh || halfB.name})`;
+        
+        const item: CartItem = {
+          id: Date.now().toString() + Math.random().toString(),
+          pizzaId: selectedPizza.id,
+          name: nameEn,
+          nameTh: nameTh, 
+          basePrice: calculatedBasePrice,
+          selectedToppings: selectedToppings,
+          quantity: 1,
+          totalPrice: total,
+          subItems: [
+              { pizzaId: halfA.id, name: `Half A: ${halfA.name}`, nameTh: `ครึ่งแรก: ${halfA.nameTh || halfA.name}`, toppings: [] },
+              { pizzaId: halfB.id, name: `Half B: ${halfB.name}`, nameTh: `ครึ่งหลัง: ${halfB.nameTh || halfB.name}`, toppings: [] }
+          ],
+          specialInstructions: specialInstructions
+        };
+        addToCart(item);
+        setSelectedPizza(null);
+        setSelectedToppings([]);
+        setSpecialInstructions('');
+        setHalfA(null);
+        setHalfB(null);
+        return;
+    }
+
     if (selectedPizza.id === 'custom_base') {
         const hasSauce = selectedToppings.some(t => t.category === 'sauce');
         if (!hasSauce) {
@@ -507,7 +554,6 @@ export const CustomerView: React.FC = () => {
             return;
         }
     }
-    const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
     const localizedPizza = getLocalizedItem(selectedPizza);
     let finalName = localizedPizza.name;
     if (selectedPizza.name === "Create Your Own Pizza") {
@@ -670,7 +716,8 @@ export const CustomerView: React.FC = () => {
         paymentMethod: paymentMethod,
         pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,
         tableNumber: tableSession || undefined, 
-        source: 'store'
+        source: 'store',
+        partnerId: partnerSession || undefined
      });
      setIsSubmitting(false);
      if (success) {
@@ -942,6 +989,22 @@ export const CustomerView: React.FC = () => {
              </div>
         )}
 
+        {/* PARTNER REFERRAL BANNER */}
+        {(() => {
+             if (!partnerSession) return null;
+             const partner = partners?.find(p => p.id === partnerSession);
+             if (!partner) return null;
+             return (
+                 <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 text-center sticky top-16 z-20 shadow-md flex items-center justify-center gap-4">
+                     <div className="font-bold text-sm md:text-base flex items-center justify-center gap-2">
+                         <span className="animate-bounce">☕️</span>
+                         {language === 'th' ? `ยินดีต้อนรับ สั่งส่งตรงจากร้านกาแฟ ${partner.nameTh || partner.name}` : `Referral order from ${partner.name}`}
+                     </div>
+                     <button onClick={() => setPartnerSession(null)} className="text-[10px] bg-white text-amber-600 px-2.5 py-1 rounded-full font-bold hover:bg-amber-50 transition shrink-0 uppercase">Dismiss</button>
+                 </div>
+             );
+        })()}
+
         {/* Categories */}
         <div className={`bg-white border-b sticky z-30 shadow-sm ${tableSession ? 'top-28' : 'top-16'}`}>
             <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
@@ -1105,7 +1168,26 @@ export const CustomerView: React.FC = () => {
         {activeCategory !== 'promotion' && (
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
-                    {menu.filter(p => p.category === activeCategory).map(item => {
+                    {(() => {
+                        const rawItems = menu.filter(p => p.category === activeCategory);
+                        if (activeCategory === 'pizza') {
+                            const virtualHalfHalfPizza: Pizza = {
+                                id: 'p_half_half',
+                                name: 'Half-Half Pizza (Create Your Own)',
+                                nameTh: 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
+                                basePrice: 0, 
+                                description: 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
+                                descriptionTh: 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
+                                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+                                available: true,
+                                category: 'pizza',
+                                badge: 'Mix 2-in-1',
+                                badgeTh: 'แบ่งครึ่งผสมผสาน'
+                            };
+                            return [virtualHalfHalfPizza, ...rawItems];
+                        }
+                        return rawItems;
+                    })().map(item => {
                         const localized = getLocalizedItem(item);
                         return (
                             <div key={item.id} onClick={() => handleCustomize(item)} className={`bg-white rounded-2xl p-2 md:p-3 shadow-sm hover:shadow-lg transition cursor-pointer border border-transparent hover:border-brand-200 group ${!item.available ? 'opacity-60 grayscale' : ''}`}>
@@ -1129,7 +1211,9 @@ export const CustomerView: React.FC = () => {
                                     <h3 className="font-bold text-gray-900 text-sm md:text-lg leading-tight mb-1 line-clamp-2">{localized.name}</h3>
                                     <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-base md:text-lg font-bold text-brand-600">฿{item.basePrice}</span>
+                                        <span className="text-base md:text-md font-bold text-brand-600">
+                                            {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${item.basePrice}`}
+                                        </span>
                                         <button className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-600 hover:text-white transition"><Plus size={16}/></button>
                                     </div>
                                 </div>
@@ -1490,6 +1574,80 @@ export const CustomerView: React.FC = () => {
                                 </div>
                             )}
                             
+                            {/* Half-Half Pizza customizer picker views */}
+                            {selectedPizza.id === 'p_half_half' && (
+                                <div className="mb-6 bg-amber-50/50 p-4 rounded-2xl border border-amber-200 text-left shadow-sm">
+                                     <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-4 text-left">
+                                         <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg text-sm">🌓</span> 
+                                         {language === 'th' ? 'เลือกหน้าผสม 2 ฝั่ง' : 'Customize Your Two Halves'}
+                                     </h3>
+                                     
+                                     <div className="space-y-4">
+                                          {/* Half A */}
+                                          <div className="text-left">
+                                               <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
+                                                   {language === 'th' ? 'ครึ่งแรก (ฝั่งซ้าย)' : 'First Half (Side A)'}
+                                               </label>
+                                               <select 
+                                                   className="w-full border-2 border-gray-250 rounded-xl p-3 focus:border-amber-500 outline-none text-sm font-bold bg-white text-gray-850"
+                                                   value={halfA?.id || ''}
+                                                   onChange={(e) => {
+                                                       const found = menu.find(p => p.id === e.target.value);
+                                                       setHalfA(found || null);
+                                                   }}
+                                               >
+                                                   <option value="">{language === 'th' ? '-- เลือกหน้าสำหรับครึ่งแรก --' : '-- Choose side A --'}</option>
+                                                   {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                       <option key={pItem.id} value={pItem.id}>
+                                                           {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                       </option>
+                                                   ))}
+                                               </select>
+                                               {halfA && (
+                                                   <div className="mt-2 flex items-center gap-3 p-2 bg-white rounded-xl border border-gray-150 shadow-sm animate-fade-in text-left">
+                                                       <img src={halfA.image} className="w-10 h-10 object-cover rounded-lg" />
+                                                       <div>
+                                                           <div className="text-xs font-bold text-gray-800">{language === 'th' ? halfA.nameTh || halfA.name : halfA.name}</div>
+                                                           <div className="text-[10px] text-gray-500">฿{halfA.basePrice / 2}</div>
+                                                       </div>
+                                                   </div>
+                                               )}
+                                          </div>
+
+                                          {/* Half B */}
+                                          <div className="text-left">
+                                               <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
+                                                   {language === 'th' ? 'ครึ่งหลัง (ฝั่งขวา)' : 'Second Half (Side B)'}
+                                               </label>
+                                               <select 
+                                                   className="w-full border-2 border-gray-250 rounded-xl p-3 focus:border-amber-500 outline-none text-sm font-bold bg-white text-gray-850"
+                                                   value={halfB?.id || ''}
+                                                   onChange={(e) => {
+                                                       const found = menu.find(p => p.id === e.target.value);
+                                                       setHalfB(found || null);
+                                                   }}
+                                               >
+                                                   <option value="">{language === 'th' ? '-- เลือกหน้าสำหรับครึ่งหลัง --' : '-- Choose side B --'}</option>
+                                                   {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                       <option key={pItem.id} value={pItem.id}>
+                                                           {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                       </option>
+                                                   ))}
+                                               </select>
+                                               {halfB && (
+                                                   <div className="mt-2 flex items-center gap-3 p-2 bg-white rounded-xl border border-gray-150 shadow-sm animate-fade-in text-left">
+                                                       <img src={halfB.image} className="w-10 h-10 object-cover rounded-lg" />
+                                                       <div>
+                                                           <div className="text-xs font-bold text-gray-800">{language === 'th' ? halfB.nameTh || halfB.name : halfB.name}</div>
+                                                           <div className="text-[10px] text-gray-500">฿{halfB.basePrice / 2}</div>
+                                                       </div>
+                                                   </div>
+                                               )}
+                                          </div>
+                                     </div>
+                                </div>
+                            )}
+
                             {/* Special Instructions */}
                             <div className="mb-6">
                                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><MessageCircle size={14}/> Special Instructions</label>
@@ -1566,9 +1724,15 @@ export const CustomerView: React.FC = () => {
 
                         {/* Footer */}
                         <div className="p-4 md:p-6 bg-white border-t border-gray-100 flex justify-between items-center shrink-0">
-                            <div className="flex flex-col">
+                            <div className="flex flex-col text-left">
                                 <span className="text-xs text-gray-400 uppercase font-bold">Total Price</span>
-                                <span className="text-2xl font-bold text-gray-900">฿{selectedPizza.basePrice + selectedToppings.reduce((s,t) => s + t.price, 0)}</span>
+                                <span className="text-2xl font-bold text-gray-900">
+                                    ฿{selectedPizza.id === 'p_half_half' 
+                                        ? (halfA && halfB 
+                                            ? Math.round((halfA.basePrice / 2) + (halfB.basePrice / 2) + 20) + selectedToppings.reduce((s,t) => s + t.price, 0)
+                                            : 20 + selectedToppings.reduce((s,t) => s + t.price, 0))
+                                        : selectedPizza.basePrice + selectedToppings.reduce((s,t) => s + t.price, 0)}
+                                </span>
                             </div>
                             <div className="flex gap-3">
                                 <button onClick={handleSaveFavorite} className="p-3 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition">

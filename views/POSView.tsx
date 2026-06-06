@@ -54,16 +54,34 @@ export const POSView: React.FC = () => {
         expenses, addExpense, deleteExpense,
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
+        partners, addPartner, updatePartner, deletePartner,
         addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount,
         paperSize, setPaperSize,
         printerIpAddress, setPrinterIpAddress,
         printerPort, setPrinterPort,
-        printerType, setPrinterType
+        printerType, setPrinterType,
+        receiptFontSize, setReceiptFontSize,
+        receiptPadding, setReceiptPadding
     } = useStore();
     
     // Unified Tab State
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
+    
+    // Half-Half customizer states for POS
+    const [halfA, setHalfA] = useState<Pizza | null>(null);
+    const [halfB, setHalfB] = useState<Pizza | null>(null);
+
+    // Partners form states
+    const [newPartnerName, setNewPartnerName] = useState('');
+    const [newPartnerComm, setNewPartnerComm] = useState<number>(10);
+
+    useEffect(() => {
+        if (selectedPizza?.id === 'p_half_half') {
+            setHalfA(null);
+            setHalfB(null);
+        }
+    }, [selectedPizza]);
 
     const handleUpdateGPDeduction = async (order: Order) => {
         const suggestion = (order.totalAmount - (order.netAmount || order.totalAmount)).toFixed(2);
@@ -608,6 +626,39 @@ export const POSView: React.FC = () => {
         if (!selectedPizza) return;
         playSuccessFeedback();
         const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
+
+        if (selectedPizza.id === 'p_half_half') {
+            if (!halfA || !halfB) {
+                alert("Please select both halves for the Half-Half pizza!");
+                return;
+            }
+            const calculatedBasePrice = Math.round((halfA.basePrice / 2) + (halfB.basePrice / 2) + 20);
+            const itemTotal = (calculatedBasePrice + toppingsPrice) * quantity;
+            const nameEn = `Half-Half Pizza (${halfA.name} / ${halfB.name})`;
+            const nameTh = `พิซซ่าครึ่ง-ครึ่ง (${halfA.nameTh || halfA.name} / ${halfB.nameTh || halfB.name})`;
+
+            const item: CartItem = {
+                id: editingCartItem ? editingCartItem.id : Date.now().toString() + Math.random().toString(),
+                pizzaId: selectedPizza.id,
+                name: nameEn,
+                nameTh: nameTh,
+                basePrice: calculatedBasePrice,
+                selectedToppings: selectedToppings,
+                quantity: quantity,
+                totalPrice: itemTotal,
+                subItems: [
+                    { pizzaId: halfA.id, name: `Half A: ${halfA.name}`, nameTh: `ครึ่งแรก: ${halfA.nameTh || halfA.name}`, toppings: [] },
+                    { pizzaId: halfB.id, name: `Half B: ${halfB.name}`, nameTh: `ครึ่งหลัง: ${halfB.nameTh || halfB.name}`, toppings: [] }
+                ],
+                specialInstructions: specialInstructions
+            };
+            if (editingCartItem) updateCartItem(item); else addToCart(item);
+            setSelectedPizza(null); setSelectedToppings([]); setEditingCartItem(null); setSpecialInstructions(''); setQuantity(1);
+            setHalfA(null); setHalfB(null);
+            if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
+            return;
+        }
+
         const localized = getLocalizedItem(selectedPizza);
         const item: CartItem = {
             id: editingCartItem ? editingCartItem.id : Date.now().toString() + Math.random().toString(),
@@ -1007,7 +1058,26 @@ export const POSView: React.FC = () => {
     const totalGrossSales = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
     const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
-    const filteredMenu = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory; });
+    const filteredMenu = useMemo(() => {
+        const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory; });
+        if (activeCategory === 'pizza') {
+            const virtualHalfHalfPizza: Pizza = {
+                id: 'p_half_half',
+                name: 'Half-Half Pizza (Create Your Own)',
+                nameTh: 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
+                basePrice: 0, 
+                description: 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
+                descriptionTh: 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
+                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+                available: true,
+                category: 'pizza',
+                badge: 'Mix 2-in-1',
+                badgeTh: 'แบ่งครึ่งผสมผสาน'
+            };
+            return [virtualHalfHalfPizza, ...raw];
+        }
+        return raw;
+    }, [menu, activeCategory]);
 
     // Export Handlers
     const handleExportSales = () => {
@@ -1068,18 +1138,32 @@ export const POSView: React.FC = () => {
                     }
                     .printable-area {
                         width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
-                        padding: ${paperSize === '58mm' ? '1mm' : '2mm'} !important;
+                        padding: ${receiptPadding}mm !important;
+                    }
+                    .printable-area, .printable-area * {
+                        font-size: ${receiptFontSize}px !important;
+                    }
+                    .printable-area .store-title {
+                        font-size: ${receiptFontSize + 3}px !important;
                     }
                 }
             ` }} />
 
             {/* --- ROBUST THAI RECEIPT PRINTER (58mm/80mm Adaptive Channel) --- */}
-            <div className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm] text-[10.5px]' : 'print:w-[80mm] text-[12px]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}>
+            <div 
+                className={`hidden print:block printable-area ${paperSize === '58mm' ? 'print:w-[58mm]' : 'print:w-[80mm]'} print:font-mono p-0 m-0 bg-white text-black leading-snug`}
+                style={{ fontSize: `${receiptFontSize}px` }}
+            >
                 {receiptData && (
-                    <div className={`${paperSize === '58mm' ? 'w-[58mm] text-[10.5px]' : 'w-[80mm] text-[12px]'} overflow-hidden`}>
+                    <div className={`${paperSize === '58mm' ? 'w-[58mm]' : 'w-[80mm]'} overflow-hidden`}>
                         <div className="text-center font-bold">
                             <div>{paperSize === '58mm' ? '=============================' : '========================================'}</div>
-                            <div className={`${paperSize === '58mm' ? 'text-[12px]' : 'text-[15px]'} mt-1 mb-1 font-black`}>{receiptData.storeName}</div>
+                            <div 
+                                className="mt-1 mb-1 font-black store-title"
+                                style={{ fontSize: `${receiptFontSize + 3}px` }}
+                            >
+                                {receiptData.storeName}
+                            </div>
                             <div className="mb-1">โทร: {receiptData.phone}</div>
                             {receiptData.deliveryPlatformRef && receiptData.source !== 'STORE' && (
                                 <div className="mt-2 mb-1">
@@ -1237,6 +1321,7 @@ export const POSView: React.FC = () => {
                     <button onClick={() => { playClickSound(); setActiveTab('tables'); }} className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Active Orders"><Layers size={28} />{activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</button>
                     <button onClick={() => { playClickSound(); setActiveTab('sales'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Reports"><PieChart size={28} /></button>
                     <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="QR Generator"><QrCode size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('partners'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'partners' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Partner Referral Shares"><Store size={28} /></button>
                      <button onClick={() => { playClickSound(); setActiveTab('manage'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Store Settings"><Settings size={28} /></button>
                 </div>
                 <div className="flex flex-col items-center gap-4 w-full">
@@ -1259,6 +1344,7 @@ export const POSView: React.FC = () => {
                  <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">Active</span></button>
                 <div className="relative -top-5"><button onClick={() => { playClickSound(); setShowMobileCart(!showMobileCart); }} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
                 <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('partners'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-brand-500' : 'text-gray-400'}`}><Store size={20}/><span className="text-[10px] font-bold">Partners</span></button>
                 <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">Settings</span></button>
             </div>
 
@@ -1299,12 +1385,25 @@ export const POSView: React.FC = () => {
                                                             <button onClick={(e) => { e.stopPropagation(); handleEditMenuItem(item); }} className="bg-blue-500 text-white p-1.5 rounded-lg shadow hover:bg-blue-600" title="Edit"><Edit2 size={14}/></button>
                                                             <button onClick={(e) => { e.stopPropagation(); togglePizzaAvailability(item.id); }} className={`p-1.5 rounded-lg shadow text-white ${item.available ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`} title="Toggle Availability"><Power size={14}/></button>
                                                             <button onClick={(e) => { e.stopPropagation(); toggleBestSeller(item.id); }} className={`p-1.5 rounded-lg shadow text-white ${item.isBestSeller ? 'bg-yellow-400' : 'bg-gray-400'}`} title="Mark Bestseller"><Star size={14} fill="currentColor"/></button>
+                                                            {item.id !== 'p_half_half' && item.id !== 'custom_base' && (
+                                                                <button onClick={async (e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    if (confirm(language === 'th' ? `คุณแน่ใจหรือไม่ที่จะลบเมนู "${getLocalizedItem(item).name}" ออกจากระบบ?` : `Are you sure you want to permanently delete "${getLocalizedItem(item).name}"?`)) {
+                                                                        await deletePizza(item.id);
+                                                                    }
+                                                                }} className="bg-red-600 text-white p-1.5 rounded-lg shadow hover:bg-red-700" title="Delete"><Trash2 size={14}/></button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="p-4 flex flex-col flex-1" onClick={() => !isEditMode && handleCustomize(item)}>
                                                     <h3 className="font-bold text-gray-800 text-base md:text-lg leading-tight mb-1">{localized.name}</h3>
-                                                    <div className="mt-auto flex justify-between items-center pt-2"><span className="font-bold text-brand-600 text-lg md:text-xl">฿{item.basePrice}</span>{!isEditMode && <div className="bg-brand-50 text-brand-600 p-2 rounded-lg"><Plus size={24}/></div>}</div>
+                                                    <div className="mt-auto flex justify-between items-center pt-2">
+                                                        <span className="font-bold text-brand-600 text-base md:text-lg">
+                                                            {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${item.basePrice}`}
+                                                        </span>
+                                                        {!isEditMode && <div className="bg-brand-50 text-brand-600 p-2 rounded-lg"><Plus size={24}/></div>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -1589,6 +1688,203 @@ export const POSView: React.FC = () => {
                     </div>
                 )}
 
+                {activeTab === 'partners' && (
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6 font-sans">
+                        <div className="max-w-5xl mx-auto space-y-6">
+                            
+                            {/* Header Summary */}
+                            <div className="bg-gradient-to-r from-brand-600 to-indigo-600 p-6 rounded-2xl text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
+                                <div>
+                                    <h2 className="text-2xl font-bold flex items-center gap-2"><Store/> {language === 'th' ? 'ระบบพันธมิตรร้านใกล้เคียง' : 'Partner Referral Ecosystem'}</h2>
+                                    <p className="text-white/85 text-sm mt-1">
+                                        {language === 'th' 
+                                            ? 'สร้างคิวอาร์โค้ดให้ร้านค้าผู้แนะนำรอบๆ ร้าน และแบ่งเปอร์เซ็นต์ส่วนแบ่งตามยอดขายจริง' 
+                                            : 'Generate referral QR codes for nearby partner stores and distribute dynamic commission splits of actual order volumes.'}
+                                    </p>
+                                </div>
+                                <div className="bg-white/10 px-4 py-2.5 rounded-xl border border-white/20 text-left">
+                                    <div className="text-xs text-white/70 font-semibold">{language === 'th' ? 'จำนวนพันธมิตรทั้งหมด' : 'Total Active Partners'}</div>
+                                    <div className="text-2xl font-black">{partners?.length || 0} {language === 'th' ? 'ร้านค้า' : 'Stores'}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                
+                                {/* Form: Add Partner */}
+                                <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm h-fit text-left">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-3 border-gray-100 text-left">
+                                        <Plus className="text-emerald-500" size={20}/> 
+                                        {language === 'th' ? 'เพิ่มพันธมิตรใหม่' : 'Register New Partner'}
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div className="text-left">
+                                            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">
+                                                {language === 'th' ? 'ชื่อร้านค้า / พันธมิตร' : 'Partner Store Name'}
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                className="w-full border border-gray-250 rounded-xl px-4 py-3 font-bold text-gray-700 focus:border-brand-500 outline-none text-sm bg-white"
+                                                placeholder="e.g. Welltech Printer, Coffee Shop"
+                                                value={newPartnerName}
+                                                onChange={e => setNewPartnerName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="text-left">
+                                            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">
+                                                {language === 'th' ? 'อัตราส่วนแบ่ง (%) จากยอดขาย' : 'Commission Share Rate (%)'}
+                                            </label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    max="100"
+                                                    className="w-full border border-gray-250 rounded-xl pl-4 pr-10 py-3 font-bold text-gray-700 focus:border-brand-500 outline-none text-sm bg-white"
+                                                    value={newPartnerComm}
+                                                    onChange={e => setNewPartnerComm(parseFloat(e.target.value) || 0)}
+                                                />
+                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-gray-400">%</span>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                if (!newPartnerName.trim()) {
+                                                    alert(language === 'th' ? 'กรุณากรอกชื่อร้านค้าพันธมิตร' : 'Please input a partner name!');
+                                                    return;
+                                                }
+                                                addPartner({
+                                                    id: 'partner_' + Date.now(),
+                                                    name: newPartnerName,
+                                                    commissionPercent: newPartnerComm
+                                                });
+                                                setNewPartnerName('');
+                                                setNewPartnerComm(10);
+                                                playSuccessFeedback();
+                                            }}
+                                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-sm cursor-pointer"
+                                        >
+                                            <Save size={16}/> {language === 'th' ? 'บันทึกพันธมิตร' : 'Create Partner Account'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* List of Active Partners */}
+                                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm text-left">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-3 border-gray-100 text-left">
+                                        <List className="text-brand-500" size={20}/>
+                                        {language === 'th' ? 'รายชื่อและข้อมูลยอดส่วนแบ่ง' : 'Partners Sales & Splits Ledger'}
+                                    </h3>
+
+                                    {!partners || partners.length === 0 ? (
+                                        <div className="py-12 text-center text-gray-400 flex flex-col items-center justify-center">
+                                            <Store size={48} className="opacity-30 mb-2" />
+                                            <p className="font-bold">{language === 'th' ? 'ยังไม่มีพันธมิตรถูกลงทะเบียน' : 'No partner accounts created yet'}</p>
+                                            <p className="text-xs text-gray-400 mt-1">{language === 'th' ? 'คุณสามารถเพิ่มร้านใกล้เคียงได้ที่แบบฟอร์มด้านซ้าย' : 'Add partner details using the form on the left.'}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {partners.map(partner => {
+                                                const partnerOrders = orders.filter(o => o.partnerId === partner.id && o.status !== 'cancelled');
+                                                const totalReferredSales = partnerOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+                                                const commissionAmountPaid = partnerOrders.reduce((sum, o) => sum + (o.partnerCommissionAmount || 0), 0);
+                                                const affiliateLink = window.location.origin + '?partner=' + partner.id;
+
+                                                return (
+                                                    <div key={partner.id} className="p-4 rounded-2xl border border-gray-150 bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-brand-200 transition-all text-left">
+                                                        <div className="space-y-1.5 flex-1 w-full text-left">
+                                                            <div className="flex items-center gap-2 justify-between md:justify-start">
+                                                                <span className="font-bold text-gray-800 text-lg">{partner.name}</span>
+                                                                <span className="bg-brand-50 text-brand-655 font-black text-xs py-1 px-2.5 rounded-lg border border-brand-100">
+                                                                    Split: {partner.commissionPercent}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2 max-w-sm">
+                                                                <div className="bg-white p-2.5 rounded-xl border border-gray-200 text-left">
+                                                                    <div className="text-[10px] uppercase font-bold text-gray-400">{language === 'th' ? 'ยอดขายแนะนำสำเร็จ' : 'Total Orders Value'}</div>
+                                                                    <div className="text-base font-black text-gray-800">฿{totalReferredSales.toLocaleString()} ({partnerOrders.length} ออเดอร์)</div>
+                                                                </div>
+                                                                <div className="bg-white p-2.5 rounded-xl border border-gray-200 text-left">
+                                                                    <div className="text-[10px] uppercase font-bold text-amber-500">{language === 'th' ? 'ส่วนแบ่งคอมมิชชั่นสะสม' : 'Earned Commission'}</div>
+                                                                    <div className="text-base font-black text-amber-600">฿{commissionAmountPaid.toLocaleString()}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-2 flex items-center gap-1 bg-white p-2 rounded-xl border border-gray-250 w-full overflow-hidden">
+                                                                <code className="text-[11px] font-mono text-gray-500 flex-1 truncate select-all">{affiliateLink}</code>
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(affiliateLink);
+                                                                        alert(language === 'th' ? 'คัดลอกลิงก์ผู้แนะนำแล้ว!' : 'Referral URL copied to clipboard!');
+                                                                    }}
+                                                                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                                                                >
+                                                                    Copy
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* QR Code and Actions */}
+                                                        <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-gray-200 w-full md:w-auto shrink-0 md:min-w-[140px] text-center">
+                                                            <img 
+                                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(affiliateLink)}`} 
+                                                                alt="Partner QR" 
+                                                                className="w-24 h-24 p-1 mix-blend-multiply border border-gray-150 rounded" 
+                                                            />
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const pWindow = window.open('', '_blank');
+                                                                    if (pWindow) {
+                                                                        pWindow.document.write(`
+                                                                            <html>
+                                                                                <head>
+                                                                                    <title>Print QR for ${partner.name}</title>
+                                                                                    <style>
+                                                                                        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fff; }
+                                                                                        .card { border: 4px solid #db2777; border-radius: 24px; padding: 40px; text-align: center; max-width: 400px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                                                                                        h1 { font-size: 24px; color: #111827; margin-bottom: 8px; }
+                                                                                        p { font-size: 14px; color: #4b5563; margin-bottom: 24px; }
+                                                                                        img { width: 250px; height: 250px; margin-bottom: 24px; }
+                                                                                        .footer { font-size: 12px; color: #9ca3af; font-weight: bold; text-transform: uppercase; }
+                                                                                    </style>
+                                                                                </head>
+                                                                                <body>
+                                                                                    <div class="card">
+                                                                                        <h1>Scan & Order Here!</h1>
+                                                                                        <p>Welcome! Our menu is sponsored by ${partner.name}. Select food and complete payment instantly.</p>
+                                                                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(affiliateLink)}" />
+                                                                                        <div class="footer">Referral Code: ${partner.name}</div>
+                                                                                    </div>
+                                                                                    <script>window.onload=function(){setTimeout(function(){window.print();},500);}</script>
+                                                                                </body>
+                                                                            </html>
+                                                                        `);
+                                                                        pWindow.document.close();
+                                                                    }
+                                                                }}
+                                                                className="mt-2 text-[10px] font-bold text-brand-600 hover:underline flex items-center gap-1 cursor-pointer"
+                                                            >
+                                                                <Printer size={12}/> {language === 'th' ? 'พิมพ์ป้ายคิวอาร์' : 'Print QR Sign'}
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (confirm(language === 'th' ? `ลบพันธมิตร "${partner.name}" หรือไม่?` : `Remove partner "${partner.name}"?`)) {
+                                                                        deletePartner(partner.id);
+                                                                    }
+                                                                }}
+                                                                className="mt-2 text-[10px] font-bold text-red-500 hover:underline cursor-pointer"
+                                                            >
+                                                                {language === 'th' ? 'ลบบัญชีพันธมิตร' : 'Delete Partner'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'manage' && (
                     <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                         <div className="max-w-4xl mx-auto space-y-6">
@@ -1674,11 +1970,11 @@ export const POSView: React.FC = () => {
                                     <p className="text-sm text-gray-500">
                                         {language === 'th' ? 'เลือกความกว้างกระดาษเครื่องพิมพ์ความร้อนที่คุณใช้อยู่ เพื่อจัดสัดส่วนใบเสร็จให้สวยงาม ไม่ตกขอบกระดาษ' : 'Choose your physical thermal printer paper width so that receipt formats align perfectly without margins clipping.'}
                                     </p>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-4 font-sans">
                                         <button 
                                             key="btn-58"
                                             onClick={() => setPaperSize('58mm')} 
-                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition ${paperSize === '58mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition cursor-pointer ${paperSize === '58mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
                                         >
                                             <span className="text-lg">58 mm</span>
                                             <span className="text-xs font-normal opacity-75 mt-1">{language === 'th' ? 'เครื่องขนาดเล็ก / พกพา' : 'Small / Portable Thermal'}</span>
@@ -1686,11 +1982,51 @@ export const POSView: React.FC = () => {
                                         <button 
                                             key="btn-80"
                                             onClick={() => setPaperSize('80mm')} 
-                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition ${paperSize === '80mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
+                                            className={`py-4 px-4 rounded-xl font-bold flex flex-col items-center justify-center border-2 transition cursor-pointer ${paperSize === '80mm' ? 'border-brand-600 bg-brand-50 text-brand-600 shadow' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-600'}`}
                                         >
                                             <span className="text-lg">80 mm</span>
                                             <span className="text-xs font-normal opacity-75 mt-1">{language === 'th' ? 'เครื่องตั้งโต๊ะมาตรฐาน' : 'Standard Desktop Thermal'}</span>
                                         </button>
+                                    </div>
+
+                                    {/* Advanced Customizations for Receipt Layout */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-150">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-600 block mb-1.5 flex items-center gap-1">
+                                                <span>🔎 {language === 'th' ? 'ขนาดอักษรใบเสร็จ (Font Size):' : 'Receipt Font Size:'}</span>
+                                                <span className="font-extrabold text-brand-600">{receiptFontSize}px</span>
+                                            </label>
+                                            <div className="grid grid-cols-5 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+                                                {[10, 11, 12, 14, 16].map((sz) => (
+                                                    <button
+                                                        type="button"
+                                                        key={`fs-${sz}`}
+                                                        onClick={() => setReceiptFontSize(sz)}
+                                                        className={`py-1 text-xs font-bold rounded-lg transition cursor-pointer ${receiptFontSize === sz ? 'bg-white text-brand-600 shadow border border-gray-200' : 'text-gray-500 hover:text-gray-800'}`}
+                                                    >
+                                                        {sz}px
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-600 block mb-1.5 flex items-center gap-1">
+                                                <span>📐 {language === 'th' ? 'ระยะขอบข้างใบเสร็จ (Margin):' : 'Receipt Margins:'}</span>
+                                                <span className="font-extrabold text-brand-600">{receiptPadding}mm</span>
+                                            </label>
+                                            <div className="grid grid-cols-5 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+                                                {[0, 1, 2, 4, 6].map((pd) => (
+                                                    <button
+                                                        type="button"
+                                                        key={`pad-${pd}`}
+                                                        onClick={() => setReceiptPadding(pd)}
+                                                        className={`py-1 text-xs font-bold rounded-lg transition cursor-pointer ${receiptPadding === pd ? 'bg-white text-brand-600 shadow border border-gray-200' : 'text-gray-500 hover:text-gray-800'}`}
+                                                    >
+                                                        {pd}mm
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-2">
                                         <span className="text-gray-600 font-bold">{language === 'th' ? 'สลิปปัจจุบัน:' : 'Currently Selected Width:'} <strong className="text-brand-600 font-extrabold text-base">{paperSize}</strong></span>
@@ -1824,6 +2160,17 @@ export const POSView: React.FC = () => {
                                                                 </li>
                                                             </ul>
                                                         </div>
+
+                                                        <div className="bg-amber-100/50 p-3 rounded-xl border border-amber-200 mt-2 text-[11px] font-sans">
+                                                            <strong className="text-amber-950 font-extrabold block mb-1">💡 ขั้นตอนที่ 5: การตั้งค่าขนาดหน้าต่างพิมพ์ (สิ่งสำคัญที่สุด)</strong>
+                                                            <p className="text-gray-700 mb-1 leading-relaxed">เมื่อกด "ทดสอบสั่งพิมพ์" หรือ สั่งพิมพ์บนบิล จะปรากฏหน้าต่างเบราเซอร์ ให้ตรวจสอบการตั้งค่า 3 อย่างดังนี้เพื่อให้เข้าขนาด Welltech:</p>
+                                                            <ul className="list-inside list-disc space-y-0.5 text-gray-700">
+                                                                <li><strong>1. ขนาดกระดาษ (Paper size):</strong> ม้วน Welltech ให้เลือกขนาดเป็น <span className="text-brand-650 font-bold">"58mm x Roll"</span> หรือ <span className="text-brand-650 font-bold">"80mm x Roll"</span></li>
+                                                                <li><strong>2. ระยะขอบ (Margins):</strong> สำคัญมาก! ปรับเป็น <span className="text-red-700 font-bold">"None" / "ไม่มี"</span> เพื่อแก้ปัญหาสลิปเยื้องหรือหดตัว</li>
+                                                                <li><strong>3. หัว/ท้ายกระดาษ (Headers/Footers):</strong> ให้ <span className="font-bold text-red-700">ตีกถูกออก</span> เพื่อไม่ให้มีที่อยู่เว็บโผล่ในกระดาษ</li>
+                                                                <li>ปรับขนาดตัวอักษร 🔎 และขอบข้าง 📐 ได้ด้วยปุ่มควิกคอนฟิกสีเขียวด้านบนนี้ได้เลยครับ</li>
+                                                            </ul>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -1908,6 +2255,45 @@ export const POSView: React.FC = () => {
                     </div>
                 ) : null}
 
+                {/* Half-Half Selector (POS) */}
+                {selectedPizza.id === 'p_half_half' && (
+                    <div className="mb-6 bg-amber-50 p-4 rounded-xl border border-amber-200 text-left">
+                        <h3 className="font-bold text-amber-950 mb-3 flex items-center gap-2">🌓 Select Two Halves</h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">Side A (First Half)</label>
+                                <select 
+                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
+                                    value={halfA?.id || ''}
+                                    onChange={(e) => setHalfA(menu.find(p => p.id === e.target.value) || null)}
+                                >
+                                    <option value="">-- Select Side A --</option>
+                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                        <option key={pItem.id} value={pItem.id}>
+                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">Side B (Second Half)</label>
+                                <select 
+                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
+                                    value={halfB?.id || ''}
+                                    onChange={(e) => setHalfB(menu.find(p => p.id === e.target.value) || null)}
+                                >
+                                    <option value="">-- Select Side B --</option>
+                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                        <option key={pItem.id} value={pItem.id}>
+                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Toppings (Only for non-combo items, though you can adapt logic as needed) */}
                 {!selectedPizza.comboCount && (
                     <div className="mb-6">
@@ -1948,7 +2334,12 @@ export const POSView: React.FC = () => {
                     onClick={selectedPizza.comboCount ? confirmAddComboToCart : confirmAddToCart} 
                     disabled={selectedPizza.comboCount ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
                     className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    {editingCartItem ? 'Update Order' : 'Add to Order'} • ฿{((selectedPizza.basePrice + selectedToppings.reduce((s,t)=>s+t.price,0)) * quantity)}
+                    {editingCartItem ? 'Update Order' : 'Add to Order'} • ฿{
+                        ((selectedPizza.id === 'p_half_half' 
+                            ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
+                            : selectedPizza.basePrice) 
+                        + selectedToppings.reduce((s,t)=>s+t.price,0)) * quantity
+                    }
                 </button>
             </div>
         </div>
@@ -2064,9 +2455,24 @@ export const POSView: React.FC = () => {
                 </div>
             </div>
             
-            <div className="mt-6 flex gap-3">
-                <button onClick={() => setShowItemModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200">Cancel</button>
-                <button onClick={handleSaveItem} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700">Save Item</button>
+            <div className="mt-6 flex flex-wrap gap-3">
+                {itemForm.id && itemForm.id !== 'p_half_half' && itemForm.id !== 'custom_base' && (
+                    <button 
+                        onClick={async () => {
+                            if (confirm(language === 'th' ? `คุณแน่ใจหรือไม่ที่จะลบเมนูนี้ออกจากระบบอย่างถาวร?` : 'Are you sure you want to permanently delete this menu item?')) {
+                                await deletePizza(itemForm.id!);
+                                setShowItemModal(false);
+                            }
+                        }} 
+                        className="px-4 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-650 flex items-center justify-center gap-1.5 shadow"
+                        title="Delete permanently"
+                    >
+                        <Trash2 size={16}/>
+                        <span className="text-sm">{language === 'th' ? 'ลบเมนู' : 'Delete'}</span>
+                    </button>
+                )}
+                <button onClick={() => setShowItemModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 text-sm">Cancel</button>
+                <button onClick={handleSaveItem} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700 text-sm">Save Item</button>
             </div>
         </div>
     </div>

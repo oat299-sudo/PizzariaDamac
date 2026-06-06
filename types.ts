@@ -110,6 +110,19 @@ export interface Order {
   deliveryPlatformRef?: string;
   rating?: number;
   comment?: string;
+
+  // Partner Cafe QR parameters
+  partnerId?: string;
+  partnerCommissionAmount?: number;
+}
+
+export interface Partner {
+  id: string;
+  name: string;
+  nameTh?: string;
+  commissionPercent: number; // e.g. 10 for 10%
+  createdAt: string;
+  note?: string;
 }
 
 // Accounting
