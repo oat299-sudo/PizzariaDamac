@@ -5,6 +5,20 @@ import { useStore } from '../context/StoreContext';
 import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../types';
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer, Phone, Globe } from 'lucide-react';
 
+const formatOrderDateTime = (dateStr?: string | null, dateStyle: 'short' | 'medium' | 'long' | 'full' | 'default' = 'default'): string => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'N/A';
+    if (dateStyle === 'default') {
+      return d.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+    }
+    return d.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle, timeStyle: 'short' });
+  } catch (e) {
+    return 'N/A';
+  }
+};
+
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding, autoPrintNewOrders, setAutoPrintNewOrders } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
@@ -200,16 +214,15 @@ export const KitchenView: React.FC = () => {
       }
   };
 
-  const isFirstLoadRef = useRef<boolean>(true);
+  const sessionStartTimeRef = useRef<number>(Date.now());
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
       if (!orders) return;
 
       // Real-time Order Monitoring Logic
-      if (isFirstLoadRef.current) {
+      if (prevOrderIdsRef.current.size === 0 && orders.length > 0) {
           prevOrderIdsRef.current = new Set(orders.map(o => o.id));
-          isFirstLoadRef.current = false;
           return;
       }
 
@@ -218,7 +231,11 @@ export const KitchenView: React.FC = () => {
       for (const order of orders) {
           if (!prevOrderIdsRef.current.has(order.id)) {
               prevOrderIdsRef.current.add(order.id);
-              if (order.status === 'pending' || order.status === 'confirmed') {
+
+              const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : Date.now();
+              const isNewSessionOrder = orderTime > sessionStartTimeRef.current - 15000; // within 15 seconds of or after session start
+
+              if (isNewSessionOrder && (order.status === 'pending' || order.status === 'confirmed')) {
                   hasNewOrder = true;
                   newOrderToPrint = order;
               }
@@ -412,7 +429,7 @@ export const KitchenView: React.FC = () => {
                       )}
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' })}</div>
+                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {formatOrderDateTime(order.createdAt, 'short')}</div>
                       {order.pickupTime && (
                            <div className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded mt-1 font-bold">
                                {language === 'th' ? 'เวลารับสินค้า' : 'Pickup'}: {order.pickupTime}
@@ -584,19 +601,58 @@ export const KitchenView: React.FC = () => {
                         </>
                     )}
                     {order.status === 'confirmed' && (
-                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'acknowledged'); }} className="w-full max-w-[140px] bg-blue-600 text-white px-3 py-2 rounded-lg shadow hover:bg-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition">
-                            <ChefHat size={14} /> {t('acknowledged')}
-                        </button>
+                        <>
+                            <button 
+                                onClick={() => { 
+                                    if (confirm(language === 'th' ? "คุณแน่ใจหรือไม่ที่จะปฏิเสธ/ยกเลิกออเดอร์นี้?" : "Are you sure you want to reject/cancel this order?")) {
+                                        playAlertSound(); 
+                                        updateOrderStatus(order.id, 'cancelled'); 
+                                    }
+                                }} 
+                                className="px-2 py-2 text-red-650 hover:bg-red-50 rounded font-semibold text-xs transition"
+                            >
+                                {t('reject')}
+                            </button>
+                            <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'acknowledged'); }} className="w-full max-w-[140px] bg-blue-600 text-white px-3 py-2 rounded-lg shadow hover:bg-blue-700 font-bold text-xs flex items-center justify-center gap-1 transition">
+                                <ChefHat size={14} /> {t('acknowledged')}
+                            </button>
+                        </>
                     )}
                     {order.status === 'acknowledged' && (
-                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'cooking'); }} className="w-full max-w-[140px] bg-orange-500 text-white px-3 py-2 rounded-lg shadow hover:bg-orange-600 font-bold text-xs flex items-center justify-center gap-1 transition">
-                            <Flame size={14} /> {t('startCooking')}
-                        </button>
+                        <>
+                            <button 
+                                onClick={() => { 
+                                    if (confirm(language === 'th' ? "คุณแน่ใจหรือไม่ที่จะปฏิเสธ/ยกเลิกออเดอร์นี้?" : "Are you sure you want to reject/cancel this order?")) {
+                                        playAlertSound(); 
+                                        updateOrderStatus(order.id, 'cancelled'); 
+                                    }
+                                }} 
+                                className="px-2 py-2 text-red-650 hover:bg-red-50 rounded font-semibold text-xs transition"
+                            >
+                                {t('reject')}
+                            </button>
+                            <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'cooking'); }} className="w-full max-w-[140px] bg-orange-500 text-white px-3 py-2 rounded-lg shadow hover:bg-orange-600 font-bold text-xs flex items-center justify-center gap-1 transition">
+                                <Flame size={14} /> {t('startCooking')}
+                            </button>
+                        </>
                     )}
                     {order.status === 'cooking' && (
-                        <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'ready'); }} className="w-full max-w-[140px] bg-green-500 text-white px-3 py-2 rounded-lg shadow hover:bg-green-600 font-bold text-xs flex items-center justify-center gap-1 transition">
-                            <CheckCircle size={14} /> {t('markReady')}
-                        </button>
+                        <>
+                            <button 
+                                onClick={() => { 
+                                    if (confirm(language === 'th' ? "คุณแน่ใจหรือไม่ที่จะปฏิเสธ/ยกเลิกออเดอร์นี้?" : "Are you sure you want to reject/cancel this order?")) {
+                                        playAlertSound(); 
+                                        updateOrderStatus(order.id, 'cancelled'); 
+                                    }
+                                }} 
+                                className="px-2 py-2 text-red-650 hover:bg-red-50 rounded font-semibold text-xs transition"
+                            >
+                                {t('reject')}
+                            </button>
+                            <button onClick={() => { playSuccessFeedback(); updateOrderStatus(order.id, 'ready'); }} className="w-full max-w-[140px] bg-green-500 text-white px-3 py-2 rounded-lg shadow hover:bg-green-600 font-bold text-xs flex items-center justify-center gap-1 transition">
+                                <CheckCircle size={14} /> {t('markReady')}
+                            </button>
+                        </>
                     )}
                     {order.status === 'ready' && (
                         <div className="w-full max-w-[160px] bg-green-100 text-green-800 px-2 py-1.5 rounded-lg font-bold text-center border border-green-200 text-[10px]">
@@ -686,11 +742,11 @@ export const KitchenView: React.FC = () => {
                 <div className="mt-1 mb-1 px-1 font-bold">
                     <div className="flex justify-between">
                         <span>บิล: #{printOrder.id.slice(-4)}</span>
-                        <span>วันที่: {new Date(printOrder.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</span>
+                        <span>วันที่: {printOrder.createdAt ? new Date(printOrder.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' }) : '-'}</span>
                     </div>
                     <div className="flex justify-between">
                         <span>ช่องทาง: {printOrder.source.toUpperCase()}</span>
-                        <span>เวลา: {new Date(printOrder.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}</span>
+                        <span>เวลา: {printOrder.createdAt ? new Date(printOrder.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' }) : '-'}</span>
                     </div>
                     {printOrder.pickupTime && (
                         <div className="font-bold">

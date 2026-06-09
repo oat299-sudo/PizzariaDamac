@@ -48,13 +48,13 @@
   }
 
   .printable-area {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: relative !important;
     width: 80mm !important;
     padding: 2mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     box-sizing: border-box !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 }
 

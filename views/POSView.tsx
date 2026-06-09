@@ -45,6 +45,20 @@ const isPhotosUrl = (url: string): boolean => {
     return url.includes('photos.app.goo.gl') || url.includes('photos.google.com');
 };
 
+const formatOrderDateTime = (dateStr?: string | null, dateStyle: 'short' | 'medium' | 'long' | 'full' | 'default' = 'default'): string => {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return 'N/A';
+        if (dateStyle === 'default') {
+            return d.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        }
+        return d.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle, timeStyle: 'short' });
+    } catch (e) {
+        return 'N/A';
+    }
+};
+
 export const POSView: React.FC = () => {
     const { 
         menu, addToCart, removeFromCart, cart, cartTotal, clearCart, placeOrder, orders, deleteOrder, updateOrderFields,
@@ -537,62 +551,55 @@ export const POSView: React.FC = () => {
         }
     }, [cashReceived, cartTotal, paymentMethod, selectedOrder]);
 
-    // Keep record of orders we have already auto-printed during this session to avoid repeats.
-    // Keys like: `${orderId}_created` or `${orderId}_completed`
-    const isFirstMountRef = React.useRef(true);
-    const printedOrdersRef = React.useRef<Set<string>>(new Set());
+    // Stable transition tracker for silent initial load & real-time auto-prints
+    const sessionStartTimeRef = React.useRef(Date.now());
+    const prevOrdersRef = React.useRef<Order[]>([]);
 
     useEffect(() => {
         if (!orders) return;
 
-        if (isFirstMountRef.current) {
-            // Seed printedOrdersRef with current status state of loaded orders on first mount
-            orders.forEach(order => {
-                if (order.status === 'completed') {
-                    printedOrdersRef.current.add(`${order.id}_completed`);
-                }
-                printedOrdersRef.current.add(`${order.id}_created`);
-            });
-            isFirstMountRef.current = false;
+        // If this is the initial mount/load or prevOrders is empty, we record current orders as pre-existing
+        if (prevOrdersRef.current.length === 0 && orders.length > 0) {
+            prevOrdersRef.current = orders;
             return;
         }
 
-        if (!autoPrintNewOrders) return;
+        if (!autoPrintNewOrders) {
+            prevOrdersRef.current = orders;
+            return;
+        }
 
         orders.forEach(order => {
-            const createdPrintKey = `${order.id}_created`;
-            const completedPrintKey = `${order.id}_completed`;
+            const prevOrder = prevOrdersRef.current.find(o => o.id === order.id);
 
-            // Condition 3: Dine-in / Walk-in / Store order created & confirmed (Pay Later)
-            if (
-                order.type === 'dine-in' && 
-                order.status === 'confirmed' && 
-                !printedOrdersRef.current.has(createdPrintKey)
-            ) {
-                printedOrdersRef.current.add(createdPrintKey);
-                handleReprintOrder(order);
-            }
+            if (!prevOrder) {
+                // New Order added to list in this active session
+                const orderTime = new Date(order.createdAt).getTime();
+                const isNewSessionOrder = orderTime > sessionStartTimeRef.current - 15000; // within 15 seconds of or after session start
 
-            // Condition 2 part A: Delivery order first received (status pending / confirmed)
-            if (
-                order.type === 'delivery' && 
-                (order.status === 'pending' || order.status === 'confirmed') && 
-                !printedOrdersRef.current.has(createdPrintKey)
-            ) {
-                printedOrdersRef.current.add(createdPrintKey);
-                handleReprintOrder(order);
-            }
-
-            // Condition 2 part B / Condition 1: Any order marked as completed/paid
-            // (Only triggers auto-print state if it transitions to completed)
-            if (
-                order.status === 'completed' && 
-                !printedOrdersRef.current.has(completedPrintKey)
-            ) {
-                printedOrdersRef.current.add(completedPrintKey);
-                handleReprintOrder(order);
+                if (isNewSessionOrder) {
+                    // Condition 1: Dine-in / Walk-in / Store order created & confirmed (Pay Later)
+                    if (order.type === 'dine-in' && order.status === 'confirmed') {
+                        handleReprintOrder(order);
+                    }
+                    // Condition 2: Delivery order first received (status pending / confirmed)
+                    else if (order.type === 'delivery' && (order.status === 'pending' || order.status === 'confirmed')) {
+                        handleReprintOrder(order);
+                    }
+                    // Condition 3: Any order instantly created as completed/paid
+                    else if (order.status === 'completed') {
+                        handleReprintOrder(order);
+                    }
+                }
+            } else {
+                // Pre-existing order modified: check status transition to completed/paid
+                if (prevOrder.status !== 'completed' && order.status === 'completed') {
+                    handleReprintOrder(order);
+                }
             }
         });
+
+        prevOrdersRef.current = orders;
     }, [orders, autoPrintNewOrders]);
 
     // PromptPay QR Payload Generator
@@ -963,7 +970,7 @@ export const POSView: React.FC = () => {
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9",
             phone: storeSettings.contactPhone || "099-497-9199",
             orderId: order.id.slice(-4),
-            date: new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
+            date: formatOrderDateTime(order.createdAt),
             tableOrType: order.tableNumber ? `Table ${order.tableNumber}` : order.type.toUpperCase(),
             source: order.source.toUpperCase(),
             customerName: order.customerName,
@@ -1172,7 +1179,7 @@ export const POSView: React.FC = () => {
         if (filteredOrders.length === 0) { alert("No sales data to export"); return; }
         const data = filteredOrders.map(o => ({
             ID: o.id,
-            Date: new Date(o.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
+            Date: formatOrderDateTime(o.createdAt),
             Customer: o.customerName,
             Type: o.type,
             Source: o.source,
@@ -1411,17 +1418,17 @@ export const POSView: React.FC = () => {
                             {vatEnabled ? (
                                 <>
                                     <div className="flex justify-between">
-                                        <span>รวมเงิน (Subtotal Ex. VAT)</span>
+                                        <span>มูลค่าก่อนภาษี (Subtotal Ex. VAT)</span>
                                         <span>{receiptData.subtotal.toFixed(2)}.-</span>
                                     </div>
                                     <div className="flex justify-between mt-0.5">
-                                        <span>ภาษีมูลค่าเพิ่ม (VAT 7%)</span>
+                                        <span>ภาษีมูลค่าเพิ่ม 7% (VAT 7%)</span>
                                         <span>{receiptData.vat.toFixed(2)}.-</span>
                                     </div>
                                 </>
                             ) : (
                                 <div className="flex justify-between">
-                                    <span>รวมเงินทั้งสิ้น (Subtotal)</span>
+                                    <span>ราคารวมสินค้า (Items Total)</span>
                                     <span>{(receiptData.total - (receiptData.deliveryFee && receiptData.deliveryFee !== 'pending' ? Number(receiptData.deliveryFee) : 0)).toFixed(0)}.-</span>
                                 </div>
                             )}
@@ -1656,7 +1663,7 @@ export const POSView: React.FC = () => {
                                                 {/* Date & Time of Order Creation */}
                                                 <div className="text-xs font-bold text-brand-600 mt-2 flex items-center gap-1 bg-brand-50/50 px-2 py-1 rounded-lg border border-brand-100 w-fit">
                                                     <Clock size={12}/>
-                                                    <span>{new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' })}</span>
+                                                    <span>{formatOrderDateTime(order.createdAt, 'short')}</span>
                                                 </div>
                                                 {/* Customer Name for Non-Table Orders */}
                                                 {!order.tableNumber && (
@@ -1829,10 +1836,10 @@ export const POSView: React.FC = () => {
                                                 <tr><th className="p-4">Date & Time (เวลาไทย)</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount(Total)</th><th className="p-4 text-orange-500">Net(After GP)</th><th className="p-4 text-right">Actions</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
-                                                {filteredOrders.reverse().map(order => (
+                                                {[...filteredOrders].reverse().map(order => (
                                                     <tr key={order.id} className="hover:bg-gray-50">
                                                         <td className="p-4 text-gray-600 font-medium">
-                                                            {new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' })}
+                                                            {formatOrderDateTime(order.createdAt, 'medium')}
                                                         </td>
                                                         <td className="p-4 font-bold text-gray-800">#{order.id.slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
                                                         <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
