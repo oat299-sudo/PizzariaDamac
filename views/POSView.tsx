@@ -535,7 +535,9 @@ export const POSView: React.FC = () => {
     };
 
     // Active Tables Logic - Show active or unpaid orders
-    const activeTables = orders.filter(o => 
+    const activeTables = (orders || []).filter(o => 
+        o && 
+        o.status &&
         o.status !== 'completed' && 
         o.status !== 'cancelled'
     );
@@ -559,22 +561,24 @@ export const POSView: React.FC = () => {
         if (!orders) return;
 
         // If this is the initial mount/load or prevOrders is empty, we record current orders as pre-existing
-        if (prevOrdersRef.current.length === 0 && orders.length > 0) {
-            prevOrdersRef.current = orders;
+        const validOrders = orders.filter(Boolean);
+        if (prevOrdersRef.current.length === 0 && validOrders.length > 0) {
+            prevOrdersRef.current = validOrders;
             return;
         }
 
         if (!autoPrintNewOrders) {
-            prevOrdersRef.current = orders;
+            prevOrdersRef.current = validOrders;
             return;
         }
 
-        orders.forEach(order => {
-            const prevOrder = prevOrdersRef.current.find(o => o.id === order.id);
+        validOrders.forEach(order => {
+            if (!order || !order.id) return;
+            const prevOrder = prevOrdersRef.current.find(o => o && o.id === order.id);
 
             if (!prevOrder) {
                 // New Order added to list in this active session
-                const orderTime = new Date(order.createdAt).getTime();
+                const orderTime = order.createdAt ? new Date(order.createdAt).getTime() : Date.now();
                 const isNewSessionOrder = orderTime > sessionStartTimeRef.current - 15000; // within 15 seconds of or after session start
 
                 if (isNewSessionOrder) {
@@ -599,7 +603,7 @@ export const POSView: React.FC = () => {
             }
         });
 
-        prevOrdersRef.current = orders;
+        prevOrdersRef.current = validOrders;
     }, [orders, autoPrintNewOrders]);
 
     // PromptPay QR Payload Generator
@@ -1147,12 +1151,12 @@ export const POSView: React.FC = () => {
     };
 
     // Sales Calculations
-    const activeOrders = orders.filter(o => o.status !== 'cancelled');
-    const filteredOrders = activeOrders.filter(o => filterByDate(o.createdAt, salesFilter));
-    const filteredExpenses = expenses.filter(e => filterByDate(e.date, salesFilter));
-    const totalGrossSales = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0) - totalExpenses;
+    const activeOrders = (orders || []).filter(o => o && o.status && o.status !== 'cancelled');
+    const filteredOrders = activeOrders.filter(o => o && filterByDate(o.createdAt, salesFilter));
+    const filteredExpenses = (expenses || []).filter(e => e && filterByDate(e.date, salesFilter));
+    const totalGrossSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount || 0), 0) - totalExpenses;
     const filteredMenu = useMemo(() => {
         const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory; });
         if (activeCategory === 'pizza') {
@@ -1796,11 +1800,11 @@ export const POSView: React.FC = () => {
                 )}
 
                 {activeTab === 'sales' && (() => {
-                    const filteredOrders = orders.filter(o => filterByDate(o.createdAt, salesFilter));
-                    const filteredExpenses = expenses.filter(e => filterByDate(e.date, salesFilter));
-                    const totalSales = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-                    const netSales = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount), 0);
-                    const totalExpensesValue = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+                    const filteredOrders = (orders || []).filter(o => o && filterByDate(o.createdAt, salesFilter));
+                    const filteredExpenses = (expenses || []).filter(e => e && filterByDate(e.date, salesFilter));
+                    const totalSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+                    const netSales = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount || 0), 0);
+                    const totalExpensesValue = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
                     
                     return (
                         <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
@@ -2000,8 +2004,8 @@ export const POSView: React.FC = () => {
                                     ) : (
                                         <div className="space-y-4">
                                             {partners.map(partner => {
-                                                const partnerOrders = orders.filter(o => o.partnerId === partner.id && o.status !== 'cancelled');
-                                                const totalReferredSales = partnerOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+                                                const partnerOrders = (orders || []).filter(o => o && o.partnerId === partner.id && o.status !== 'cancelled');
+                                                const totalReferredSales = partnerOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
                                                 const commissionAmountPaid = partnerOrders.reduce((sum, o) => sum + (o.partnerCommissionAmount || 0), 0);
                                                 const affiliateLink = window.location.origin + '?partner=' + partner.id;
 

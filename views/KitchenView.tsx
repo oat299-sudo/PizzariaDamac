@@ -21,7 +21,7 @@ const formatOrderDateTime = (dateStr?: string | null, dateStyle: 'short' | 'medi
 
 export const KitchenView: React.FC = () => {
   const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding, autoPrintNewOrders, setAutoPrintNewOrders } = useStore();
-  const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
+  const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday' | 'cancelled'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
@@ -265,6 +265,7 @@ export const KitchenView: React.FC = () => {
           case 'cooking': return 'bg-orange-100 text-orange-800 border-orange-200'; // Baking
           case 'ready': return 'bg-green-100 text-green-800 border-green-200'; // Done
           case 'completed': return 'bg-gray-100 text-gray-600 border-gray-200';
+          case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
           default: return 'bg-gray-50';
       }
   };
@@ -288,10 +289,12 @@ export const KitchenView: React.FC = () => {
       return type;
   };
 
-  const displayOrders = orders.filter(o => o.status !== 'cancelled').filter(o => {
-      if (filterType === 'active') return o.status !== 'completed';
+  const displayOrders = (orders || []).filter(o => o).filter(o => {
+      if (filterType === 'active') return o.status !== 'completed' && o.status !== 'cancelled';
+      if (filterType === 'cancelled') return o.status === 'cancelled';
       
-      const d = new Date(o.createdAt);
+      const d = o.createdAt ? new Date(o.createdAt) : null;
+      if (!d) return false;
       const now = new Date();
       if (filterType === 'today') {
            return d.toDateString() === now.toDateString();
@@ -352,6 +355,9 @@ export const KitchenView: React.FC = () => {
                 </button>
                 <button onClick={() => { playClickSound(); setFilterType('yesterday'); }} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'yesterday' ? 'bg-brand-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
                     {language === 'th' ? 'เมื่อวาน' : 'Yesterday'}
+                </button>
+                <button onClick={() => { playClickSound(); setFilterType('cancelled'); }} className={`px-4 py-2 rounded-md text-sm font-bold transition flex items-center gap-1 ${filterType === 'cancelled' ? 'bg-red-600 text-white shadow' : 'text-gray-300 hover:text-white'}`}>
+                    {language === 'th' ? 'ถูกปฏิเสธ / ยกเลิก' : 'Rejected'}
                 </button>
             </div>
 
@@ -661,6 +667,11 @@ export const KitchenView: React.FC = () => {
                     )}
                     {order.status === 'completed' && (
                         <span className="text-gray-400 text-xs font-semibold py-1">{t('completed')}</span>
+                    )}
+                    {order.status === 'cancelled' && (
+                        <div className="w-full max-w-[160px] bg-red-100 text-red-800 px-2 py-1.5 rounded-lg font-bold text-center border border-red-200 text-[10px]">
+                            {language === 'th' ? 'ถูกปฏิเสธ / ยกเลิกแล้ว' : 'Rejected'}
+                        </div>
                     )}
                 </div>
               </div>
