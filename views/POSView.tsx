@@ -62,7 +62,8 @@ export const POSView: React.FC = () => {
         printerType, setPrinterType,
         receiptFontSize, setReceiptFontSize,
         receiptPadding, setReceiptPadding,
-        autoPrintNewOrders, setAutoPrintNewOrders
+        autoPrintNewOrders, setAutoPrintNewOrders,
+        vatEnabled, setVatEnabled
     } = useStore();
     
     // Unified Tab State
@@ -892,8 +893,8 @@ export const POSView: React.FC = () => {
         const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
         const tableOrType = selectedOrder ? (selectedOrder.tableNumber ? `Table ${selectedOrder.tableNumber}` : selectedOrder.type.toUpperCase()) : (tableNumber ? `Table ${tableNumber}` : 'Walk-in');
         
-        // Calculate VAT (7% included) => Total * 7 / 107
-        const vatAmount = (currentTotal * 7) / 107;
+        // Calculate VAT (7% included if enabled) => Total * 7 / 107
+        const vatAmount = vatEnabled ? (currentTotal * 7) / 107 : 0;
         const subtotal = currentTotal - vatAmount;
 
         // Payment Details (Use current state if paying now, or defaults)
@@ -944,8 +945,8 @@ export const POSView: React.FC = () => {
     // --- REPRINT FOR LOG BOOK ---
     const handleReprintOrder = (order: Order) => {
         playSuccessFeedback();
-        // Calculate VAT (7% included)
-        const vatAmount = (order.totalAmount * 7) / 107;
+        // Calculate VAT (7% included if enabled)
+        const vatAmount = vatEnabled ? (order.totalAmount * 7) / 107 : 0;
         const subtotal = order.totalAmount - vatAmount;
 
         // Queue/Table Logic
@@ -1218,14 +1219,30 @@ export const POSView: React.FC = () => {
                         size: ${paperSize === '58mm' ? '58mm' : '80mm'} auto !important;
                         margin: 0mm !important;
                     }
-                    html, body {
+                    html, body, #root {
                         width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                        height: auto !important;
+                        overflow: visible !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        background: white !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    body > *:not(.printable-area) {
+                        display: none !important;
+                    }
+                    #root > *:not(.printable-area) {
+                        display: none !important;
                     }
                     .printable-area {
                         width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
                         padding: ${receiptPadding}mm !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        display: block !important;
                     }
                     .printable-area, .printable-area * {
                         font-size: ${receiptFontSize}px !important;
@@ -1391,10 +1408,23 @@ export const POSView: React.FC = () => {
                         <div className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
 
                         <div className="px-1 mt-1 font-bold">
-                            <div className="flex justify-between">
-                                <span>รวมเงินทั้งสิ้น (Subtotal)</span>
-                                <span>{receiptData.subtotal.toFixed(0)}.-</span>
-                            </div>
+                            {vatEnabled ? (
+                                <>
+                                    <div className="flex justify-between">
+                                        <span>รวมเงิน (Subtotal Ex. VAT)</span>
+                                        <span>{receiptData.subtotal.toFixed(2)}.-</span>
+                                    </div>
+                                    <div className="flex justify-between mt-0.5">
+                                        <span>ภาษีมูลค่าเพิ่ม (VAT 7%)</span>
+                                        <span>{receiptData.vat.toFixed(2)}.-</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex justify-between">
+                                    <span>รวมเงินทั้งสิ้น (Subtotal)</span>
+                                    <span>{(receiptData.total - (receiptData.deliveryFee && receiptData.deliveryFee !== 'pending' ? Number(receiptData.deliveryFee) : 0)).toFixed(0)}.-</span>
+                                </div>
+                            )}
                             {receiptData.deliveryFee && receiptData.deliveryFee !== 'pending' && (
                                 <div className="flex justify-between mt-1 text-[10px]">
                                     <span>ค่าจัดส่ง (Delivery)</span>
@@ -1570,7 +1600,33 @@ export const POSView: React.FC = () => {
                                 {orderSource !== 'store' && (
                                     <div className="w-full"><input type="text" placeholder={`${orderSource.toUpperCase()} Order No.`} className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" value={deliveryPlatformRef} onChange={e => setDeliveryPlatformRef(e.target.value)}/></div>
                                 )}
-                                <div className="flex justify-between items-center text-2xl font-bold text-gray-900 mt-2"><span>Total</span><span>฿{cartTotal}</span></div>
+                                <div className="space-y-1.5 pt-1.5 border-t border-gray-100">
+                                    <div className="flex justify-between items-center text-xs font-bold text-gray-500">
+                                        <span>{language === 'th' ? 'ภาษี 7% (VAT Toggle):' : '7% VAT (VAT Toggle):'}</span>
+                                        <button 
+                                            onClick={() => setVatEnabled(!vatEnabled)} 
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer ${vatEnabled ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
+                                        >
+                                            {vatEnabled ? (language === 'th' ? 'เปิดใช้งาน / ON' : 'ON') : (language === 'th' ? 'ปิดการใช้งาน / OFF' : 'OFF')}
+                                        </button>
+                                    </div>
+                                    {vatEnabled && cartTotal > 0 && (
+                                        <>
+                                            <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
+                                                <span>{language === 'th' ? 'ก่อนภาษี (Ex. VAT)' : 'Before VAT (Ex. VAT)'}</span>
+                                                <span>฿{(cartTotal - (cartTotal * 7 / 107)).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs text-gray-400 font-medium">
+                                                <span>{language === 'th' ? 'ภาษีมูลค่าเพิ่ม (VAT 7%)' : 'Value Added Tax (VAT 7%)'}</span>
+                                                <span>฿{(cartTotal * 7 / 107).toFixed(2)}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="flex justify-between items-center text-2xl font-black text-gray-950 pt-1">
+                                        <span>Total</span>
+                                        <span>฿{cartTotal}</span>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-3"><button onClick={handleSendToKitchen} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Kitchen</button><button onClick={handleCheckBill} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Pay Now</button></div>
                             </div>
                         </div>
@@ -1597,9 +1653,14 @@ export const POSView: React.FC = () => {
                                                         </span>
                                                     )}
                                                 </h3>
+                                                {/* Date & Time of Order Creation */}
+                                                <div className="text-xs font-bold text-brand-600 mt-2 flex items-center gap-1 bg-brand-50/50 px-2 py-1 rounded-lg border border-brand-100 w-fit">
+                                                    <Clock size={12}/>
+                                                    <span>{new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' })}</span>
+                                                </div>
                                                 {/* Customer Name for Non-Table Orders */}
                                                 {!order.tableNumber && (
-                                                    <div className="text-sm font-bold text-gray-600 mt-1 flex items-center gap-1">
+                                                    <div className="text-sm font-bold text-gray-600 mt-1.5 flex items-center gap-1">
                                                         <User size={14}/> {order.customerName}
                                                     </div>
                                                 )}
@@ -2177,17 +2238,32 @@ export const POSView: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-4">
-                                        <div className="flex items-center gap-3">
-                                            <button 
-                                                onClick={() => setAutoPrintNewOrders(!autoPrintNewOrders)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer leading-tight transition ${autoPrintNewOrders ? 'bg-amber-100/80 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200'}`}
-                                            >
-                                                {autoPrintNewOrders ? 'AUTOPRINT: ON' : 'AUTOPRINT: OFF'}
-                                            </button>
-                                            <span className="text-xs text-gray-400 font-bold block max-w-xs">{language === 'th' ? 'สั่งพิมพ์บิลใบเสร็จและใบจัดส่งทันทีเมื่อได้รับออเดอร์หรือชำระเงิน' : 'Prints bills, delivery receipts, and tickets instantly.'}</span>
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center text-sm gap-4">
+                                        <div className="flex flex-col gap-3 w-full">
+                                            <div className="flex items-center gap-3">
+                                                <button 
+                                                    onClick={() => setAutoPrintNewOrders(!autoPrintNewOrders)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer leading-tight transition shrink-0 ${autoPrintNewOrders ? 'bg-amber-100/80 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200'}`}
+                                                >
+                                                    {autoPrintNewOrders ? 'AUTOPRINT: ON' : 'AUTOPRINT: OFF'}
+                                                </button>
+                                                <span className="text-xs text-gray-400 font-bold block max-w-xl">{language === 'th' ? 'สั่งพิมพ์บิลใบเสร็จและใบจัดส่งทันทีเมื่อได้รับออเดอร์หรือชำระเงิน' : 'Prints bills, delivery receipts, and tickets instantly.'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 border-t border-gray-50 pt-2">
+                                                <button 
+                                                    onClick={() => setVatEnabled(!vatEnabled)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer leading-tight transition shrink-0 ${vatEnabled ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 ring-2 ring-emerald-50' : 'bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200'}`}
+                                                >
+                                                    {vatEnabled ? (language === 'th' ? 'ภาษีมูลค่าเพิ่ม (VAT 7%): ON' : 'VAT 7% DISPLAY: ON') : (language === 'th' ? 'ภาษีมูลค่าเพิ่ม (VAT 7%): OFF' : 'VAT 7% DISPLAY: OFF')}
+                                                </button>
+                                                <span className="text-xs text-gray-400 font-bold block max-w-xl">
+                                                    {language === 'th' 
+                                                        ? 'เปิด/ปิดการคำนวณและแสดงแจกแจงภาษีมูลค่าเพิ่ม 7% (รวมในราคาสินค้าแล้ว ไม่บวกเพิ่มจากราคาหน้า POS) บนใบเสร็จ' 
+                                                        : 'Toggle display of 7% Value Added Tax calculated from existing prices (VAT inclusive, no extra charges added on top) on printed bills.'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 hover:bg-brand-100 rounded-xl transition">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
+                                        <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 hover:bg-brand-100 rounded-xl transition self-end md:self-center shrink-0">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
                                     </div>
                                     
                                     <div className="mt-6 pt-6 border-t border-gray-150 space-y-4">

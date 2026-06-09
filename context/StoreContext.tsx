@@ -118,6 +118,8 @@ interface StoreContextType {
   setReceiptPadding: (padding: number) => void;
   autoPrintNewOrders: boolean;
   setAutoPrintNewOrders: (val: boolean) => void;
+  vatEnabled: boolean;
+  setVatEnabled: (val: boolean) => void;
 
   partners: Partner[];
   addPartner: (partner: Partner) => void;
@@ -235,6 +237,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setAutoPrintNewOrdersState(val);
       try {
           localStorage.setItem('damac_auto_print_new_orders', String(val));
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  const [vatEnabled, setVatEnabledState] = useState<boolean>(() => {
+      if (typeof window !== 'undefined') {
+          const val = localStorage.getItem('damac_vat_enabled');
+          return val === null ? true : val === 'true';
+      }
+      return true;
+  });
+  const setVatEnabled = (val: boolean) => {
+      setVatEnabledState(val);
+      try {
+          localStorage.setItem('damac_vat_enabled', String(val));
       } catch(e) { console.error("Storage Error", e); }
   };
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
@@ -1648,6 +1664,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       receiptFontSize, setReceiptFontSize,
       receiptPadding, setReceiptPadding,
       autoPrintNewOrders, setAutoPrintNewOrders,
+      vatEnabled, setVatEnabled,
       partners, addPartner, updatePartner, deletePartner
   };
 

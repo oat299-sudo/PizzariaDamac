@@ -412,7 +412,7 @@ export const KitchenView: React.FC = () => {
                       )}
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute:'2-digit' })}</div>
+                      <div className="flex items-center gap-1 justify-end font-bold text-gray-700"><Clock size={14}/> {new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'short' })}</div>
                       {order.pickupTime && (
                            <div className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded mt-1 font-bold">
                                {language === 'th' ? 'เวลารับสินค้า' : 'Pickup'}: {order.pickupTime}
@@ -621,14 +621,30 @@ export const KitchenView: React.FC = () => {
                 size: ${paperSize === '58mm' ? '58mm' : '80mm'} auto !important;
                 margin: 0mm !important;
             }
-            html, body {
+            html, body, #root {
                 width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
+                height: auto !important;
+                overflow: visible !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                background: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            body > *:not(.printable-area) {
+                display: none !important;
+            }
+            #root > *:not(.printable-area) {
+                display: none !important;
             }
             .printable-area {
                 width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
                 padding: ${receiptPadding}mm !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                display: block !important;
             }
             .printable-area, .printable-area * {
                 font-size: ${receiptFontSize}px !important;
