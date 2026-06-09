@@ -21,7 +21,8 @@ CREATE TABLE store_settings (
     map_url TEXT,
     contact_phone TEXT,
     prompt_pay_number TEXT,
-    news_items JSONB DEFAULT '[]'::jsonb
+    news_items JSONB DEFAULT '[]'::jsonb,
+    partners JSONB DEFAULT '[]'::jsonb
 );
 
 -- Initialize the first row for settings

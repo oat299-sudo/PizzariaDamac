@@ -439,16 +439,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) {}
   }, [partners]);
 
-  const addPartner = (partner: Partner) => {
-    setPartners(prev => [partner, ...prev]);
+  const addPartner = async (partner: Partner) => {
+    const updated = [partner, ...partners];
+    setPartners(updated);
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ partners: updated }).eq('id', 1);
+        } catch(e) {
+            console.warn("Could not sync partner list to Supabase. Run SQL migration to add 'partners' column.", e);
+        }
+    }
   };
 
-  const updatePartner = (updated: Partner) => {
-    setPartners(prev => prev.map(p => p.id === updated.id ? updated : p));
+  const updatePartner = async (updated: Partner) => {
+    const updatedList = partners.map(p => p.id === updated.id ? updated : p);
+    setPartners(updatedList);
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ partners: updatedList }).eq('id', 1);
+        } catch(e) {
+            console.warn("Could not sync partner list update to Supabase.", e);
+        }
+    }
   };
 
-  const deletePartner = (id: string) => {
-    setPartners(prev => prev.filter(p => p.id !== id));
+  const deletePartner = async (id: string) => {
+    const updatedList = partners.filter(p => p.id !== id);
+    setPartners(updatedList);
+    if (isSupabaseConfigured) {
+        try {
+            await supabase.from('store_settings').update({ partners: updatedList }).eq('id', 1);
+        } catch(e) {
+            console.warn("Could not sync partner deletion to Supabase.", e);
+        }
+    }
   };
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -669,6 +693,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   eventGalleryUrls: data.event_gallery_urls || DEFAULT_STORE_SETTINGS.eventGalleryUrls, // Map new column
                   newsItems: data.news_items || []
               });
+              if (data.partners && Array.isArray(data.partners)) {
+                  setPartners(data.partners);
+              }
           }
       } catch (err) { console.error("Settings fetch failed", err); }
   };
@@ -1563,6 +1590,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           if (settings.mapUrl !== undefined) payload.map_url = settings.mapUrl;
           if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
           if (settings.promptPayNumber !== undefined) payload.prompt_pay_number = settings.promptPayNumber;
+          if (settings.partners !== undefined) payload.partners = settings.partners;
           
           if (settings.storeLocationGps !== undefined) payload.store_location_gps = settings.storeLocationGps;
           if (settings.freeDeliveryRadiusKm !== undefined) payload.free_delivery_radius_km = settings.freeDeliveryRadiusKm;

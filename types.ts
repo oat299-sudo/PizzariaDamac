@@ -177,6 +177,7 @@ export interface StoreSettings {
   eventGalleryUrls?: string[]; // New: Catering Images
   
   newsItems?: NewsItem[];
+  partners?: Partner[];
 }
 
 export function parseAnyMapLink(text?: string): { lat: number, lng: number } | null {

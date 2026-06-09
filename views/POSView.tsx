@@ -1820,7 +1820,7 @@ export const POSView: React.FC = () => {
                                             </button>
                                         ))}
                                     </div>
-                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: o.items.length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2"><Download size={18}/> Export CSV</button>
+                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: (o.items || []).length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2"><Download size={18}/> Export CSV</button>
                                 </div>
 
                                 {/* KPIs */}
@@ -2759,7 +2759,7 @@ export const POSView: React.FC = () => {
                         <div className="hidden lg:flex lg:w-1/2 bg-gray-50 border-r border-gray-200 p-6 flex-col">
                             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800"><Receipt size={24}/> {selectedOrder ? `Bill for Table ${selectedOrder.tableNumber}` : 'Current Order'}</h2>
                             <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                                {(selectedOrder ? selectedOrder.items : cart).map((item, idx) => (
+                                {((selectedOrder ? selectedOrder.items : cart) || []).map((item, idx) => (
                                     <div key={idx} className="flex justify-between items-start bg-white p-3 rounded-lg shadow-sm border border-gray-100">
                                         <div>
                                             <div className="font-bold text-gray-800">{item.quantity}x {item.name}</div>
