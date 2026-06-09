@@ -116,6 +116,8 @@ interface StoreContextType {
   setReceiptFontSize: (size: number) => void;
   receiptPadding: number;
   setReceiptPadding: (padding: number) => void;
+  autoPrintNewOrders: boolean;
+  setAutoPrintNewOrders: (val: boolean) => void;
 
   partners: Partner[];
   addPartner: (partner: Partner) => void;
@@ -220,6 +222,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setReceiptPaddingState(padding);
       try {
           localStorage.setItem('damac_receipt_padding', String(padding));
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
+  const [autoPrintNewOrders, setAutoPrintNewOrdersState] = useState<boolean>(() => {
+      if (typeof window !== 'undefined') {
+          return localStorage.getItem('damac_auto_print_new_orders') === 'true';
+      }
+      return false;
+  });
+  const setAutoPrintNewOrders = (val: boolean) => {
+      setAutoPrintNewOrdersState(val);
+      try {
+          localStorage.setItem('damac_auto_print_new_orders', String(val));
       } catch(e) { console.error("Storage Error", e); }
   };
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
@@ -1632,6 +1647,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       printerType, setPrinterType,
       receiptFontSize, setReceiptFontSize,
       receiptPadding, setReceiptPadding,
+      autoPrintNewOrders, setAutoPrintNewOrders,
       partners, addPartner, updatePartner, deletePartner
   };
 

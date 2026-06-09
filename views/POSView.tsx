@@ -61,7 +61,8 @@ export const POSView: React.FC = () => {
         printerPort, setPrinterPort,
         printerType, setPrinterType,
         receiptFontSize, setReceiptFontSize,
-        receiptPadding, setReceiptPadding
+        receiptPadding, setReceiptPadding,
+        autoPrintNewOrders, setAutoPrintNewOrders
     } = useStore();
     
     // Unified Tab State
@@ -453,6 +454,7 @@ export const POSView: React.FC = () => {
             taxId: string;
             address: string;
         };
+        isPaid?: boolean;
     }
     const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
@@ -533,6 +535,64 @@ export const POSView: React.FC = () => {
             setChange(0);
         }
     }, [cashReceived, cartTotal, paymentMethod, selectedOrder]);
+
+    // Keep record of orders we have already auto-printed during this session to avoid repeats.
+    // Keys like: `${orderId}_created` or `${orderId}_completed`
+    const isFirstMountRef = React.useRef(true);
+    const printedOrdersRef = React.useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!orders) return;
+
+        if (isFirstMountRef.current) {
+            // Seed printedOrdersRef with current status state of loaded orders on first mount
+            orders.forEach(order => {
+                if (order.status === 'completed') {
+                    printedOrdersRef.current.add(`${order.id}_completed`);
+                }
+                printedOrdersRef.current.add(`${order.id}_created`);
+            });
+            isFirstMountRef.current = false;
+            return;
+        }
+
+        if (!autoPrintNewOrders) return;
+
+        orders.forEach(order => {
+            const createdPrintKey = `${order.id}_created`;
+            const completedPrintKey = `${order.id}_completed`;
+
+            // Condition 3: Dine-in / Walk-in / Store order created & confirmed (Pay Later)
+            if (
+                order.type === 'dine-in' && 
+                order.status === 'confirmed' && 
+                !printedOrdersRef.current.has(createdPrintKey)
+            ) {
+                printedOrdersRef.current.add(createdPrintKey);
+                handleReprintOrder(order);
+            }
+
+            // Condition 2 part A: Delivery order first received (status pending / confirmed)
+            if (
+                order.type === 'delivery' && 
+                (order.status === 'pending' || order.status === 'confirmed') && 
+                !printedOrdersRef.current.has(createdPrintKey)
+            ) {
+                printedOrdersRef.current.add(createdPrintKey);
+                handleReprintOrder(order);
+            }
+
+            // Condition 2 part B / Condition 1: Any order marked as completed/paid
+            // (Only triggers auto-print state if it transitions to completed)
+            if (
+                order.status === 'completed' && 
+                !printedOrdersRef.current.has(completedPrintKey)
+            ) {
+                printedOrdersRef.current.add(completedPrintKey);
+                handleReprintOrder(order);
+            }
+        });
+    }, [orders, autoPrintNewOrders]);
 
     // PromptPay QR Payload Generator
     const promptPayQRUrl = useMemo(() => {
@@ -873,7 +933,8 @@ export const POSView: React.FC = () => {
             paymentMethod: payMethod === 'cash' ? 'CASH' : payMethod === 'thai_chuay_thai' ? 'THAI CHUAY THAI' : 'QR / TRANSFER',
             received: received,
             change: changeAmt,
-            taxInvoice: taxInvoice
+            taxInvoice: taxInvoice,
+            isPaid: selectedOrder ? selectedOrder.status === 'completed' : true
         });
 
         playSuccessFeedback();
@@ -918,6 +979,7 @@ export const POSView: React.FC = () => {
             paymentMethod: order.paymentMethod === 'cash' ? 'CASH' : order.paymentMethod === 'thai_chuay_thai' ? 'THAI CHUAY THAI' : 'QR / TRANSFER',
             received: order.totalAmount, // Assumed exact for history
             change: 0,
+            isPaid: order.status === 'completed'
         });
 
         setTimeout(() => { window.print(); }, 200);
@@ -1205,6 +1267,38 @@ export const POSView: React.FC = () => {
                             <div className="mt-1 text-[11px] font-extrabold">ใบเสร็จรับเงิน / ใบสั่งอาหาร</div>
                             <div className="text-[10px] font-bold">(Receipt / Order Bill)</div>
                             <div>{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
+                            
+                            {receiptData.isPaid ? (
+                                <div className="my-1 base-border py-1 px-2 text-center font-black text-[12px] tracking-wider uppercase flex items-center justify-center gap-1 bg-white text-black" style={{ border: '1px solid black' }}>
+                                    <span>✔ ชำระเงินแล้ว / PAID</span>
+                                </div>
+                            ) : (
+                                <div className="my-1 base-border py-1 px-2 text-center font-black text-[12px] tracking-wider uppercase flex items-center justify-center gap-1 bg-white text-black" style={{ border: '1px solid black' }}>
+                                    <span>⚠️ ยังไม่ชำระเงิน / UNPAID</span>
+                                </div>
+                            )}
+
+                            {receiptData.deliveryAddress && (
+                                <div className="my-1.5 p-1 text-[9px] rounded font-bold leading-normal text-black bg-white" style={{ border: '1px solid black' }}>
+                                    <div className="font-extrabold border-b pb-0.5 mb-1 text-[9.5px]" style={{ borderBottom: '1px solid black' }}>
+                                        📍 ข้อมูลจัดส่ง / DELIVERY DETAILS:
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <div>
+                                            <span className="font-black">ที่อยู่:</span>{" "}
+                                            <span>{receiptData.deliveryAddress.replace(/\[Phone: .*?\]/g, '')}</span>
+                                        </div>
+                                        {parseDeliveryPhone(receiptData.deliveryAddress) && (
+                                            <div>
+                                                <span className="font-black">เบอร์โทร:</span>{" "}
+                                                <span className="text-[10px] underline font-black">
+                                                    {parseDeliveryPhone(receiptData.deliveryAddress)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-1 mb-1 px-0.5 space-y-0.5 font-bold">
@@ -1316,6 +1410,28 @@ export const POSView: React.FC = () => {
                         <div className="text-center font-bold mt-1">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
                         <div className="text-center mt-2 mb-2 font-bold px-1">
                             <div className="mb-2 text-[10px]">({receiptData.total} บาทถ้วน)</div>
+                            
+                            {!receiptData.isPaid && (
+                                <div className="my-2 flex flex-col items-center justify-center p-2 rounded-xl bg-gray-50" style={{ border: '1px dashed gray' }}>
+                                    <div className="text-[9px] font-black mb-1.5 text-center text-black">
+                                        สแกนจ่ายเงินผ่าน THAI QR / PROMPTPAY
+                                    </div>
+                                    <img 
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                                            generatePromptPayPayload(
+                                                storeSettings.promptPayNumber || "0-9949-7919-9",
+                                                receiptData.total
+                                            )
+                                        )}`} 
+                                        alt="PromptPay QR Code" 
+                                        className="w-32 h-32 border border-gray-350 p-1 bg-white rounded mx-auto"
+                                    />
+                                    <div className="text-[8px] mt-1 text-center font-bold text-gray-700">
+                                        PromptPay: {storeSettings.promptPayNumber || "0-9949-7919-9"}
+                                    </div>
+                                </div>
+                            )}
+
                             <div>ขอบคุณที่ใช้บริการ / Thank You</div>
                         </div>
                         <div className="text-center font-bold">{paperSize === '58mm' ? '=============================' : '========================================'}</div>
@@ -2061,8 +2177,16 @@ export const POSView: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-2">
-                                        <span className="text-gray-600 font-bold">{language === 'th' ? 'สลิปปัจจุบัน:' : 'Currently Selected Width:'} <strong className="text-brand-600 font-extrabold text-base">{paperSize}</strong></span>
+                                    <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center text-sm gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <button 
+                                                onClick={() => setAutoPrintNewOrders(!autoPrintNewOrders)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-black cursor-pointer leading-tight transition ${autoPrintNewOrders ? 'bg-amber-100/80 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200'}`}
+                                            >
+                                                {autoPrintNewOrders ? 'AUTOPRINT: ON' : 'AUTOPRINT: OFF'}
+                                            </button>
+                                            <span className="text-xs text-gray-400 font-bold block max-w-xs">{language === 'th' ? 'สั่งพิมพ์บิลใบเสร็จและใบจัดส่งทันทีเมื่อได้รับออเดอร์หรือชำระเงิน' : 'Prints bills, delivery receipts, and tickets instantly.'}</span>
+                                        </div>
                                         <button onClick={() => { window.print(); }} className="text-brand-600 font-bold hover:underline py-1.5 px-4 bg-brand-50 hover:bg-brand-100 rounded-xl transition">{language === 'th' ? '🖨️ ทดสอบสั่งพิมพ์' : '🖨️ Try Printing Test'}</button>
                                     </div>
                                     

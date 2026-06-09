@@ -6,7 +6,7 @@ import { Order, OrderStatus, parseGPSCoordinates, parseDeliveryPhone } from '../
 import { CheckCircle, Clock, Utensils, Bell, MapPin, Truck, ShoppingBag, Banknote, QrCode, ChefHat, Flame, LogOut, Bike, Layers, History, Calendar, Volume2, VolumeX, Printer, Phone, Globe } from 'lucide-react';
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding } = useStore();
+  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding, autoPrintNewOrders, setAutoPrintNewOrders } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
@@ -214,11 +214,13 @@ export const KitchenView: React.FC = () => {
       }
 
       let hasNewOrder = false;
+      let newOrderToPrint: Order | null = null;
       for (const order of orders) {
           if (!prevOrderIdsRef.current.has(order.id)) {
               prevOrderIdsRef.current.add(order.id);
               if (order.status === 'pending' || order.status === 'confirmed') {
                   hasNewOrder = true;
+                  newOrderToPrint = order;
               }
           }
       }
@@ -226,7 +228,11 @@ export const KitchenView: React.FC = () => {
       if (hasNewOrder && soundEnabled) {
           playBellChime();
       }
-  }, [orders, soundEnabled]);
+
+      if (newOrderToPrint && autoPrintNewOrders) {
+          handlePrintOrder(newOrderToPrint);
+      }
+  }, [orders, soundEnabled, autoPrintNewOrders]);
 
   const toggleItemCheck = (orderId: string, itemIdx: number) => {
       playClickSound();
@@ -340,6 +346,16 @@ export const KitchenView: React.FC = () => {
             >
                 {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
                 <span>{soundEnabled ? (language === 'th' ? 'เสียงแจ้งเตือน: เปิด' : 'Sound: ON') : (language === 'th' ? 'เสียงแจ้งเตือน: ปิด' : 'Sound: OFF')}</span>
+            </button>
+
+            {/* Auto Print Toggle */}
+            <button 
+                onClick={() => { playClickSound(); setAutoPrintNewOrders(!autoPrintNewOrders); }} 
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition border cursor-pointer ${autoPrintNewOrders ? 'bg-amber-900/40 text-amber-300 border-amber-600/80 hover:bg-amber-900/50 animate-pulse' : 'bg-gray-750 text-gray-400 border-gray-600 hover:bg-gray-700'}`}
+                title={autoPrintNewOrders ? (language === 'th' ? "ปิดการพิมพ์อัตโนมัติ" : "Disable auto printing") : (language === 'th' ? "เปิดใช้งานระบบพิมพ์อัตโนมัติ" : "Enable automatic print on new order")}
+            >
+                <Printer size={18} />
+                <span>{autoPrintNewOrders ? (language === 'th' ? 'พิมพ์อัตโนมัติ: เปิด' : 'Auto-Print: ON') : (language === 'th' ? 'พิมพ์อัตโนมัติ: ปิด' : 'Auto-Print: OFF')}</span>
             </button>
 
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
@@ -671,6 +687,38 @@ export const KitchenView: React.FC = () => {
                         </div>
                     )}
                 </div>
+
+                {printOrder.deliveryAddress && (
+                    <div className="my-1.5 p-1 text-[9px] rounded font-bold leading-normal text-black bg-white" style={{ border: '1px solid black' }}>
+                        <div className="font-extrabold border-b pb-0.5 mb-1 text-[9.5px]" style={{ borderBottom: '1px solid black' }}>
+                            📍 ที่อยู่จัดส่ง / DELIVERY DETAILS:
+                        </div>
+                        <div className="space-y-0.5">
+                            <div>
+                                <span className="font-black">ที่อยู่:</span>{" "}
+                                <span>{printOrder.deliveryAddress.replace(/\[Phone: .*?\]/g, '')}</span>
+                            </div>
+                            {parseDeliveryPhone(printOrder.deliveryAddress) && (
+                                <div>
+                                    <span className="font-black">เบอร์โทร:</span>{" "}
+                                    <span className="text-[10px] underline font-black">
+                                        {parseDeliveryPhone(printOrder.deliveryAddress)}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {printOrder.status === 'completed' ? (
+                    <div className="my-1 py-1 px-2 text-center font-black text-[12px] uppercase bg-black text-white rounded">
+                        <span>ชำระเงินแล้ว / PAID</span>
+                    </div>
+                ) : (
+                    <div className="my-1 py-1 px-2 text-center font-black text-[11px] uppercase" style={{ border: '1px dashed black' }}>
+                        <span>ค้างชำระ / UNPAID</span>
+                    </div>
+                )}
 
                 <div className="text-center font-bold">{paperSize === '58mm' ? '-----------------------------' : '----------------------------------------'}</div>
                 <div className="px-1 font-bold">
