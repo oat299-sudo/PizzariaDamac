@@ -101,7 +101,7 @@ export const POSView: React.FC = () => {
 
     const handleUpdateGPDeduction = async (order: Order) => {
         const suggestion = (order.totalAmount - (order.netAmount || order.totalAmount)).toFixed(2);
-        const deductionStr = prompt(`Enter GP Deduction Amount for Order #${order.id.slice(-4)}:`, suggestion);
+        const deductionStr = prompt(`Enter GP Deduction Amount for Order #${String(order.id).slice(-4)}:`, suggestion);
         if (deductionStr !== null) {
             const deduction = parseFloat(deductionStr);
             if (!isNaN(deduction) && deduction >= 0) {
@@ -141,8 +141,8 @@ export const POSView: React.FC = () => {
 
     const handleDeleteOrderPrompt = async (order: Order) => {
         const confirmMsg = language === 'th' 
-            ? `คุณแน่ใจหรือไม่ว่าต้องการลบออเดอร์ #${order.id.slice(-4)} ของคุณ ${order.customerName}? (การลบนี้จะไม่สามารถย้อนกลับได้และข้อมูลในฐานข้อมูลจะถูกลบถาวร)` 
-            : `Are you sure you want to delete order #${order.id.slice(-4)} for ${order.customerName}? (This action cannot be undone and data will be permanently removed from database)`;
+            ? `คุณแน่ใจหรือไม่ว่าต้องการลบออเดอร์ #${String(order.id).slice(-4)} ของคุณ ${order.customerName}? (การลบนี้จะไม่สามารถย้อนกลับได้และข้อมูลในฐานข้อมูลจะถูกลบถาวร)` 
+            : `Are you sure you want to delete order #${String(order.id).slice(-4)} for ${order.customerName}? (This action cannot be undone and data will be permanently removed from database)`;
         if (confirm(confirmMsg)) {
             try {
                 await deleteOrder(order.id);
@@ -843,7 +843,7 @@ export const POSView: React.FC = () => {
     }
 
     const handleUpdateDeliveryFee = async (order: Order) => {
-        const feeStr = prompt(`Enter delivery fee for Order #${order.id.slice(-4)}:`, order.deliveryFee === 'pending' ? '' : String(order.deliveryFee));
+        const feeStr = prompt(`Enter delivery fee for Order #${String(order.id).slice(-4)}:`, order.deliveryFee === 'pending' ? '' : String(order.deliveryFee));
         if (feeStr !== null) {
             const fee = parseFloat(feeStr);
             if (!isNaN(fee) && fee >= 0) {
@@ -919,7 +919,7 @@ export const POSView: React.FC = () => {
             queueNo = `Table ${selectedOrder?.tableNumber || tableNumber}`;
         } else {
             const id = selectedOrder ? selectedOrder.id : Date.now().toString();
-            queueNo = `Q-${id.slice(-3)}`;
+            queueNo = `Q-${String(id).slice(-3)}`;
         }
 
         setReceiptData({
@@ -927,7 +927,7 @@ export const POSView: React.FC = () => {
             address: "Nonthaburi, Thailand",
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9", // Use PromptPay as placeholder Tax ID
             phone: storeSettings.contactPhone || "099-497-9199",
-            orderId: selectedOrder ? selectedOrder.id.slice(-4) : 'NEW',
+            orderId: selectedOrder ? String(selectedOrder.id).slice(-4) : 'NEW',
             date: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
             tableOrType: tableOrType,
             source: selectedOrder ? selectedOrder.source.toUpperCase() : orderSource.toUpperCase(),
@@ -965,7 +965,7 @@ export const POSView: React.FC = () => {
         if (order.tableNumber) {
             queueNo = `Table ${order.tableNumber}`;
         } else {
-            queueNo = `Q-${order.id.slice(-3)}`;
+            queueNo = `Q-${String(order.id).slice(-3)}`;
         }
 
         setReceiptData({
@@ -973,7 +973,7 @@ export const POSView: React.FC = () => {
             address: "Nonthaburi, Thailand",
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9",
             phone: storeSettings.contactPhone || "099-497-9199",
-            orderId: order.id.slice(-4),
+            orderId: String(order.id).slice(-4),
             date: formatOrderDateTime(order.createdAt),
             tableOrType: order.tableNumber ? `Table ${order.tableNumber}` : order.type.toUpperCase(),
             source: order.source.toUpperCase(),
@@ -1653,7 +1653,7 @@ export const POSView: React.FC = () => {
                                     <div key={order.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col relative group hover:border-brand-300 transition">
                                         <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
                                             <div>
-                                                <div className="text-xs text-gray-500 font-bold uppercase mb-1">Order #{order.id.slice(-4)}</div>
+                                                <div className="text-xs text-gray-500 font-bold uppercase mb-1">Order #{String(order.id).slice(-4)}</div>
                                                 <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                                     {order.tableNumber ? (
                                                         <span className="bg-gray-800 text-white px-3 py-1 rounded-lg text-lg">Table {order.tableNumber}</span>
@@ -1845,7 +1845,7 @@ export const POSView: React.FC = () => {
                                                         <td className="p-4 text-gray-600 font-medium">
                                                             {formatOrderDateTime(order.createdAt, 'medium')}
                                                         </td>
-                                                        <td className="p-4 font-bold text-gray-800">#{order.id.slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
+                                                        <td className="p-4 font-bold text-gray-800">#{String(order.id).slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
                                                         <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
                                                         <td className="p-4">
                                                             <span className={`uppercase text-[10px] font-bold px-2 py-1 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -2920,7 +2920,7 @@ export const POSView: React.FC = () => {
                     <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-fade-in text-gray-800">
                         <div className="bg-gray-905 px-6 py-4 flex items-center justify-between text-white border-b border-gray-805 bg-brand-650" style={{backgroundColor: '#b91c1c'}}>
                             <h3 className="font-extrabold text-lg flex items-center gap-2">
-                                🍕 แก้ไขออเดอร์ #{editingOrder.id.slice(-4)}
+                                🍕 แก้ไขออเดอร์ #{String(editingOrder.id).slice(-4)}
                             </h3>
                             <button onClick={() => { setShowEditOrderModal(false); setEditingOrder(null); }} className="text-gray-200 hover:text-white font-bold text-2xl p-1 leading-none">&times;</button>
                         </div>

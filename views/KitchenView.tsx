@@ -420,7 +420,7 @@ export const KitchenView: React.FC = () => {
               <div className={`p-4 border-b flex justify-between items-start ${order.status === 'pending' ? 'bg-red-50' : 'bg-white'}`}>
                   <div>
                       <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-lg text-gray-900">#{order.id.slice(-4)}</span>
+                          <span className="font-bold text-lg text-gray-900">#{String(order.id).slice(-4)}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${getStatusColor(order.status)}`}>
                             {t(order.status as any)}
                           </span>
@@ -752,7 +752,7 @@ export const KitchenView: React.FC = () => {
 
                 <div className="mt-1 mb-1 px-1 font-bold">
                     <div className="flex justify-between">
-                        <span>บิล: #{printOrder.id.slice(-4)}</span>
+                        <span>บิล: #{String(printOrder.id).slice(-4)}</span>
                         <span>วันที่: {printOrder.createdAt ? new Date(printOrder.createdAt).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' }) : '-'}</span>
                     </div>
                     <div className="flex justify-between">
