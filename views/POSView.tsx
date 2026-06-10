@@ -85,6 +85,7 @@ export const POSView: React.FC = () => {
     } = useStore();
     
     // Unified Tab State
+    const [customCP, setCustomCP] = useState<string>("18");
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     
@@ -2420,24 +2421,73 @@ export const POSView: React.FC = () => {
                                                 )}
 
                                                 {/* Dynamic Thai Encoding / Code Page Sector Selection */}
-                                                <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-1.5 text-left mb-3">
+                                                <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2 text-left mb-3">
                                                     <label className="text-xs font-bold text-gray-700 block flex items-center gap-1">
-                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / encoding)' : 'Thai Code Page / Encoding'}
+                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / Encoding)' : 'Thai Code Page / Encoding'}
                                                     </label>
                                                     <select
-                                                        value={thaiCodePage}
-                                                        onChange={(e) => setThaiCodePage(Number(e.target.value))}
+                                                        value={thaiCodePage.startsWith('custom-') ? 'custom' : thaiCodePage}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val === 'custom') {
+                                                                setThaiCodePage(`custom-${customCP}`);
+                                                            } else {
+                                                                setThaiCodePage(val);
+                                                            }
+                                                        }}
                                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition cursor-pointer"
                                                     >
-                                                        <option value={26}>Code Page 26 - TIS-620 (แนะนำสำหรับ Welltech G5 / Xprinter ✅)</option>
-                                                        <option value={18}>Code Page 18 - CP874 (มาตรฐาน Xprinter ดั้งเดิม)</option>
-                                                        <option value={17}>Code Page 17 - TIS-620 Alternative</option>
-                                                        <option value={40}>Code Page 40 - Thai CP874 Alternative 2</option>
+                                                        <optgroup label="🌟 UTF-8 (แนะนำสำหรับเครื่องพิมพ์ยุคใหม่)">
+                                                            <option value="utf8-epson">UTF-8 (Epson Setup - สระเรียงซ้อน สวยงามที่สุด ⭐)</option>
+                                                            <option value="utf8-xprinter">UTF-8 (Xprinter Multi-byte Command)</option>
+                                                            <option value="utf8-raw">UTF-8 (Raw / Direct Unicode - เครื่องพิมพ์สติกเกอร์ทั่วไป)</option>
+                                                        </optgroup>
+                                                        <optgroup label="💾 TIS-620 / CP874 (สำหรับถอดรหัสแบบ 1 ไบต์ดั้งเดิม)">
+                                                            <option value="tis620-26">Code Page 26 - TIS-620 (แนะนำสำหรับ Welltech G5 / Xprinter ✅)</option>
+                                                            <option value="tis620-18">Code Page 18 - CP874 (มาตรฐาน Xprinter เก่า / Epson)</option>
+                                                            <option value="tis620-17">Code Page 17 - TIS-620 Alt</option>
+                                                            <option value="tis620-40">Code Page 40 - CP874 Alt 2</option>
+                                                            <option value="tis620-51">Code Page 51 - CP874 Alt 3 (เครื่องพิมพ์จีนไร้แบรนด์)</option>
+                                                            <option value="tis620-41">Code Page 41 - Space/Thai Alt 4</option>
+                                                            <option value="tis620-12">Code Page 12 - Thai Alt 5</option>
+                                                            <option value="tis620-19">Code Page 19 - Thai Alt 6</option>
+                                                            <option value="tis620-20">Code Page 20 - Thai Alt 7</option>
+                                                            <option value="tis620-21">Code Page 21 - Thai Alt 8</option>
+                                                            <option value="tis620-22">Code Page 22 - Thai Alt 9</option>
+                                                            <option value="tis620-23">Code Page 23 - Thai Alt 10</option>
+                                                            <option value="tis620-24">Code Page 24 - Thai Alt 11</option>
+                                                            <option value="tis620-25">Code Page 25 - Thai Alt 12</option>
+                                                            <option value="tis620-30">Code Page 30 - Thai Alt 13</option>
+                                                            <option value="tis620-255">Code Page 255 - Thai Alternate 14</option>
+                                                        </optgroup>
+                                                        <optgroup label="⚙️ อื่นๆ">
+                                                            <option value="custom">{language === 'th' ? 'ระบุรหัส Code Page อื่นๆ ด้วยตัวเอง...' : 'Specify Custom Code Page Number...'}</option>
+                                                        </optgroup>
                                                     </select>
+
+                                                    {/* Custom Code Page Input */}
+                                                    {(thaiCodePage.startsWith('custom-') || thaiCodePage === 'custom') && (
+                                                        <div className="flex gap-1.5 items-center bg-gray-50 p-2 rounded-lg border border-gray-200 mt-1 animate-fade-in">
+                                                            <span className="text-[10px] font-bold text-gray-500">ESC t [Number]:</span>
+                                                            <input
+                                                                type="number"
+                                                                value={customCP}
+                                                                min="0"
+                                                                max="255"
+                                                                onChange={(e) => {
+                                                                    setCustomCP(e.target.value);
+                                                                    setThaiCodePage(`custom-${e.target.value}`);
+                                                                }}
+                                                                className="w-16 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-bold text-gray-800 focus:border-brand-500 outline-none"
+                                                            />
+                                                            <p className="text-[10px] text-gray-400">ระบุเลข 0-255 เพื่อทดสอบ</p>
+                                                        </div>
+                                                    )}
+
                                                     <p className="text-[10px] text-gray-400 leading-tight">
                                                         {language === 'th' 
-                                                            ? '* หากภาษาไทยพิมพ์ออกมาเป็นตัวหนังสือพิลึก (เช่น รัสเซียหรือสัญลักษณ์) รหัสเริ่มต้นมักเป็น 26 หรือ 18 กรุณาปรับเปลี่ยนแล้วทดสอบพิมพ์ใบเสร็จอีกครั้ง' 
-                                                            : '* If Thai characters print out corrupted or as Cyrillic symbols, toggle this select option and perform a test block print again.'}
+                                                            ? '* เนื่องจากเครื่องพิมพ์ Welltech/Xprinter มีรุ่นย่อยเยอะมาก รหัสเริ่มต้นมักจะเป็น 26 หรือ 18 หรือเปลี่ยนมาใช้ "UTF-8" ด้านบนสุด หากภาษาไทยพิลึกแสดงว่ารหัสเครื่องไม่ตรง กรุณากดทดสอบแต่ละแบบด้านล่าง' 
+                                                            : '* Welltech/Xprinter printers have many model variations. If Thai displays garbled, toggle between UTF-8 modes or TIS-620 code pages, then click Test Print.'}
                                                     </p>
                                                 </div>
 
@@ -2457,11 +2507,14 @@ export const POSView: React.FC = () => {
                                                                 onClick={async () => {
                                                                     const testPayload = {
                                                                         storeName: "Pizza Damac Nonthaburi",
-                                                                        address: "TEST PRINT SUCCESSFUL",
+                                                                        address: `ทดสอบภาษาไทย: กขค ะาิีึืุู ่้๊๋็์ 🍕`,
                                                                         phone: "099-497-9199",
-                                                                        queueNo: "Printer001 TEST",
+                                                                        queueNo: `TEST: ${thaiCodePage}`,
                                                                         date: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
-                                                                        items: [{ name: "Test Pizza Margherita", quantity: 1, totalPrice: 0 }],
+                                                                        items: [
+                                                                            { name: "ทดสอบพิมพ์ไทย - มาร์เกริต้า", quantity: 1, totalPrice: 0 },
+                                                                            { name: "ทดสอบพิมพ์สระจมลอย - หนึ่งสองสาม", quantity: 1, totalPrice: 0 }
+                                                                        ],
                                                                         total: 0,
                                                                         paymentMethod: "BLUETOOTH FEED"
                                                                     };

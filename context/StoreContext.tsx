@@ -140,8 +140,8 @@ interface StoreContextType {
   generateEscPosData: (data: any, lang: Language) => Uint8Array;
   generateKitchenEscPosData: (order: Order, lang: Language) => Uint8Array;
   writeBtInChunks: (characteristic: any, data: Uint8Array) => Promise<void>;
-  thaiCodePage: number;
-  setThaiCodePage: (cp: number) => void;
+  thaiCodePage: string;
+  setThaiCodePage: (cp: string) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -271,18 +271,66 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) { console.error("Storage Error", e); }
   };
 
-  const [thaiCodePage, setThaiCodePageState] = useState<number>(() => {
+  const [thaiCodePage, setThaiCodePageState] = useState<string>(() => {
       if (typeof window !== 'undefined') {
           const cp = localStorage.getItem('damac_thai_code_page');
-          return cp ? parseInt(cp, 10) : 26; // Default to 26 (TIS-620 for Xprinter/Welltech)
+          // Support migration from number stores to key strings
+          if (cp) {
+              if (cp === '26' || cp === '18' || cp === '17' || cp === '40') {
+                  return `tis620-${cp}`;
+              }
+              return cp;
+          }
+          return 'tis620-26'; // Default to TIS-620 Page 26
       }
-      return 26;
+      return 'tis620-26';
   });
-  const setThaiCodePage = (cp: number) => {
+  const setThaiCodePage = (cp: string) => {
       setThaiCodePageState(cp);
       try {
-          localStorage.setItem('damac_thai_code_page', String(cp));
+          localStorage.setItem('damac_thai_code_page', cp);
       } catch(e) { console.error("Storage Error", e); }
+  };
+
+  // Helper to parse active Thai configuration
+  const getThaiConfigs = (mode: string) => {
+      const ESC = 0x1B;
+      const GS = 0x1D;
+      const FS = 0x1C;
+      
+      let initBytes: number[] = [ESC, 0x40]; // Init printer first
+      let isUtf8 = false;
+
+      if (mode === 'utf8-epson') {
+          isUtf8 = true;
+          // ESC ( G pL pH m n (Epson standard UTF-8 mode setup)
+          initBytes.push(0x1B, 0x28, 0x47, 0x02, 0x00, 0x30, 0x01);
+      } else if (mode === 'utf8-xprinter') {
+          isUtf8 = true;
+          // FS & (Enable multi-byte mode for Xprinter Chinese/Thai/etc UTF-8)
+          initBytes.push(FS, 0x26);
+      } else if (mode === 'utf8-raw') {
+          isUtf8 = true;
+          // Only standard init ESC @, no special page commands
+      } else if (mode.startsWith('tis620-')) {
+          const num = parseInt(mode.split('-')[1], 10);
+          const singleByteVal = isNaN(num) ? 26 : num;
+          initBytes.push(ESC, 0x74, singleByteVal);
+      } else if (mode.startsWith('custom-')) {
+          const num = parseInt(mode.split('-')[1], 10);
+          const singleByteVal = isNaN(num) ? 26 : num;
+          initBytes.push(ESC, 0x74, singleByteVal);
+      } else {
+          // Backward compatibility
+          const num = parseInt(mode, 10);
+          if (!isNaN(num)) {
+              initBytes.push(ESC, 0x74, num);
+          } else {
+              initBytes.push(ESC, 0x74, 26);
+          }
+      }
+
+      return { initBytes, isUtf8 };
   };
 
   // --- BLUETOOTH DIRECT PRINTING STATE & IMPLEMENTATION ---
@@ -314,15 +362,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const ESC = 0x1B;
       const GS = 0x1D;
 
-      const commands: number[] = [
-          ESC, 0x40, // Init printer
-          ESC, 0x74, thaiCodePage, // Dynamic Thai Code Page Selection (default: 26, can be toggled by user)
-      ];
+      const { initBytes, isUtf8 } = getThaiConfigs(thaiCodePage);
+      const commands: number[] = [...initBytes];
 
       const addText = (text: string) => {
           // Replace raw '฿' with 'B' or 'THB' or 'บาท' to avoid black background box
           const safeText = text.replace(/฿/g, lang === 'th' ? 'บาท' : 'B');
-          const encoded = encodeThaiTIS620(safeText);
+          let encoded: Uint8Array;
+          if (isUtf8) {
+              encoded = new TextEncoder().encode(safeText);
+          } else {
+              encoded = encodeThaiTIS620(safeText);
+          }
           commands.push(...Array.from(encoded));
       };
 
@@ -426,14 +477,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const ESC = 0x1B;
       const GS = 0x1D;
 
-      const commands: number[] = [
-          ESC, 0x40, // Init printer
-          ESC, 0x74, thaiCodePage, // Dynamic Thai Code Page Selection (default: 26, can be toggled by user)
-      ];
+      const { initBytes, isUtf8 } = getThaiConfigs(thaiCodePage);
+      const commands: number[] = [...initBytes];
 
       const addText = (text: string) => {
           const safeText = text.replace(/฿/g, lang === 'th' ? 'บาท' : 'B');
-          const encoded = encodeThaiTIS620(safeText);
+          let encoded: Uint8Array;
+          if (isUtf8) {
+              encoded = new TextEncoder().encode(safeText);
+          } else {
+              encoded = encodeThaiTIS620(safeText);
+          }
           commands.push(...Array.from(encoded));
       };
 
