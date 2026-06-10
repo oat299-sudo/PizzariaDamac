@@ -125,6 +125,21 @@ interface StoreContextType {
   addPartner: (partner: Partner) => void;
   updatePartner: (partner: Partner) => void;
   deletePartner: (id: string) => void;
+
+  // Bluetooth Direct Printing
+  btDevice: any;
+  setBtDevice: (device: any) => void;
+  btCharacteristic: any;
+  setBtCharacteristic: (char: any) => void;
+  btStatus: 'disconnected' | 'connecting' | 'connected';
+  setBtStatus: (status: 'disconnected' | 'connecting' | 'connected') => void;
+  connectBluetoothPrinter: () => Promise<void>;
+  disconnectBluetoothPrinter: () => void;
+  triggerReceiptPrint: (payload: any) => Promise<void>;
+  triggerKitchenPrint: (order: Order) => Promise<void>;
+  generateEscPosData: (data: any, lang: Language) => Uint8Array;
+  generateKitchenEscPosData: (order: Order, lang: Language) => Uint8Array;
+  writeBtInChunks: (characteristic: any, data: Uint8Array) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -253,6 +268,339 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           localStorage.setItem('damac_vat_enabled', String(val));
       } catch(e) { console.error("Storage Error", e); }
   };
+
+  // --- BLUETOOTH DIRECT PRINTING STATE & IMPLEMENTATION ---
+  const [btDevice, setBtDevice] = useState<any>(null);
+  const [btCharacteristic, setBtCharacteristic] = useState<any>(null);
+  const [btStatus, setBtStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+
+  const encodeThaiTIS620 = (str: string): Uint8Array => {
+      const bytes: number[] = [];
+      for (let i = 0; i < str.length; i++) {
+          const code = str.charCodeAt(i);
+          if (code >= 0x0E01 && code <= 0x0E5B) {
+              // Map Unicode Thai [ก-๏] to TIS-620 [0xA1-0xFB]
+              bytes.push(code - 0x0E00 + 0xA0);
+          } else if (code === 0x000A) {
+              bytes.push(0x0A); // LF
+          } else if (code === 0x000D) {
+              bytes.push(0x0D); // CR
+          } else if (code < 128) {
+              bytes.push(code); // ASCII
+          } else {
+              bytes.push(32); // Space for unsupported character
+          }
+      }
+      return new Uint8Array(bytes);
+  };
+
+  const generateEscPosData = (data: any, lang: Language): Uint8Array => {
+      const ESC = 0x1B;
+      const GS = 0x1D;
+
+      const commands: number[] = [
+          ESC, 0x40, // Init printer
+          ESC, 0x74, 0x11, // Select TIS-620 Code Page
+      ];
+
+      const addText = (text: string) => {
+          // Replace raw '฿' with 'B' or 'THB' or 'บาท' to avoid black background box
+          const safeText = text.replace(/฿/g, lang === 'th' ? 'บาท' : 'B');
+          const encoded = encodeThaiTIS620(safeText);
+          commands.push(...Array.from(encoded));
+      };
+
+      const addLine = (text: string) => {
+          addText(text + "\n");
+      };
+
+      const centerAlign = () => commands.push(ESC, 0x61, 0x01);
+      const leftAlign = () => commands.push(ESC, 0x61, 0x00);
+      const rightAlign = () => commands.push(ESC, 0x61, 0x02);
+      const bigText = () => commands.push(GS, 0x21, 0x11); // Double width + double height
+      const normalText = () => commands.push(GS, 0x21, 0x00);
+
+      centerAlign();
+      bigText();
+      addLine(data.storeName || "Pizza Damac");
+      normalText();
+      addLine(data.address || "Nonthaburi, Thailand");
+      if (data.phone) addLine((lang === 'th' ? "โทร: " : "Tel: ") + data.phone);
+      addLine("================================");
+      
+      bigText();
+      addLine(data.queueNo || `ORDER: #${data.orderId}`);
+      normalText();
+      addLine(`${lang === 'th' ? 'ประเภท: ' : 'Type: '}${data.tableOrType || (lang === 'th' ? 'ลูกค้าทั่วไป' : 'Walk-in')}`);
+      addLine(`${lang === 'th' ? 'วันที่: ' : 'Date: '}${data.date}`);
+      
+      if (data.customerName && data.customerName !== 'Guest') {
+          addLine(`${lang === 'th' ? 'ลูกค้า: ' : 'Cust: '}${data.customerName}`);
+      }
+      if (data.customerPhone) {
+          addLine(`${lang === 'th' ? 'เบอร์โทร: ' : 'Phone: '}${data.customerPhone}`);
+      }
+      if (data.deliveryAddress) {
+          const cleanDeliveryAddr = (data.deliveryAddress || '')
+              .replace(/\[Phone: .*?\]/g, '')
+              .replace(/\[GPS Pin: .*?\]/g, '')
+              .replace(/\[Google Maps Link: .*?\]/g, '')
+              .trim();
+          if (cleanDeliveryAddr) {
+              addLine(`${lang === 'th' ? 'ที่อยู่จัดส่ง: ' : 'Addr: '}${cleanDeliveryAddr}`);
+          }
+      }
+      if (data.note) {
+          addLine(`${lang === 'th' ? '* โน้ต: ' : '* Note: '}${data.note}`);
+      }
+
+      leftAlign();
+      addLine("--------------------------------");
+      
+      // Render items safely
+      (data.items || []).filter(Boolean).forEach((item: any) => {
+          addLine(`${item.quantity}x ${item.name}`);
+          if (item.selectedToppings && item.selectedToppings.length > 0) {
+              addLine(` + ${lang === 'th' ? 'ท็อปปิ้ง' : 'Toppings'}: ` + item.selectedToppings.map((t: any) => t.name).join(", "));
+          }
+          if (item.subItems && item.subItems.length > 0) {
+              addLine(` + ${lang === 'th' ? 'รายการย่อย' : 'Sub'}: ` + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "));
+          }
+          if (item.specialInstructions) {
+              addLine(` * ${lang === 'th' ? 'หมายเหตุ' : 'Note'}: ` + item.specialInstructions);
+          }
+          rightAlign();
+          addLine(`${lang === 'th' ? 'ราคา' : 'Price'}: B${item.totalPrice}`);
+          leftAlign();
+      });
+
+      addLine("--------------------------------");
+      
+      rightAlign();
+      if (data.subtotal && Math.abs(data.subtotal - data.total) > 1) {
+          addLine(`${lang === 'th' ? 'มูลค่าก่อนภาษี: ' : 'Subtotal: '}B${data.subtotal.toFixed(2)}`);
+          addLine(`${lang === 'th' ? 'ภาษี (7%): ' : 'VAT (7%): '}B${data.vat.toFixed(2)}`);
+      }
+      bigText();
+      addLine(`${lang === 'th' ? 'ยอดสุทธิ: ' : 'TOTAL: '}B${data.total?.toLocaleString() || '0'}`);
+      normalText();
+      leftAlign();
+      
+      addLine("--------------------------------");
+      addLine(`${lang === 'th' ? 'ชำระโดย: ' : 'Paid: '}${data.paymentMethod || 'CASH'}`);
+      if (data.received !== undefined) addLine(`${lang === 'th' ? 'รับเงิน: ' : 'Recv: '}B${data.received}`);
+      if (data.change !== undefined) addLine(`${lang === 'th' ? 'เงินทอน: ' : 'Chg:  '}B${data.change}`);
+      addLine("================================");
+      
+      centerAlign();
+      addLine(lang === 'th' ? "ขอบคุณค่ะ/ครับ - พิซซ่า ดามัค นนทบุรี 🍕" : "Thank you! - Pizza Damac Nonthaburi 🍕");
+      addLine("\n\n\n\n"); // Feed lines
+      
+      // Standard Paper Cutting Command: GS V 66 0
+      commands.push(GS, 0x56, 0x42, 0x00); // 0x42 is 66, which is "Feed paper to cutting position and partial cut"
+
+      return new Uint8Array(commands);
+  };
+
+  const generateKitchenEscPosData = (order: Order, lang: Language): Uint8Array => {
+      const ESC = 0x1B;
+      const GS = 0x1D;
+
+      const commands: number[] = [
+          ESC, 0x40, // Init printer
+          ESC, 0x74, 0x11, // Select TIS-620 Code Page
+      ];
+
+      const addText = (text: string) => {
+          const safeText = text.replace(/฿/g, lang === 'th' ? 'บาท' : 'B');
+          const encoded = encodeThaiTIS620(safeText);
+          commands.push(...Array.from(encoded));
+      };
+
+      const addLine = (text: string) => {
+          addText(text + "\n");
+      };
+
+      const centerAlign = () => commands.push(ESC, 0x61, 0x01);
+      const leftAlign = () => commands.push(ESC, 0x61, 0x00);
+      const rightAlign = () => commands.push(ESC, 0x61, 0x02);
+      const bigText = () => commands.push(GS, 0x21, 0x11); // Double width + double height
+      const normalText = () => commands.push(GS, 0x21, 0x00);
+
+      centerAlign();
+      bigText();
+      addLine(lang === 'th' ? "--- ออเดอร์ครัว (KITCHEN) ---" : "--- KITCHEN ORDER ---");
+      addLine("================================");
+      
+      // Very large Queue/Table header
+      let headerStr = "";
+      if (order.tableNumber) {
+          headerStr = lang === 'th' ? `โต๊ะ (Table) ${order.tableNumber}` : `Table ${order.tableNumber}`;
+      } else {
+          headerStr = `Q-${String(order.id).slice(-3)}`;
+      }
+      addLine(headerStr);
+      normalText();
+      
+      addLine(`${lang === 'th' ? 'ประเภท: ' : 'Type: '}${order.type.toUpperCase()}`);
+      if (order.createdAt) {
+          addLine(`${lang === 'th' ? 'เวลาสั่ง: ' : 'Time: '}${new Date(order.createdAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+      }
+      addLine("--------------------------------");
+      
+      leftAlign();
+      // Render ordered item list, making items DOUBLE size for cooks to read easily
+      (order.items || []).filter(Boolean).forEach((item: any) => {
+          bigText();
+          addLine(`${item.quantity}x ${item.name}`);
+          normalText();
+          
+          if (item.selectedToppings && item.selectedToppings.length > 0) {
+              addLine(`  + ${lang === 'th' ? 'ท็อปปิ้ง' : 'Toppings'}: ` + item.selectedToppings.map((t: any) => t.name).join(", "));
+          }
+          if (item.subItems && item.subItems.length > 0) {
+              addLine(`  + ${lang === 'th' ? 'รายการย่อย' : 'Sub items'}: ` + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "));
+          }
+          if (item.specialInstructions) {
+              addLine(`  * ${lang === 'th' ? 'หมายเหตุ' : 'Instructions'}: ` + item.specialInstructions);
+          }
+          addLine("--------------------------------");
+      });
+
+      if (order.note) {
+          centerAlign();
+          addLine(lang === 'th' ? "== หมายเหตุสำคัญ ==" : "== SPECIAL NOTICE ==");
+          bigText();
+          addLine(order.note);
+          normalText();
+          addLine("--------------------------------");
+      }
+      
+      centerAlign();
+      addLine(lang === 'th' ? "เร่งมือทำความอร่อยเลยค่ะ/ครับ! 🍕" : "Let's Pizza! 🍕");
+      addLine("\n\n\n\n"); // Feed lines
+
+      // Standard Paper Cutting Command: GS V 66 0
+      commands.push(GS, 0x56, 0x42, 0x00); // 0x42 is 66, which is "Feed paper to cutting position and partial cut"
+
+      return new Uint8Array(commands);
+  };
+
+  const writeBtInChunks = async (characteristic: any, data: Uint8Array) => {
+      const chunkSize = 20; // Stable BLE write packet limit
+      for (let i = 0; i < data.length; i += chunkSize) {
+          const chunk = data.slice(i, i + chunkSize);
+          await characteristic.writeValue(chunk);
+          await new Promise(r => setTimeout(r, 15)); // Prevents buffer overflow
+      }
+  };
+
+  const triggerReceiptPrint = async (payload: any) => {
+      if (printerType === 'bluetooth') {
+          if (btCharacteristic) {
+              try {
+                  const escPosBytes = generateEscPosData(payload, language);
+                  await writeBtInChunks(btCharacteristic, escPosBytes);
+                  return; // Successfully printed directly via Bluetooth!
+              } catch (err: any) {
+                  console.error("Bluetooth write failed, falling back to system print", err);
+              }
+          } else {
+              alert(language === 'th' ? "⚠️ ยังไม่ได้เชื่อมต่อเครื่องพิมพ์ Bluetooth (Printer001)! ระบบจะเปิดหน้าต่างปกติพิมพ์แทนให้ชั่วคราว" : "⚠️ Bluetooth printer is active but not connected! Using browser print fallback.");
+          }
+      }
+      
+      // Fallback
+      setTimeout(() => { window.print(); }, 250);
+  };
+
+  const triggerKitchenPrint = async (order: Order) => {
+      if (printerType === 'bluetooth') {
+          if (btCharacteristic) {
+              try {
+                  const escPosBytes = generateKitchenEscPosData(order, language);
+                  await writeBtInChunks(btCharacteristic, escPosBytes);
+                  return; // Successfully printed kitchen ticket directly via Bluetooth!
+              } catch (err: any) {
+                  console.error("Bluetooth kitchen write failed", err);
+              }
+          }
+      }
+      console.log("No Bluetooth direct printer connected or fallback when calling kitchen auto print");
+  };
+
+  // Connect & Disconnect methods
+  const connectBluetoothPrinter = async () => {
+      if (!navigator.bluetooth) {
+          alert("⚠️ เบราว์เซอร์ของคุณไม่สนับสนุน Bluetooth หรือไม่ได้รับการเปิดใช้ผ่าน HTTPS! กรุณาเปิดแอปในแท็บใหม่ หรือเปลี่ยนมาใช้บราวเซอร์ที่รองรับ (Chrome, Edge หรือ Opera)");
+          return;
+      }
+      setBtStatus('connecting');
+      try {
+          const device = await navigator.bluetooth.requestDevice({
+              acceptAllDevices: true,
+              optionalServices: [
+                  '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS Thermal SPP Service
+                  '0000e7e1-0000-1000-8000-00805f9b34fb', // Other generic thermal Service
+                  '49535343-fe7d-4158-938b-12e24011271a' // ISSC BLE Service
+              ]
+          });
+          
+          setBtDevice(device);
+          const server = await device.gatt.connect();
+          
+          const services = await server.getPrimaryServices();
+          let characteristic = null;
+          
+          for (const service of services) {
+              try {
+                  const characteristics = await service.getCharacteristics();
+                  for (const char of characteristics) {
+                      if (char.properties.write || char.properties.writeWithoutResponse) {
+                          characteristic = char;
+                          break;
+                      }
+                  }
+              } catch (e) {
+                  console.warn("Could not read characteristics for service", service.uuid, e);
+              }
+              if (characteristic) break;
+          }
+          
+          if (!characteristic) {
+              throw new Error("ไม่พบช่องรับข้อมูลสั่งพิมพ์ (writeable characteristic) บนเครื่องพิมพ์นี้ กรุณาลองใหม่อีกครั้ง");
+          }
+          
+          setBtCharacteristic(characteristic);
+          setBtStatus('connected');
+          
+          device.addEventListener('gattserverdisconnected', () => {
+              setBtStatus('disconnected');
+              setBtCharacteristic(null);
+              setBtDevice(null);
+          });
+          
+          alert(`🎉 เชื่อมต่อเครื่องพิมพ์สำเร็จ: ${device.name || 'Printer001'}! พร้อมใช้งานพิมพ์ใบเสร็จอัตโนมัติแล้ว`);
+      } catch (err: any) {
+          console.error("Bluetooth connection failed", err);
+          setBtStatus('disconnected');
+          setBtCharacteristic(null);
+          setBtDevice(null);
+          if (err.name !== 'NotFoundError') {
+              alert(`❌ เชื่อมต่อล้มเหลว: ${err.message || String(err)}`);
+          }
+      }
+  };
+
+  const disconnectBluetoothPrinter = () => {
+      if (btDevice && btDevice.gatt.connected) {
+          btDevice.gatt.disconnect();
+      }
+      setBtStatus('disconnected');
+      setBtCharacteristic(null);
+      setBtDevice(null);
+  };
+
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
       let text = TRANSLATIONS[language][key] || TRANSLATIONS['en'][key] || key;
       if (params) {
@@ -1693,7 +2041,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       receiptPadding, setReceiptPadding,
       autoPrintNewOrders, setAutoPrintNewOrders,
       vatEnabled, setVatEnabled,
-      partners, addPartner, updatePartner, deletePartner
+      partners, addPartner, updatePartner, deletePartner,
+      btDevice, setBtDevice,
+      btCharacteristic, setBtCharacteristic,
+      btStatus, setBtStatus,
+      connectBluetoothPrinter, disconnectBluetoothPrinter,
+      triggerReceiptPrint, triggerKitchenPrint,
+      generateEscPosData, generateKitchenEscPosData,
+      writeBtInChunks
   };
 
   return (

@@ -20,12 +20,24 @@ const formatOrderDateTime = (dateStr?: string | null, dateStyle: 'short' | 'medi
 };
 
 export const KitchenView: React.FC = () => {
-  const { orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, paperSize, setPaperSize, receiptFontSize, receiptPadding, autoPrintNewOrders, setAutoPrintNewOrders } = useStore();
+  const { 
+    orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, 
+    paperSize, setPaperSize, receiptFontSize, receiptPadding, 
+    autoPrintNewOrders, setAutoPrintNewOrders, printerType, btCharacteristic, triggerKitchenPrint 
+  } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday' | 'cancelled'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
 
-  const handlePrintOrder = (order: Order) => {
+  const handlePrintOrder = async (order: Order) => {
+    if (printerType === 'bluetooth' && btCharacteristic) {
+      try {
+        await triggerKitchenPrint(order);
+        return;
+      } catch (err: any) {
+        console.error("Bluetooth kitchen print failed, falling back to standard print", err);
+      }
+    }
     setPrintOrder(order);
     setTimeout(() => {
         window.print();

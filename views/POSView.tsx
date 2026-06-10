@@ -77,17 +77,15 @@ export const POSView: React.FC = () => {
         receiptFontSize, setReceiptFontSize,
         receiptPadding, setReceiptPadding,
         autoPrintNewOrders, setAutoPrintNewOrders,
-        vatEnabled, setVatEnabled
+        vatEnabled, setVatEnabled,
+        btDevice, btCharacteristic, btStatus,
+        connectBluetoothPrinter, disconnectBluetoothPrinter,
+        triggerReceiptPrint, generateEscPosData, writeBtInChunks
     } = useStore();
     
     // Unified Tab State
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
-    
-    // Bluetooth Printer States
-    const [btDevice, setBtDevice] = useState<any>(null);
-    const [btCharacteristic, setBtCharacteristic] = useState<any>(null);
-    const [btStatus, setBtStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
     
     // Half-Half customizer states for POS
     const [halfA, setHalfA] = useState<Pizza | null>(null);
@@ -904,210 +902,11 @@ export const POSView: React.FC = () => {
         setShowPaymentModal(false);
     };
 
-    // --- WEB BLUETOOTH PRINTING IMPLEMENTATION ---
-    const encodeThaiTIS620 = (str: string): Uint8Array => {
-        const bytes: number[] = [];
-        for (let i = 0; i < str.length; i++) {
-            const code = str.charCodeAt(i);
-            if (code >= 0x0E01 && code <= 0x0E5B) {
-                // Map Unicode Thai [ก-๏] to TIS-620 [0xA1-0xFB]
-                bytes.push(code - 0x0E00 + 0xA0);
-            } else if (code === 0x000A) {
-                bytes.push(0x0A); // LF
-            } else if (code === 0x000D) {
-                bytes.push(0x0D); // CR
-            } else if (code < 128) {
-                bytes.push(code); // ASCII
-            } else {
-                bytes.push(32); // Space for unsupported character
-            }
-        }
-        return new Uint8Array(bytes);
-    };
-
-    const generateEscPosData = (data: any): Uint8Array => {
-        const ESC = 0x1B;
-        const GS = 0x1D;
-
-        const commands: number[] = [
-            ESC, 0x40, // Init printer
-            ESC, 0x74, 0x11, // Select TIS-620 Code Page
-        ];
-
-        const addText = (text: string) => {
-            const encoded = encodeThaiTIS620(text);
-            commands.push(...Array.from(encoded));
-        };
-
-        const addLine = (text: string) => {
-            addText(text + "\n");
-        };
-
-        const centerAlign = () => commands.push(ESC, 0x61, 0x01);
-        const leftAlign = () => commands.push(ESC, 0x61, 0x00);
-        const rightAlign = () => commands.push(ESC, 0x61, 0x02);
-        const bigText = () => commands.push(GS, 0x21, 0x11); // Double width + double height
-        const normalText = () => commands.push(GS, 0x21, 0x00);
-
-        centerAlign();
-        bigText();
-        addLine(data.storeName || "Pizza Damac");
-        normalText();
-        addLine(data.address || "Nonthaburi, Thailand");
-        if (data.phone) addLine("Tel: " + data.phone);
-        addLine("================================");
-        
-        bigText();
-        addLine(data.queueNo || `ORDER: #${data.orderId}`);
-        normalText();
-        addLine(`Type: ${data.tableOrType || 'Walk-in'}`);
-        addLine(`Date: ${data.date}`);
-        leftAlign();
-        addLine("--------------------------------");
-        
-        // Render items safely
-        (data.items || []).filter(Boolean).forEach((item: any) => {
-            addLine(`${item.quantity}x ${item.name}`);
-            if (item.selectedToppings && item.selectedToppings.length > 0) {
-                addLine(" + Toppings: " + item.selectedToppings.map((t: any) => t.name).join(", "));
-            }
-            if (item.subItems && item.subItems.length > 0) {
-                addLine(" + Sub: " + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "));
-            }
-            if (item.specialInstructions) {
-                addLine(" * Note: " + item.specialInstructions);
-            }
-            rightAlign();
-            addLine(`Price: ฿${item.totalPrice}`);
-            leftAlign();
-        });
-
-        addLine("--------------------------------");
-        
-        rightAlign();
-        if (data.subtotal && Math.abs(data.subtotal - data.total) > 1) {
-            addLine(`Subtotal: ฿${data.subtotal.toFixed(2)}`);
-            addLine(`VAT (7%): ฿${data.vat.toFixed(2)}`);
-        }
-        bigText();
-        addLine(`TOTAL: ฿${data.total?.toLocaleString() || '0'}`);
-        normalText();
-        leftAlign();
-        
-        addLine("--------------------------------");
-        addLine(`Paid: ${data.paymentMethod || 'CASH'}`);
-        if (data.received !== undefined) addLine(`Recv: ฿${data.received}`);
-        if (data.change !== undefined) addLine(`Chg:  ฿${data.change}`);
-        addLine("================================");
-        
-        centerAlign();
-        addLine("Thank you! - Pizza Damac Nonthaburi 🍕");
-        addLine("\n\n\n\n"); // Feed lines
-        commands.push(GS, 0x56, 0x66, 0x00); // Feed tape and cut partially
-
-        return new Uint8Array(commands);
-    };
-
-    const writeBtInChunks = async (characteristic: any, data: Uint8Array) => {
-        const chunkSize = 20; // Stable BLE write packet limit
-        for (let i = 0; i < data.length; i += chunkSize) {
-            const chunk = data.slice(i, i + chunkSize);
-            await characteristic.writeValue(chunk);
-            await new Promise(r => setTimeout(r, 15)); // CPU delay to prevent printer queue overflow
-        }
-    };
-
-    const triggerReceiptPrint = async (payload: any) => {
+    // --- INTEGRATED RECEIPT TRIGGER (WITH LOCAL RECEIPT DATA CACHING) ---
+    const handleTriggerReceiptPrint = async (payload: any) => {
         setReceiptData(payload);
         playSuccessFeedback();
-
-        if (printerType === 'bluetooth') {
-            if (btCharacteristic) {
-                try {
-                    const escPosBytes = generateEscPosData(payload);
-                    await writeBtInChunks(btCharacteristic, escPosBytes);
-                    return; // Intercept successfully! No secondary dialog.
-                } catch (err: any) {
-                    console.error("Bluetooth write failed, falling back to system print", err);
-                }
-            } else {
-                alert("⚠️ ยังไม่ได้เชื่อมต่อเครื่องพิมพ์ Bluetooth (Printer001)! ระบบจะเปิดหน้าต่างปกติพิมพ์แทนให้ชั่วคราว");
-            }
-        }
-
-        // System print fallback
-        setTimeout(() => { window.print(); }, 250);
-    };
-
-    const connectBluetoothPrinter = async () => {
-        if (!navigator.bluetooth) {
-            alert("⚠️ เบราว์เซอร์ของคุณไม่สนับสนุน Bluetooth หรือไม่ได้รับการเปิดใช้ผ่าน HTTPS! กรุณาเปิดแอปในแท็บใหม่ หรือเปลี่ยนมาใช้บราวเซอร์ที่รองรับ (Chrome, Edge หรือ Opera)");
-            return;
-        }
-        setBtStatus('connecting');
-        try {
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [
-                    '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS Thermal SPP Service
-                    '0000e7e1-0000-1000-8000-00805f9b34fb', // Other generic thermal Service
-                    '49535343-fe7d-4158-938b-12e24011271a' // ISSC BLE Service
-                ]
-            });
-            
-            setBtDevice(device);
-            const server = await device.gatt.connect();
-            
-            const services = await server.getPrimaryServices();
-            let characteristic = null;
-            
-            for (const service of services) {
-                try {
-                    const characteristics = await service.getCharacteristics();
-                    for (const char of characteristics) {
-                        if (char.properties.write || char.properties.writeWithoutResponse) {
-                            characteristic = char;
-                            break;
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Could not read characteristics for service", service.uuid, e);
-                }
-                if (characteristic) break;
-            }
-            
-            if (!characteristic) {
-                throw new Error("ไม่พบช่องรับข้อมูลสั่งพิมพ์ (writeable characteristic) บนเครื่องพิมพ์นี้ กรุณาลองใหม่อีกครั้ง");
-            }
-            
-            setBtCharacteristic(characteristic);
-            setBtStatus('connected');
-            
-            device.addEventListener('gattserverdisconnected', () => {
-                setBtStatus('disconnected');
-                setBtCharacteristic(null);
-                setBtDevice(null);
-            });
-            
-            alert(`🎉 เชื่อมต่อเครื่องพิมพ์สำเร็จ: ${device.name || 'Printer001'}! พร้อมใช้งานพิมพ์ใบเสร็จอัตโนมัติแล้ว`);
-        } catch (err: any) {
-            console.error("Bluetooth connection failed", err);
-            setBtStatus('disconnected');
-            setBtCharacteristic(null);
-            setBtDevice(null);
-            if (err.name !== 'NotFoundError') {
-                alert(`❌ เชื่อมต่อล้มเหลว: ${err.message || String(err)}`);
-            }
-        }
-    };
-
-    const disconnectBluetoothPrinter = () => {
-        if (btDevice && btDevice.gatt.connected) {
-            btDevice.gatt.disconnect();
-        }
-        setBtStatus('disconnected');
-        setBtCharacteristic(null);
-        setBtDevice(null);
+        await triggerReceiptPrint(payload);
     };
 
     const handlePrintBill = () => {
@@ -1160,7 +959,7 @@ export const POSView: React.FC = () => {
             isPaid: selectedOrder ? selectedOrder.status === 'completed' : true
         };
 
-        triggerReceiptPrint(payload);
+        handleTriggerReceiptPrint(payload);
     };
 
     // --- REPRINT FOR LOG BOOK ---
@@ -1203,7 +1002,7 @@ export const POSView: React.FC = () => {
             isPaid: order.status === 'completed'
         };
 
-        triggerReceiptPrint(payload);
+        handleTriggerReceiptPrint(payload);
     };
 
     const handleDeleteOrder = async (orderId: string) => {
@@ -2644,7 +2443,7 @@ export const POSView: React.FC = () => {
                                                                         paymentMethod: "BLUETOOTH FEED"
                                                                     };
                                                                     try {
-                                                                        const bytes = generateEscPosData(testPayload);
+                                                                        const bytes = generateEscPosData(testPayload, language);
                                                                         await writeBtInChunks(btCharacteristic, bytes);
                                                                         alert("🎉 ส่งใบทดสอบสำเร็จกรุณาดูที่เครื่องพิมพ์!");
                                                                     } catch (err: any) {
