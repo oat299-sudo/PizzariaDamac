@@ -80,7 +80,8 @@ export const POSView: React.FC = () => {
         vatEnabled, setVatEnabled,
         btDevice, btCharacteristic, btStatus,
         connectBluetoothPrinter, disconnectBluetoothPrinter,
-        triggerReceiptPrint, generateEscPosData, writeBtInChunks
+        triggerReceiptPrint, generateEscPosData, writeBtInChunks,
+        thaiCodePage, setThaiCodePage
     } = useStore();
     
     // Unified Tab State
@@ -2417,6 +2418,28 @@ export const POSView: React.FC = () => {
                                                         <div>🔋 <strong>GATT Server:</strong> Connected</div>
                                                     </div>
                                                 )}
+
+                                                {/* Dynamic Thai Encoding / Code Page Sector Selection */}
+                                                <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-1.5 text-left mb-3">
+                                                    <label className="text-xs font-bold text-gray-700 block flex items-center gap-1">
+                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / encoding)' : 'Thai Code Page / Encoding'}
+                                                    </label>
+                                                    <select
+                                                        value={thaiCodePage}
+                                                        onChange={(e) => setThaiCodePage(Number(e.target.value))}
+                                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition cursor-pointer"
+                                                    >
+                                                        <option value={26}>Code Page 26 - TIS-620 (แนะนำสำหรับ Welltech G5 / Xprinter ✅)</option>
+                                                        <option value={18}>Code Page 18 - CP874 (มาตรฐาน Xprinter ดั้งเดิม)</option>
+                                                        <option value={17}>Code Page 17 - TIS-620 Alternative</option>
+                                                        <option value={40}>Code Page 40 - Thai CP874 Alternative 2</option>
+                                                    </select>
+                                                    <p className="text-[10px] text-gray-400 leading-tight">
+                                                        {language === 'th' 
+                                                            ? '* หากภาษาไทยพิมพ์ออกมาเป็นตัวหนังสือพิลึก (เช่น รัสเซียหรือสัญลักษณ์) รหัสเริ่มต้นมักเป็น 26 หรือ 18 กรุณาปรับเปลี่ยนแล้วทดสอบพิมพ์ใบเสร็จอีกครั้ง' 
+                                                            : '* If Thai characters print out corrupted or as Cyrillic symbols, toggle this select option and perform a test block print again.'}
+                                                    </p>
+                                                </div>
 
                                                 <div className="flex gap-2">
                                                     {btStatus !== 'connected' ? (

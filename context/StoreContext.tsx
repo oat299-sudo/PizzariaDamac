@@ -140,6 +140,8 @@ interface StoreContextType {
   generateEscPosData: (data: any, lang: Language) => Uint8Array;
   generateKitchenEscPosData: (order: Order, lang: Language) => Uint8Array;
   writeBtInChunks: (characteristic: any, data: Uint8Array) => Promise<void>;
+  thaiCodePage: number;
+  setThaiCodePage: (cp: number) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -269,6 +271,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) { console.error("Storage Error", e); }
   };
 
+  const [thaiCodePage, setThaiCodePageState] = useState<number>(() => {
+      if (typeof window !== 'undefined') {
+          const cp = localStorage.getItem('damac_thai_code_page');
+          return cp ? parseInt(cp, 10) : 26; // Default to 26 (TIS-620 for Xprinter/Welltech)
+      }
+      return 26;
+  });
+  const setThaiCodePage = (cp: number) => {
+      setThaiCodePageState(cp);
+      try {
+          localStorage.setItem('damac_thai_code_page', String(cp));
+      } catch(e) { console.error("Storage Error", e); }
+  };
+
   // --- BLUETOOTH DIRECT PRINTING STATE & IMPLEMENTATION ---
   const [btDevice, setBtDevice] = useState<any>(null);
   const [btCharacteristic, setBtCharacteristic] = useState<any>(null);
@@ -300,7 +316,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const commands: number[] = [
           ESC, 0x40, // Init printer
-          ESC, 0x74, 0x11, // Select TIS-620 Code Page
+          ESC, 0x74, thaiCodePage, // Dynamic Thai Code Page Selection (default: 26, can be toggled by user)
       ];
 
       const addText = (text: string) => {
@@ -396,17 +412,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addLine(lang === 'th' ? "ขอบคุณค่ะ/ครับ - พิซซ่า ดามัค นนทบุรี 🍕" : "Thank you! - Pizza Damac Nonthaburi 🍕");
       addLine("\n\n\n\n"); // Feed lines
       
-      // Ultra compatible Paper Cut Sequence:
+      // Standard Paper Cut Sequence:
       // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
       commands.push(ESC, 0x64, 0x04);
       
-      // Send multiple highly-compatible ESC/POS cutting commands to guarantee cutting on ALL firmware / Welltech / generic printers:
-      commands.push(GS, 0x56, 0x01); // 1D 56 01 (Partial cut)
-      commands.push(GS, 0x56, 0x00); // 1D 56 00 (Full cut)
-      commands.push(GS, 0x56, 0x31); // 1D 56 49 (Partial cut string alternate '1')
-      commands.push(GS, 0x56, 0x30); // 1D 56 48 (Full cut string alternate '0')
-      commands.push(ESC, 0x69);      // 1B 69 (Full cut command for simpler/older controllers & Welltech)
-      commands.push(ESC, 0x6D);      // 1B 6D (Partial cut command alternative)
+      // Send exact single paper cut command: GS V 66 0 (1D 56 42 00)
+      commands.push(GS, 0x56, 0x42, 0x00);
 
       return new Uint8Array(commands);
   };
@@ -417,7 +428,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const commands: number[] = [
           ESC, 0x40, // Init printer
-          ESC, 0x74, 0x11, // Select TIS-620 Code Page
+          ESC, 0x74, thaiCodePage, // Dynamic Thai Code Page Selection (default: 26, can be toggled by user)
       ];
 
       const addText = (text: string) => {
@@ -489,17 +500,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addLine(lang === 'th' ? "เร่งมือทำความอร่อยเลยค่ะ/ครับ! 🍕" : "Let's Pizza! 🍕");
       addLine("\n\n\n\n"); // Feed lines
 
-      // Ultra compatible Paper Cut Sequence:
+      // Standard Paper Cut Sequence:
       // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
       commands.push(ESC, 0x64, 0x04);
       
-      // Send multiple highly-compatible ESC/POS cutting commands to guarantee cutting on ALL firmware / Welltech / generic printers:
-      commands.push(GS, 0x56, 0x01); // 1D 56 01 (Partial cut)
-      commands.push(GS, 0x56, 0x00); // 1D 56 00 (Full cut)
-      commands.push(GS, 0x56, 0x31); // 1D 56 49 (Partial cut string alternate '1')
-      commands.push(GS, 0x56, 0x30); // 1D 56 48 (Full cut string alternate '0')
-      commands.push(ESC, 0x69);      // 1B 69 (Full cut command for simpler/older controllers & Welltech)
-      commands.push(ESC, 0x6D);      // 1B 6D (Partial cut command alternative)
+      // Send exact single paper cut command: GS V 66 0 (1D 56 42 00)
+      commands.push(GS, 0x56, 0x42, 0x00);
 
       return new Uint8Array(commands);
   };
@@ -2066,7 +2072,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       connectBluetoothPrinter, disconnectBluetoothPrinter,
       triggerReceiptPrint, triggerKitchenPrint,
       generateEscPosData, generateKitchenEscPosData,
-      writeBtInChunks
+      writeBtInChunks,
+      thaiCodePage, setThaiCodePage
   };
 
   return (
