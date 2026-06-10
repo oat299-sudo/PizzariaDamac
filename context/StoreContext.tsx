@@ -315,14 +315,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } else if (mode.startsWith('tis620-')) {
           const num = parseInt(mode.split('-')[1], 10);
           const singleByteVal = isNaN(num) ? 26 : num;
+          // Cancel double-byte Kanji/Chinese mode explicitly to prevent interception of Thai high-ASCII bytes
+          initBytes.push(FS, 0x2E);
           initBytes.push(ESC, 0x74, singleByteVal);
       } else if (mode.startsWith('custom-')) {
           const num = parseInt(mode.split('-')[1], 10);
           const singleByteVal = isNaN(num) ? 26 : num;
+          initBytes.push(FS, 0x2E);
           initBytes.push(ESC, 0x74, singleByteVal);
       } else {
           // Backward compatibility
           const num = parseInt(mode, 10);
+          initBytes.push(FS, 0x2E);
           if (!isNaN(num)) {
               initBytes.push(ESC, 0x74, num);
           } else {
@@ -331,6 +335,298 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       return { initBytes, isUtf8 };
+  };
+
+  // --- BLUETOOTH GRAPHICS THERMAL PRINT COMPILER ---
+  const canvasToEscPosBytes = (canvas: HTMLCanvasElement): Uint8Array => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return new Uint8Array();
+      const width = canvas.width;
+      const height = canvas.height;
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const data = imgData.data;
+
+      const widthBytes = Math.ceil(width / 8);
+      const escposBytes: number[] = [];
+
+      const ESC = 0x1B;
+      const GS = 0x1D;
+
+      // Start with standard hardware reset / init
+      escposBytes.push(ESC, 0x40);
+
+      // GS v 0 0 xL xH yL yH (Standard ESC/POS Raster Graphic Print Command)
+      const xL = widthBytes % 256;
+      const xH = Math.floor(widthBytes / 256);
+      const yL = height % 256;
+      const yH = Math.floor(height / 256);
+
+      escposBytes.push(GS, 0x76, 0x30, 0, xL, xH, yL, yH);
+
+      for (let y = 0; y < height; y++) {
+          for (let x = 0; x < widthBytes * 8; x += 8) {
+              let byteVal = 0;
+              for (let bit = 0; bit < 8; bit++) {
+                  const pxX = x + bit;
+                  if (pxX < width) {
+                      const idx = (y * width + pxX) * 4;
+                      const r = data[idx];
+                      const g = data[idx + 1];
+                      const b = data[idx + 2];
+                      const a = data[idx + 3];
+                      
+                      let isBlack = false;
+                      if (a > 50) {
+                          // Standard grayscale calculation
+                          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                          if (luminance < 140) { // Slight bias towards black for maximum readability
+                              isBlack = true;
+                          }
+                      }
+                      if (isBlack) {
+                          byteVal |= (1 << (7 - bit));
+                      }
+                  }
+              }
+              escposBytes.push(byteVal);
+          }
+      }
+
+      // Feed paper to clear mechanical knife & cut
+      escposBytes.push(ESC, 0x64, 0x04); // Feed 4 lines
+      escposBytes.push(GS, 0x56, 0x42, 0x00); // Standard Auto-Cut command
+
+      return new Uint8Array(escposBytes);
+  };
+
+  const generateEscPosGraphicData = async (payload: any, isKitchen: boolean, lang: Language, width: number): Promise<Uint8Array> => {
+      if (typeof document === 'undefined') return new Uint8Array();
+
+      const lines: any[] = [];
+      const addLineText = (left: string, right: string = '', options: any = {}) => {
+          lines.push({ type: 'text', left, right, ...options });
+      };
+      const addDivider = (char: string = '-') => {
+          lines.push({ type: 'divider', char });
+      };
+      const addGap = (height: number = 10) => {
+          lines.push({ type: 'gap', height });
+      };
+
+      if (isKitchen) {
+          addLineText(lang === 'th' ? "--- ครัว PIZZA DAMAC ---" : "--- KITCHEN ORDER ---", '', { align: 'center', size: 'large', bold: true });
+          addDivider('=');
+          
+          let headerStr = "";
+          if (payload.tableNumber) {
+              headerStr = lang === 'th' ? `โต๊ะ (Table) ${payload.tableNumber}` : `Table ${payload.tableNumber}`;
+          } else {
+              headerStr = `Q-${String(payload.id).slice(-3)}`;
+          }
+          addLineText(headerStr, '', { align: 'center', size: 'huge', bold: true });
+          addGap(5);
+
+          addLineText(`${lang === 'th' ? 'ประเภท: ' : 'Type: '}${payload.type?.toUpperCase() || ''}`, '', { align: 'center', size: 'normal' });
+          if (payload.createdAt) {
+              const orderTimeStr = new Date(payload.createdAt).toLocaleString('th-TH', { 
+                  timeZone: 'Asia/Bangkok',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+              });
+              addLineText(`${lang === 'th' ? 'เวลาสั่ง: ' : 'Time: '}${orderTimeStr}`, '', { align: 'center', size: 'normal' });
+          }
+          addDivider('-');
+
+          (payload.items || []).filter(Boolean).forEach((item: any) => {
+              // Large size bold for easy reading in hot pizza kitchens
+              addLineText(`${item.quantity}x ${item.name}`, '', { align: 'left', size: 'large', bold: true });
+              
+              if (item.selectedToppings && item.selectedToppings.length > 0) {
+                  addLineText(`  + ${lang === 'th' ? 'ท็อปปิ้ง: ' : 'Toppings: '}` + item.selectedToppings.map((t: any) => t.name).join(", "), '', { align: 'left', size: 'normal', indent: 15 });
+              }
+              if (item.subItems && item.subItems.length > 0) {
+                  addLineText(`  + ${lang === 'th' ? 'รายการย่อย: ' : 'Sub items: '}` + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "), '', { align: 'left', size: 'normal', indent: 15 });
+              }
+              if (item.specialInstructions) {
+                  addLineText(`  * ${lang === 'th' ? 'หมายเหตุ: ' : 'Instructions: '}` + item.specialInstructions, '', { align: 'left', size: 'normal', italic: true, indent: 15 });
+              }
+              addDivider('-');
+          });
+
+          if (payload.note) {
+              addLineText(lang === 'th' ? "== หมายเหตุสำคัญ ==" : "== SPECIAL NOTICE ==", '', { align: 'center', size: 'normal', bold: true });
+              addLineText(payload.note, '', { align: 'center', size: 'large', bold: true });
+              addDivider('-');
+          }
+          
+          addLineText(lang === 'th' ? "เร่งมือทำความอร่อยเลยค่ะ/ครับ! 🍕" : "Let's Pizza! 🍕", '', { align: 'center', size: 'normal' });
+      } else {
+          // Customer Receipt
+          addLineText(payload.storeName || "Pizza Damac Nonthaburi", '', { align: 'center', size: 'large', bold: true });
+          addLineText(payload.address || "Nonthaburi, Thailand", '', { align: 'center', size: 'normal' });
+          if (payload.phone) {
+              addLineText((lang === 'th' ? "โทร: " : "Tel: ") + payload.phone, '', { align: 'center', size: 'normal' });
+          }
+          addDivider('=');
+
+          addLineText(payload.queueNo || `ORDER: #${payload.orderId}`, '', { align: 'center', size: 'large', bold: true });
+          addLineText(`${lang === 'th' ? 'ประเภท: ' : 'Type: '}${payload.tableOrType || (lang === 'th' ? 'ลูกค้าทั่วไป' : 'Walk-in')}`, '', { align: 'left', size: 'normal' });
+          addLineText(`${lang === 'th' ? 'วันที่: ' : 'Date: '}${payload.date}`, '', { align: 'left', size: 'normal' });
+
+          if (payload.customerName && payload.customerName !== 'Guest') {
+              addLineText(`${lang === 'th' ? 'ลูกค้า: ' : 'Cust: '}${payload.customerName}`, '', { align: 'left', size: 'normal' });
+          }
+          if (payload.customerPhone) {
+              addLineText(`${lang === 'th' ? 'เบอร์โทร: ' : 'Phone: '}${payload.customerPhone}`, '', { align: 'left', size: 'normal' });
+          }
+          if (payload.deliveryAddress) {
+              const cleanDeliveryAddr = (payload.deliveryAddress || '')
+                  .replace(/\[Phone: .*?\]/g, '')
+                  .replace(/\[GPS Pin: .*?\]/g, '')
+                  .replace(/\[Google Maps Link: .*?\]/g, '')
+                  .trim();
+              if (cleanDeliveryAddr) {
+                  addLineText(`${lang === 'th' ? 'ที่อยู่จัดส่ง: ' : 'Addr: '}${cleanDeliveryAddr}`, '', { align: 'left', size: 'normal' });
+              }
+          }
+          if (payload.note) {
+              addLineText(`${lang === 'th' ? '* โน้ต: ' : '* Note: '}${payload.note}`, '', { align: 'left', size: 'normal', italic: true });
+          }
+
+          addDivider('-');
+
+          // Menu items
+          (payload.items || []).filter(Boolean).forEach((item: any) => {
+              addLineText(`${item.quantity}x ${item.name}`, `B${item.totalPrice}`, { align: 'split', size: 'normal', bold: true });
+              
+              if (item.selectedToppings && item.selectedToppings.length > 0) {
+                  addLineText(`  + ${lang === 'th' ? 'ท็อปปิ้ง: ' : 'Toppings: '}` + item.selectedToppings.map((t: any) => t.name).join(", "), '', { align: 'left', size: 'small', indent: 15 });
+              }
+              if (item.subItems && item.subItems.length > 0) {
+                  addLineText(`  + ${lang === 'th' ? 'รายการย่อย: ' : 'Sub: '}` + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "), '', { align: 'left', size: 'small', indent: 15 });
+              }
+              if (item.specialInstructions) {
+                  addLineText(`  * ${lang === 'th' ? 'หมายเหตุ: ' : 'Note: '}${item.specialInstructions}`, '', { align: 'left', size: 'small', italic: true, indent: 15 });
+              }
+          });
+
+          addDivider('-');
+
+          // Totals section
+          if (payload.subtotal && Math.abs(payload.subtotal - payload.total) > 1) {
+              addLineText(lang === 'th' ? 'มูลค่าก่อนภาษี:' : 'Subtotal:', `B${payload.subtotal.toFixed(2)}`, { align: 'split', size: 'normal' });
+              addLineText(lang === 'th' ? 'ภาษี (7%):' : 'VAT (7%):', `B${payload.vat.toFixed(2)}`, { align: 'split', size: 'normal' });
+          }
+          addLineText(lang === 'th' ? 'ยอดสุทธิ:' : 'TOTAL:', `B${payload.total?.toLocaleString() || '0'}`, { align: 'split', size: 'large', bold: true });
+          
+          addDivider('-');
+          addLineText(lang === 'th' ? 'ชำระโดย:' : 'Paid:', payload.paymentMethod || 'CASH', { align: 'split', size: 'normal' });
+          if (payload.received !== undefined) {
+              addLineText(lang === 'th' ? 'รับเงิน:' : 'Recv:', `B${payload.received}`, { align: 'split', size: 'normal' });
+          }
+          if (payload.change !== undefined) {
+              addLineText(lang === 'th' ? 'เงินทอน:' : 'Chg:', `B${payload.change}`, { align: 'split', size: 'normal' });
+          }
+          
+          addDivider('=');
+          addLineText(lang === 'th' ? "ขอบคุณค่ะ/ครับ - พิซซ่า ดามัค นนทบุรี 🍕" : "Thank you! - Pizza Damac Nonthaburi 🍕", '', { align: 'center', size: 'normal', bold: true });
+      }
+
+      // Layout geometry specs
+      const margin = 10;
+      const xMarginLeft = margin;
+      const xMarginRight = width - margin;
+      
+      let currentY = 15;
+      const computedYCoords: number[] = [];
+      const computedHeights: number[] = [];
+
+      lines.forEach((line) => {
+          let h = 0;
+          if (line.type === 'gap') {
+              h = line.height;
+          } else if (line.type === 'divider') {
+              h = 16;
+          } else if (line.type === 'text') {
+              if (line.size === 'small') h = 18;
+              else if (line.size === 'large') h = 30;
+              else if (line.size === 'huge') h = 42;
+              else h = 24;
+          }
+          computedYCoords.push(currentY);
+          computedHeights.push(h);
+          currentY += h;
+      });
+
+      const totalHeight = currentY + 30; // Safety tail padding
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = totalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return new Uint8Array();
+
+      // Clear layout background to solid white
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, totalHeight);
+
+      // Render lines
+      lines.forEach((line, index) => {
+          const y = computedYCoords[index];
+          const h = computedHeights[index];
+
+          if (line.type === 'gap') {
+              // space gap
+          } else if (line.type === 'divider') {
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = line.char === '=' ? 3 : 1;
+              ctx.beginPath();
+              if (line.char === '-') {
+                  ctx.setLineDash([4, 4]);
+              } else {
+                  ctx.setLineDash([]);
+              }
+              ctx.moveTo(margin, y + h / 2);
+              ctx.lineTo(width - margin, y + h / 2);
+              ctx.stroke();
+          } else if (line.type === 'text') {
+              let fontStyle = '';
+              if (line.italic) fontStyle += 'italic ';
+              if (line.bold !== false) fontStyle += 'bold ';
+
+              let fontSize = '18px';
+              if (line.size === 'small') fontSize = '15px';
+              else if (line.size === 'large') fontSize = '24px';
+              else if (line.size === 'huge') fontSize = '34px';
+
+              // Beautiful modern and accessible font specs for crisp details
+              ctx.font = `${fontStyle}${fontSize} "Sarabun", "Inter", "Helvetica Neue", "Arial", sans-serif`;
+              ctx.fillStyle = '#000000';
+              ctx.textBaseline = 'middle';
+
+              const textY = y + h / 2;
+              const indent = line.indent || 0;
+
+              if (line.align === 'center') {
+                  ctx.textAlign = 'center';
+                  ctx.fillText(line.left, width / 2, textY);
+              } else if (line.align === 'right') {
+                  ctx.textAlign = 'right';
+                  ctx.fillText(line.left, xMarginRight, textY);
+              } else if (line.align === 'split') {
+                  ctx.textAlign = 'left';
+                  ctx.fillText(line.left, xMarginLeft + indent, textY);
+                  ctx.textAlign = 'right';
+                  ctx.fillText(line.right, xMarginRight, textY);
+              } else {
+                  ctx.textAlign = 'left';
+                  ctx.fillText(line.left, xMarginLeft + indent, textY);
+              }
+          }
+      });
+
+      return canvasToEscPosBytes(canvas);
   };
 
   // --- BLUETOOTH DIRECT PRINTING STATE & IMPLEMENTATION ---
@@ -577,7 +873,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (printerType === 'bluetooth') {
           if (btCharacteristic) {
               try {
-                  const escPosBytes = generateEscPosData(payload, language);
+                  let escPosBytes: Uint8Array;
+                  if (thaiCodePage.startsWith('graphic-')) {
+                      const width = thaiCodePage === 'graphic-80' ? 576 : 384;
+                      escPosBytes = await generateEscPosGraphicData(payload, false, language, width);
+                  } else {
+                      escPosBytes = generateEscPosData(payload, language);
+                  }
                   await writeBtInChunks(btCharacteristic, escPosBytes);
                   return; // Successfully printed directly via Bluetooth!
               } catch (err: any) {
@@ -596,7 +898,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (printerType === 'bluetooth') {
           if (btCharacteristic) {
               try {
-                  const escPosBytes = generateKitchenEscPosData(order, language);
+                  let escPosBytes: Uint8Array;
+                  if (thaiCodePage.startsWith('graphic-')) {
+                      const width = thaiCodePage === 'graphic-80' ? 576 : 384;
+                      escPosBytes = await generateEscPosGraphicData(order, true, language, width);
+                  } else {
+                      escPosBytes = generateKitchenEscPosData(order, language);
+                  }
                   await writeBtInChunks(btCharacteristic, escPosBytes);
                   return; // Successfully printed kitchen ticket directly via Bluetooth!
               } catch (err: any) {

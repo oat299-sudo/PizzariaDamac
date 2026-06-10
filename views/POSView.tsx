@@ -2437,6 +2437,10 @@ export const POSView: React.FC = () => {
                                                         }}
                                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition cursor-pointer"
                                                     >
+                                                        <optgroup label="👑 โหมดรูปภาพ (แก้ปัญหาสระลอยและภาษาต่างดาวได้ 100% 🎯)">
+                                                            <option value="graphic-58">🖼️ โหมดรูปภาพ 58 มม. (แนะนำพิเศษสำหรับ Welltech G5 / Xprinter ✅)</option>
+                                                            <option value="graphic-80">🖼️ โหมดรูปภาพ 80 มม. (สำหรับเครื่องรุ่นใหญ่หน้ากว้าง)</option>
+                                                        </optgroup>
                                                         <optgroup label="🌟 UTF-8 (แนะนำสำหรับเครื่องพิมพ์ยุคใหม่)">
                                                             <option value="utf8-epson">UTF-8 (Epson Setup - สระเรียงซ้อน สวยงามที่สุด ⭐)</option>
                                                             <option value="utf8-xprinter">UTF-8 (Xprinter Multi-byte Command)</option>
