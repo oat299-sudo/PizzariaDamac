@@ -396,8 +396,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addLine(lang === 'th' ? "ขอบคุณค่ะ/ครับ - พิซซ่า ดามัค นนทบุรี 🍕" : "Thank you! - Pizza Damac Nonthaburi 🍕");
       addLine("\n\n\n\n"); // Feed lines
       
-      // Standard Paper Cutting Command: GS V 66 0
-      commands.push(GS, 0x56, 0x42, 0x00); // 0x42 is 66, which is "Feed paper to cutting position and partial cut"
+      // Ultra compatible Paper Cut Sequence:
+      // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
+      commands.push(ESC, 0x64, 0x04);
+      
+      // Send multiple highly-compatible ESC/POS cutting commands to guarantee cutting on ALL firmware / Welltech / generic printers:
+      commands.push(GS, 0x56, 0x01); // 1D 56 01 (Partial cut)
+      commands.push(GS, 0x56, 0x00); // 1D 56 00 (Full cut)
+      commands.push(GS, 0x56, 0x31); // 1D 56 49 (Partial cut string alternate '1')
+      commands.push(GS, 0x56, 0x30); // 1D 56 48 (Full cut string alternate '0')
+      commands.push(ESC, 0x69);      // 1B 69 (Full cut command for simpler/older controllers & Welltech)
+      commands.push(ESC, 0x6D);      // 1B 6D (Partial cut command alternative)
 
       return new Uint8Array(commands);
   };
@@ -480,8 +489,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       addLine(lang === 'th' ? "เร่งมือทำความอร่อยเลยค่ะ/ครับ! 🍕" : "Let's Pizza! 🍕");
       addLine("\n\n\n\n"); // Feed lines
 
-      // Standard Paper Cutting Command: GS V 66 0
-      commands.push(GS, 0x56, 0x42, 0x00); // 0x42 is 66, which is "Feed paper to cutting position and partial cut"
+      // Ultra compatible Paper Cut Sequence:
+      // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
+      commands.push(ESC, 0x64, 0x04);
+      
+      // Send multiple highly-compatible ESC/POS cutting commands to guarantee cutting on ALL firmware / Welltech / generic printers:
+      commands.push(GS, 0x56, 0x01); // 1D 56 01 (Partial cut)
+      commands.push(GS, 0x56, 0x00); // 1D 56 00 (Full cut)
+      commands.push(GS, 0x56, 0x31); // 1D 56 49 (Partial cut string alternate '1')
+      commands.push(GS, 0x56, 0x30); // 1D 56 48 (Full cut string alternate '0')
+      commands.push(ESC, 0x69);      // 1B 69 (Full cut command for simpler/older controllers & Welltech)
+      commands.push(ESC, 0x6D);      // 1B 6D (Partial cut command alternative)
 
       return new Uint8Array(commands);
   };

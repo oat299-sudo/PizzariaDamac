@@ -23,11 +23,13 @@ export const KitchenView: React.FC = () => {
   const { 
     orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, 
     paperSize, setPaperSize, receiptFontSize, receiptPadding, 
-    autoPrintNewOrders, setAutoPrintNewOrders, printerType, btCharacteristic, triggerKitchenPrint 
+    autoPrintNewOrders, setAutoPrintNewOrders, printerType, setPrinterType, btCharacteristic, triggerKitchenPrint,
+    btDevice, btStatus, connectBluetoothPrinter, disconnectBluetoothPrinter, writeBtInChunks
   } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday' | 'cancelled'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [showPrinterSettings, setShowPrinterSettings] = useState<boolean>(false);
 
   const handlePrintOrder = async (order: Order) => {
     if (printerType === 'bluetooth' && btCharacteristic) {
@@ -392,6 +394,162 @@ export const KitchenView: React.FC = () => {
                 <Printer size={18} />
                 <span>{autoPrintNewOrders ? (language === 'th' ? 'พิมพ์อัตโนมัติ: เปิด' : 'Auto-Print: ON') : (language === 'th' ? 'พิมพ์อัตโนมัติ: ปิด' : 'Auto-Print: OFF')}</span>
             </button>
+
+            {/* Bluetooth Printer Setup & Connection Popover */}
+            <div className="relative">
+                <button 
+                    onClick={() => { playClickSound(); setShowPrinterSettings(!showPrinterSettings); }} 
+                    className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition border cursor-pointer ${
+                        printerType === 'bluetooth' 
+                            ? (btStatus === 'connected' 
+                                ? 'bg-emerald-950/45 text-emerald-300 border-emerald-600/80 hover:bg-emerald-900/50' 
+                                : btStatus === 'connecting' 
+                                    ? 'bg-blue-950/45 text-blue-300 border-blue-600/80 animate-pulse hover:bg-blue-900/50' 
+                                    : 'bg-red-955/45 text-red-300 border-red-650/80 hover:bg-red-900/50') 
+                            : 'bg-gray-750 text-gray-400 border-gray-600 hover:bg-gray-700'
+                    }`}
+                    title={language === 'th' ? "ตั้งค่าเครื่องพิมพ์ด่วน" : "Quick Printer Settings"}
+                >
+                    <span className={`w-2 h-2 rounded-full ${
+                        printerType === 'bluetooth'
+                            ? (btStatus === 'connected' ? 'bg-emerald-400' : btStatus === 'connecting' ? 'bg-blue-400 animate-ping' : 'bg-red-400 animate-pulse')
+                            : 'bg-gray-400'
+                    }`} />
+                    <span>
+                        {printerType === 'bluetooth' 
+                            ? (btStatus === 'connected' 
+                                ? (language === 'th' ? `พิมพ์ BT: ดำเนินการ` : `BT Print: Active`) 
+                                : btStatus === 'connecting' 
+                                    ? (language === 'th' ? `พิมพ์ BT: กำลังเชื่อม...` : `BT Print: Connecting...`) 
+                                    : (language === 'th' ? `เชื่อมต่อเครื่องพิมพ์` : `Connect BT Printer`)) 
+                            : (language === 'th' ? 'บราวเซอร์ปริ้นต์' : 'System Print')}
+                    </span>
+                    <span className="text-[10px] opacity-75">▼</span>
+                </button>
+
+                {showPrinterSettings && (
+                    <>
+                        {/* Overlay to close popover */}
+                        <div className="fixed inset-0 z-40" onClick={() => setShowPrinterSettings(false)} />
+                        
+                        {/* Dropdown Card */}
+                        <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-4 z-50 animate-fade-in text-left space-y-3">
+                            <h4 className="font-bold text-white text-sm pb-1.5 border-b border-gray-750 flex items-center justify-between">
+                                <span>🖨️ {language === 'th' ? 'การพิมพ์ครัว & ใบเสร็จ' : 'Kitchen Printer settings'}</span>
+                                <button type="button" onClick={() => setShowPrinterSettings(false)} className="text-gray-400 hover:text-white text-xs cursor-pointer">✕</button>
+                            </h4>
+                            
+                            {/* Mode Selection */}
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{language === 'th' ? 'โหมดเครื่องพิมพ์' : 'Printer Mode'}</label>
+                                <select 
+                                    value={printerType}
+                                    onChange={(e) => {
+                                        playClickSound();
+                                        setPrinterType(e.target.value as any);
+                                    }}
+                                    className="w-full bg-gray-750 text-white text-xs py-2 px-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer"
+                                >
+                                    <option value="system">{language === 'th' ? '🌐 ระบบพิมพ์ผ่านบราวเซอร์' : '🌐 Browser System Print'}</option>
+                                    <option value="bluetooth">{language === 'th' ? '🔵 บลูทูธ Direct (Welltech G5)' : '🔵 Bluetooth Direct (Welltech)'}</option>
+                                </select>
+                            </div>
+
+                            {/* Bluetooth Controls */}
+                            {printerType === 'bluetooth' && (
+                                <div className="space-y-2.5 pt-1.5 border-t border-gray-750">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="text-gray-400 font-medium">{language === 'th' ? 'สถานะบลูทูธ:' : 'Bluetooth status:'}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                            btStatus === 'connected' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                                            btStatus === 'connecting' ? 'bg-blue-950 text-blue-400 border border-blue-800 animate-pulse' :
+                                            'bg-gray-750 text-gray-400 border border-gray-600'
+                                        }`}>
+                                            {btStatus === 'connected' ? (language === 'th' ? 'เชื่อมต่อแล้ว' : 'Connected') :
+                                             btStatus === 'connecting' ? (language === 'th' ? 'กำลังเชื่อม...' : 'Connecting...') :
+                                             (language === 'th' ? 'ยังไม่เชื่อมต่อ' : 'Disconnected')}
+                                        </span>
+                                    </div>
+
+                                    {btDevice && (
+                                        <div className="text-[10px] font-mono bg-gray-750 p-2 rounded border border-gray-700 text-gray-300 space-y-0.5 max-w-full overflow-hidden">
+                                            <div className="truncate">🏷️ Name: {btDevice.name || 'Printer001'}</div>
+                                            <div className="truncate">🔋 Server: Connected</div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-col gap-1.5 pt-1">
+                                        {btStatus !== 'connected' ? (
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    playClickSound();
+                                                    await connectBluetoothPrinter();
+                                                }}
+                                                className="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
+                                            >
+                                                🔗 {btStatus === 'connecting' ? (language === 'th' ? 'กำลังเชื่อมต่อ...' : 'Connecting...') : (language === 'th' ? 'ค้นหา & เชื่อมต่อเครื่องพิมพ์' : 'Search & Connect Bluetooth')}
+                                            </button>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        playClickSound();
+                                                        // Test kitchen print payload
+                                                        const testOrder: any = {
+                                                            id: "TEST-KDS",
+                                                            tableNumber: "KDS-TEST",
+                                                            type: "dine_in",
+                                                            createdAt: new Date().toISOString(),
+                                                            items: [
+                                                                { name: "ทดสอบพิมพ์ใบพาสลี่ครัว (TEST KITCHEN)", quantity: 1, selectedToppings: [], subItems: [], specialInstructions: "ไม่ใส่หอม" }
+                                                            ],
+                                                            note: "พิมพ์ทดสอบจากหน้าที่ครัวห้องครัว"
+                                                        };
+                                                        try {
+                                                            await triggerKitchenPrint(testOrder);
+                                                            alert("🎉 ส่งยอดพิมพ์ทดสอบใบห้องครัวสำเร็จ!");
+                                                        } catch (err: any) {
+                                                            alert("❌ พิมพ์ไม่ได้: " + err.message);
+                                                        }
+                                                    }}
+                                                    className="w-full bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
+                                                >
+                                                    📝 {language === 'th' ? 'ทดสอบพิมพ์ใบครัว' : 'Test Kitchen Print'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        playClickSound();
+                                                        disconnectBluetoothPrinter();
+                                                    }}
+                                                    className="w-full bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
+                                                >
+                                                    ❌ {language === 'th' ? 'ยกเลิกการเชื่อมต่อบลูทูธ' : 'Disconnect Bluetooth'}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Additional paper options */}
+                            <div className="pt-2 border-t border-gray-750 text-[10px] text-gray-400 space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <span>{language === 'th' ? 'ขนาดกระดาษ:' : 'Paper size:'}</span>
+                                    <span className="font-bold text-gray-200">{paperSize === '80mm' ? '80mm' : '58mm'}</span>
+                                </div>
+                                <div className="text-[9px] text-gray-500 leading-snug">
+                                    {language === 'th' 
+                                        ? '* หากเปลี่ยนเป็นโหมด Bluetooth ระบบจะเชื่อมตรงผ่านบราวเซอร์ และพิมพ์ใบสั่งอาหารของห้องครัวโดยตรง' 
+                                        : '* Bluetooth mode bypasses system print dialog by sending direct ESC/POS command to Welltech G5.'}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
 
             <div className="bg-gray-700 px-4 py-2 rounded-lg shadow-sm border border-gray-600">
                 <span className="text-gray-400 text-sm block">{language === 'th' ? 'จำนวนออเดอร์' : 'Orders'}</span>
