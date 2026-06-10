@@ -110,8 +110,8 @@ interface StoreContextType {
   setPrinterIpAddress: (ip: string) => void;
   printerPort: number;
   setPrinterPort: (port: number) => void;
-  printerType: 'system' | 'rawbt' | 'local_proxy';
-  setPrinterType: (type: 'system' | 'rawbt' | 'local_proxy') => void;
+  printerType: 'system' | 'rawbt' | 'local_proxy' | 'bluetooth';
+  setPrinterType: (type: 'system' | 'rawbt' | 'local_proxy' | 'bluetooth') => void;
   receiptFontSize: number;
   setReceiptFontSize: (size: number) => void;
   receiptPadding: number;
@@ -186,13 +186,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) { console.error("Storage Error", e); }
   };
 
-  const [printerType, setPrinterTypeState] = useState<'system' | 'rawbt' | 'local_proxy'>(() => {
+  const [printerType, setPrinterTypeState] = useState<'system' | 'rawbt' | 'local_proxy' | 'bluetooth'>(() => {
       if (typeof window !== 'undefined') {
-          return (localStorage.getItem('damac_printer_type') as 'system' | 'rawbt' | 'local_proxy') || 'system';
+          return (localStorage.getItem('damac_printer_type') as 'system' | 'rawbt' | 'local_proxy' | 'bluetooth') || 'system';
       }
       return 'system';
   });
-  const setPrinterType = (type: 'system' | 'rawbt' | 'local_proxy') => {
+  const setPrinterType = (type: 'system' | 'rawbt' | 'local_proxy' | 'bluetooth') => {
       setPrinterTypeState(type);
       try {
           localStorage.setItem('damac_printer_type', type);

@@ -84,6 +84,11 @@ export const POSView: React.FC = () => {
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     
+    // Bluetooth Printer States
+    const [btDevice, setBtDevice] = useState<any>(null);
+    const [btCharacteristic, setBtCharacteristic] = useState<any>(null);
+    const [btStatus, setBtStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+    
     // Half-Half customizer states for POS
     const [halfA, setHalfA] = useState<Pizza | null>(null);
     const [halfB, setHalfB] = useState<Pizza | null>(null);
@@ -899,6 +904,212 @@ export const POSView: React.FC = () => {
         setShowPaymentModal(false);
     };
 
+    // --- WEB BLUETOOTH PRINTING IMPLEMENTATION ---
+    const encodeThaiTIS620 = (str: string): Uint8Array => {
+        const bytes: number[] = [];
+        for (let i = 0; i < str.length; i++) {
+            const code = str.charCodeAt(i);
+            if (code >= 0x0E01 && code <= 0x0E5B) {
+                // Map Unicode Thai [ก-๏] to TIS-620 [0xA1-0xFB]
+                bytes.push(code - 0x0E00 + 0xA0);
+            } else if (code === 0x000A) {
+                bytes.push(0x0A); // LF
+            } else if (code === 0x000D) {
+                bytes.push(0x0D); // CR
+            } else if (code < 128) {
+                bytes.push(code); // ASCII
+            } else {
+                bytes.push(32); // Space for unsupported character
+            }
+        }
+        return new Uint8Array(bytes);
+    };
+
+    const generateEscPosData = (data: any): Uint8Array => {
+        const ESC = 0x1B;
+        const GS = 0x1D;
+
+        const commands: number[] = [
+            ESC, 0x40, // Init printer
+            ESC, 0x74, 0x11, // Select TIS-620 Code Page
+        ];
+
+        const addText = (text: string) => {
+            const encoded = encodeThaiTIS620(text);
+            commands.push(...Array.from(encoded));
+        };
+
+        const addLine = (text: string) => {
+            addText(text + "\n");
+        };
+
+        const centerAlign = () => commands.push(ESC, 0x61, 0x01);
+        const leftAlign = () => commands.push(ESC, 0x61, 0x00);
+        const rightAlign = () => commands.push(ESC, 0x61, 0x02);
+        const bigText = () => commands.push(GS, 0x21, 0x11); // Double width + double height
+        const normalText = () => commands.push(GS, 0x21, 0x00);
+
+        centerAlign();
+        bigText();
+        addLine(data.storeName || "Pizza Damac");
+        normalText();
+        addLine(data.address || "Nonthaburi, Thailand");
+        if (data.phone) addLine("Tel: " + data.phone);
+        addLine("================================");
+        
+        bigText();
+        addLine(data.queueNo || `ORDER: #${data.orderId}`);
+        normalText();
+        addLine(`Type: ${data.tableOrType || 'Walk-in'}`);
+        addLine(`Date: ${data.date}`);
+        leftAlign();
+        addLine("--------------------------------");
+        
+        // Render items safely
+        (data.items || []).filter(Boolean).forEach((item: any) => {
+            addLine(`${item.quantity}x ${item.name}`);
+            if (item.selectedToppings && item.selectedToppings.length > 0) {
+                addLine(" + Toppings: " + item.selectedToppings.map((t: any) => t.name).join(", "));
+            }
+            if (item.subItems && item.subItems.length > 0) {
+                addLine(" + Sub: " + item.subItems.filter(Boolean).map((s: any) => s.name).join(", "));
+            }
+            if (item.specialInstructions) {
+                addLine(" * Note: " + item.specialInstructions);
+            }
+            rightAlign();
+            addLine(`Price: ฿${item.totalPrice}`);
+            leftAlign();
+        });
+
+        addLine("--------------------------------");
+        
+        rightAlign();
+        if (data.subtotal && Math.abs(data.subtotal - data.total) > 1) {
+            addLine(`Subtotal: ฿${data.subtotal.toFixed(2)}`);
+            addLine(`VAT (7%): ฿${data.vat.toFixed(2)}`);
+        }
+        bigText();
+        addLine(`TOTAL: ฿${data.total?.toLocaleString() || '0'}`);
+        normalText();
+        leftAlign();
+        
+        addLine("--------------------------------");
+        addLine(`Paid: ${data.paymentMethod || 'CASH'}`);
+        if (data.received !== undefined) addLine(`Recv: ฿${data.received}`);
+        if (data.change !== undefined) addLine(`Chg:  ฿${data.change}`);
+        addLine("================================");
+        
+        centerAlign();
+        addLine("Thank you! - Pizza Damac Nonthaburi 🍕");
+        addLine("\n\n\n\n"); // Feed lines
+        commands.push(GS, 0x56, 0x66, 0x00); // Feed tape and cut partially
+
+        return new Uint8Array(commands);
+    };
+
+    const writeBtInChunks = async (characteristic: any, data: Uint8Array) => {
+        const chunkSize = 20; // Stable BLE write packet limit
+        for (let i = 0; i < data.length; i += chunkSize) {
+            const chunk = data.slice(i, i + chunkSize);
+            await characteristic.writeValue(chunk);
+            await new Promise(r => setTimeout(r, 15)); // CPU delay to prevent printer queue overflow
+        }
+    };
+
+    const triggerReceiptPrint = async (payload: any) => {
+        setReceiptData(payload);
+        playSuccessFeedback();
+
+        if (printerType === 'bluetooth') {
+            if (btCharacteristic) {
+                try {
+                    const escPosBytes = generateEscPosData(payload);
+                    await writeBtInChunks(btCharacteristic, escPosBytes);
+                    return; // Intercept successfully! No secondary dialog.
+                } catch (err: any) {
+                    console.error("Bluetooth write failed, falling back to system print", err);
+                }
+            } else {
+                alert("⚠️ ยังไม่ได้เชื่อมต่อเครื่องพิมพ์ Bluetooth (Printer001)! ระบบจะเปิดหน้าต่างปกติพิมพ์แทนให้ชั่วคราว");
+            }
+        }
+
+        // System print fallback
+        setTimeout(() => { window.print(); }, 250);
+    };
+
+    const connectBluetoothPrinter = async () => {
+        if (!navigator.bluetooth) {
+            alert("⚠️ เบราว์เซอร์ของคุณไม่สนับสนุน Bluetooth หรือไม่ได้รับการเปิดใช้ผ่าน HTTPS! กรุณาเปิดแอปในแท็บใหม่ หรือเปลี่ยนมาใช้บราวเซอร์ที่รองรับ (Chrome, Edge หรือ Opera)");
+            return;
+        }
+        setBtStatus('connecting');
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [
+                    '000018f0-0000-1000-8000-00805f9b34fb', // ESC/POS Thermal SPP Service
+                    '0000e7e1-0000-1000-8000-00805f9b34fb', // Other generic thermal Service
+                    '49535343-fe7d-4158-938b-12e24011271a' // ISSC BLE Service
+                ]
+            });
+            
+            setBtDevice(device);
+            const server = await device.gatt.connect();
+            
+            const services = await server.getPrimaryServices();
+            let characteristic = null;
+            
+            for (const service of services) {
+                try {
+                    const characteristics = await service.getCharacteristics();
+                    for (const char of characteristics) {
+                        if (char.properties.write || char.properties.writeWithoutResponse) {
+                            characteristic = char;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Could not read characteristics for service", service.uuid, e);
+                }
+                if (characteristic) break;
+            }
+            
+            if (!characteristic) {
+                throw new Error("ไม่พบช่องรับข้อมูลสั่งพิมพ์ (writeable characteristic) บนเครื่องพิมพ์นี้ กรุณาลองใหม่อีกครั้ง");
+            }
+            
+            setBtCharacteristic(characteristic);
+            setBtStatus('connected');
+            
+            device.addEventListener('gattserverdisconnected', () => {
+                setBtStatus('disconnected');
+                setBtCharacteristic(null);
+                setBtDevice(null);
+            });
+            
+            alert(`🎉 เชื่อมต่อเครื่องพิมพ์สำเร็จ: ${device.name || 'Printer001'}! พร้อมใช้งานพิมพ์ใบเสร็จอัตโนมัติแล้ว`);
+        } catch (err: any) {
+            console.error("Bluetooth connection failed", err);
+            setBtStatus('disconnected');
+            setBtCharacteristic(null);
+            setBtDevice(null);
+            if (err.name !== 'NotFoundError') {
+                alert(`❌ เชื่อมต่อล้มเหลว: ${err.message || String(err)}`);
+            }
+        }
+    };
+
+    const disconnectBluetoothPrinter = () => {
+        if (btDevice && btDevice.gatt.connected) {
+            btDevice.gatt.disconnect();
+        }
+        setBtStatus('disconnected');
+        setBtCharacteristic(null);
+        setBtDevice(null);
+    };
+
     const handlePrintBill = () => {
         const currentItems = selectedOrder ? selectedOrder.items : cart;
         const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
@@ -922,10 +1133,10 @@ export const POSView: React.FC = () => {
             queueNo = `Q-${String(id).slice(-3)}`;
         }
 
-        setReceiptData({
+        const payload = {
             storeName: "Pizza Damac Nonthaburi",
             address: "Nonthaburi, Thailand",
-            taxId: storeSettings.promptPayNumber || "0-9949-7919-9", // Use PromptPay as placeholder Tax ID
+            taxId: storeSettings.promptPayNumber || "0-9949-7919-9", 
             phone: storeSettings.contactPhone || "099-497-9199",
             orderId: selectedOrder ? String(selectedOrder.id).slice(-4) : 'NEW',
             date: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
@@ -947,15 +1158,13 @@ export const POSView: React.FC = () => {
             change: changeAmt,
             taxInvoice: taxInvoice,
             isPaid: selectedOrder ? selectedOrder.status === 'completed' : true
-        });
+        };
 
-        playSuccessFeedback();
-        setTimeout(() => { window.print(); }, 200);
+        triggerReceiptPrint(payload);
     };
 
     // --- REPRINT FOR LOG BOOK ---
     const handleReprintOrder = (order: Order) => {
-        playSuccessFeedback();
         // Calculate VAT (7% included if enabled)
         const vatAmount = vatEnabled ? (order.totalAmount * 7) / 107 : 0;
         const subtotal = order.totalAmount - vatAmount;
@@ -968,7 +1177,7 @@ export const POSView: React.FC = () => {
             queueNo = `Q-${String(order.id).slice(-3)}`;
         }
 
-        setReceiptData({
+        const payload = {
             storeName: "Pizza Damac Nonthaburi",
             address: "Nonthaburi, Thailand",
             taxId: storeSettings.promptPayNumber || "0-9949-7919-9",
@@ -992,9 +1201,9 @@ export const POSView: React.FC = () => {
             received: order.totalAmount, // Assumed exact for history
             change: 0,
             isPaid: order.status === 'completed'
-        });
+        };
 
-        setTimeout(() => { window.print(); }, 200);
+        triggerReceiptPrint(payload);
     };
 
     const handleDeleteOrder = async (orderId: string) => {
@@ -1649,151 +1858,181 @@ export const POSView: React.FC = () => {
                         <div className="max-w-7xl mx-auto">
                             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Layers className="text-brand-600"/> Active Orders & Tables</h2>
                             {activeTables.length === 0 ? <div className="flex flex-col items-center justify-center h-64 text-gray-400"><Layers size={64} className="mb-4 opacity-20"/><p className="text-xl font-bold">No active orders</p><button onClick={() => setActiveTab('order')} className="mt-4 text-brand-600 hover:underline font-bold">Start New Order</button></div> : 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">{activeTables.map(order => (
-                                    <div key={order.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col relative group hover:border-brand-300 transition">
-                                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
-                                            <div>
-                                                <div className="text-xs text-gray-500 font-bold uppercase mb-1">Order #{String(order.id).slice(-4)}</div>
-                                                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                                    {order.tableNumber ? (
-                                                        <span className="bg-gray-800 text-white px-3 py-1 rounded-lg text-lg">Table {order.tableNumber}</span>
-                                                    ) : (
-                                                        <span className="bg-brand-600 text-white px-3 py-1 rounded-lg text-lg uppercase flex items-center gap-1">
-                                                            {order.type === 'delivery' ? <Bike size={16}/> : <ShoppingBag size={16}/>}
-                                                            {order.type}
-                                                        </span>
-                                                    )}
-                                                </h3>
-                                                {/* Date & Time of Order Creation */}
-                                                <div className="text-xs font-bold text-brand-600 mt-2 flex items-center gap-1 bg-brand-50/50 px-2 py-1 rounded-lg border border-brand-100 w-fit">
-                                                    <Clock size={12}/>
-                                                    <span>{formatOrderDateTime(order.createdAt, 'short')}</span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">{activeTables.map(order => {
+                                    try {
+                                        if (!order || !order.id) {
+                                            throw new Error("Invalid or missing order data");
+                                        }
+                                        return (
+                                            <div key={order.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col relative group hover:border-brand-300 transition">
+                                                <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                                                    <div>
+                                                        <div className="text-xs text-gray-500 font-bold uppercase mb-1">Order #{String(order.id).slice(-4)}</div>
+                                                        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                                            {order.tableNumber ? (
+                                                                <span className="bg-gray-800 text-white px-3 py-1 rounded-lg text-lg">Table {order.tableNumber}</span>
+                                                            ) : (
+                                                                <span className="bg-brand-600 text-white px-3 py-1 rounded-lg text-lg uppercase flex items-center gap-1">
+                                                                    {order.type === 'delivery' ? <Bike size={16}/> : <ShoppingBag size={16}/>}
+                                                                    {order.type}
+                                                                </span>
+                                                            )}
+                                                        </h3>
+                                                        {/* Date & Time of Order Creation */}
+                                                        <div className="text-xs font-bold text-brand-600 mt-2 flex items-center gap-1 bg-brand-50/50 px-2 py-1 rounded-lg border border-brand-100 w-fit">
+                                                            <Clock size={12}/>
+                                                            <span>{formatOrderDateTime(order.createdAt, 'short')}</span>
+                                                        </div>
+                                                        {/* Customer Name for Non-Table Orders */}
+                                                        {!order.tableNumber && (
+                                                            <div className="text-sm font-bold text-gray-600 mt-1.5 flex items-center gap-1">
+                                                                <User size={14}/> {order.customerName}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-2xl font-bold text-brand-600">฿{order.totalAmount}</div>
+                                                        <div className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded mt-1 inline-block border border-red-100">UNPAID</div>
+                                                    </div>
                                                 </div>
-                                                {/* Customer Name for Non-Table Orders */}
-                                                {!order.tableNumber && (
-                                                    <div className="text-sm font-bold text-gray-600 mt-1.5 flex items-center gap-1">
-                                                        <User size={14}/> {order.customerName}
+                                                <div className="p-4 flex-1">
+                                                    <div className="text-sm text-gray-600 space-y-2 max-h-48 overflow-y-auto">
+                                                        {(order.items || []).filter(Boolean).map((item, i) => (
+                                                            <div key={i} className="flex justify-between border-b border-gray-100 pb-1">
+                                                                <span className="font-bold">{item.quantity}x {item.name}</span>
+                                                                <span className="font-bold text-gray-800">฿{item.totalPrice}</span>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-2xl font-bold text-brand-600">฿{order.totalAmount}</div>
-                                                <div className="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded mt-1 inline-block border border-red-100">UNPAID</div>
-                                            </div>
-                                        </div>
-                                        <div className="p-4 flex-1">
-                                            <div className="text-sm text-gray-600 space-y-2 max-h-48 overflow-y-auto">
-                                                {(order.items || []).map((item, i) => (
-                                                    <div key={i} className="flex justify-between border-b border-gray-100 pb-1">
-                                                        <span className="font-bold">{item.quantity}x {item.name}</span>
-                                                        <span className="font-bold text-gray-800">฿{item.totalPrice}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            {order.note && <div className="mt-2 text-xs italic text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-100">Note: {order.note}</div>}
-                                            {order.type === 'delivery' && (
-                                                <div className="mt-3 space-y-2 bg-blue-50 p-3 rounded-xl border border-blue-100 shadow-sm animate-fade-in">
-                                                    <div className="flex justify-between items-center pb-2 border-b border-blue-100/40">
-                                                        <span className="text-sm font-bold text-blue-800">Delivery Fee: {order.deliveryFee === 'pending' ? 'TBD' : `฿${order.deliveryFee}`}</span>
-                                                        <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
-                                                    </div>
-                                                    
-                                                    {/* Decoded delivery address annotations */}
-                                                    <div className="text-xs space-y-2 pt-2 pb-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <span className="font-bold text-gray-700">ที่อยู่จัดส่ง:</span>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    const cleanAddress = (order.deliveryAddress || '')
+                                                    {order.note && <div className="mt-2 text-xs italic text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-100">Note: {order.note}</div>}
+                                                    {order.type === 'delivery' && (
+                                                        <div className="mt-3 space-y-2 bg-blue-50 p-3 rounded-xl border border-blue-100 shadow-sm animate-fade-in">
+                                                            <div className="flex justify-between items-center pb-2 border-b border-blue-100/40">
+                                                                <span className="text-sm font-bold text-blue-800">Delivery Fee: {order.deliveryFee === 'pending' ? 'TBD' : `฿${order.deliveryFee}`}</span>
+                                                                <button onClick={() => handleUpdateDeliveryFee(order)} className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-bold shadow-sm">Update Fee</button>
+                                                            </div>
+                                                            
+                                                            {/* Decoded delivery address annotations */}
+                                                            <div className="text-xs space-y-2 pt-2 pb-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <span className="font-bold text-gray-700">ที่อยู่จัดส่ง:</span>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const cleanAddress = (order.deliveryAddress || '')
+                                                                                .replace(/\[Phone: .*?\]/g, '')
+                                                                                .replace(/\[GPS Pin: .*?\]/g, '')
+                                                                                .replace(/\[Google Maps Link: .*?\]/g, '')
+                                                                                .trim();
+                                                                            navigator.clipboard.writeText(cleanAddress);
+                                                                            alert('คัดลอกที่อยู่แล้ว!');
+                                                                        }}
+                                                                        className="text-brand-600 hover:text-brand-800 underline active:text-brand-500 whitespace-nowrap ml-2"
+                                                                    >
+                                                                        คัดลอก
+                                                                    </button>
+                                                                </div>
+                                                                <p className="text-gray-600 leading-relaxed bg-white p-2 rounded border border-blue-100/50">
+                                                                    {(order.deliveryAddress || '')
                                                                         .replace(/\[Phone: .*?\]/g, '')
                                                                         .replace(/\[GPS Pin: .*?\]/g, '')
                                                                         .replace(/\[Google Maps Link: .*?\]/g, '')
-                                                                        .trim();
-                                                                    navigator.clipboard.writeText(cleanAddress);
-                                                                    alert('คัดลอกที่อยู่แล้ว!');
-                                                                }}
-                                                                className="text-brand-600 hover:text-brand-800 underline active:text-brand-500 whitespace-nowrap ml-2"
-                                                            >
-                                                                คัดลอก
-                                                            </button>
+                                                                        .trim()
+                                                                    }
+                                                                </p>
+                                                                
+                                                                {parseDeliveryPhone(order.deliveryAddress) && (
+                                                                    <div className="flex items-center justify-between font-sans font-bold text-gray-700 border-t border-dashed border-blue-100 pt-2">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <Phone size={13} className="text-blue-600 shrink-0"/>
+                                                                            <span>เบอร์โทร:</span>
+                                                                        </div>
+                                                                        <a href={`tel:${parseDeliveryPhone(order.deliveryAddress)}`} className="text-blue-600 underline">
+                                                                            {parseDeliveryPhone(order.deliveryAddress)}
+                                                                        </a>
+                                                                    </div>
+                                                                )}
+                                                                {parseGPSCoordinates(order.deliveryAddress) && (
+                                                                    <div className="flex items-center justify-between gap-1.5 font-bold pt-2 border-t border-dashed border-blue-100">
+                                                                        <div className="flex items-center gap-1.5 text-gray-750">
+                                                                            <MapPin size={13} className="text-red-500 animate-pulse shrink-0"/>
+                                                                            <span>ระยะทาง: {
+                                                                                (() => {
+                                                                                    const coords = parseGPSCoordinates(order.deliveryAddress);
+                                                                                    if (!coords) return '?';
+                                                                                    const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
+                                                                                    const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
+                                                                                    const sLat = storeCoords.lat;
+                                                                                    const sLng = storeCoords.lng;
+                                                                                    return calculateDistanceKm(sLat, sLng, coords.lat, coords.lng).toFixed(2);
+                                                                                })()
+                                                                            } กม.</span>
+                                                                        </div>
+                                                                        <a 
+                                                                            href={parseGPSCoordinates(order.deliveryAddress)?.url} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer" 
+                                                                            className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded-lg font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95"
+                                                                        >
+                                                                            <Globe size={11}/> เปิด Google Maps
+                                                                        </a>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <p className="text-gray-600 leading-relaxed bg-white p-2 rounded border border-blue-100/50">
-                                                            {(order.deliveryAddress || '')
-                                                                .replace(/\[Phone: .*?\]/g, '')
-                                                                .replace(/\[GPS Pin: .*?\]/g, '')
-                                                                .replace(/\[Google Maps Link: .*?\]/g, '')
-                                                                .trim()
-                                                            }
-                                                        </p>
-                                                        
-                                                        {parseDeliveryPhone(order.deliveryAddress) && (
-                                                            <div className="flex items-center justify-between font-sans font-bold text-gray-700 border-t border-dashed border-blue-100 pt-2">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <Phone size={13} className="text-blue-600 shrink-0"/>
-                                                                    <span>เบอร์โทร:</span>
-                                                                </div>
-                                                                <a href={`tel:${parseDeliveryPhone(order.deliveryAddress)}`} className="text-blue-600 underline">
-                                                                    {parseDeliveryPhone(order.deliveryAddress)}
-                                                                </a>
-                                                            </div>
-                                                        )}
-                                                        {parseGPSCoordinates(order.deliveryAddress) && (
-                                                            <div className="flex items-center justify-between gap-1.5 font-bold pt-2 border-t border-dashed border-blue-100">
-                                                                <div className="flex items-center gap-1.5 text-gray-750">
-                                                                    <MapPin size={13} className="text-red-500 animate-pulse shrink-0"/>
-                                                                    <span>ระยะทาง: {
-                                                                        (() => {
-                                                                            const coords = parseGPSCoordinates(order.deliveryAddress);
-                                                                            if (!coords) return '?';
-                                                                            const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
-                                                                            const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
-                                                                            const sLat = storeCoords.lat;
-                                                                            const sLng = storeCoords.lng;
-                                                                            return calculateDistanceKm(sLat, sLng, coords.lat, coords.lng).toFixed(2);
-                                                                        })()
-                                                                    } กม.</span>
-                                                                </div>
-                                                                <a 
-                                                                    href={parseGPSCoordinates(order.deliveryAddress)?.url} 
-                                                                    target="_blank" 
-                                                                    rel="noopener noreferrer" 
-                                                                    className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded-lg font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95"
-                                                                >
-                                                                    <Globe size={11}/> เปิด Google Maps
-                                                                </a>
-                                                            </div>
-                                                        )}
+                                                    )}
+                                                    {order.source !== 'store' && (
+                                                        <div className="mt-2 flex justify-between items-center bg-orange-50 p-2 rounded border border-orange-100">
+                                                            <span className="text-sm font-bold text-orange-800">GP Deduction</span>
+                                                            <button onClick={() => handleUpdateGPDeduction(order)} className="text-xs bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 font-bold shadow-sm">Edit GP</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="p-4 border-t bg-gray-50 space-y-2.5">
+                                                    {(order.status === 'pending' || order.status === 'confirmed') && (
+                                                        <button onClick={() => handleConfirmPaymentAndCook(order.id)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base">
+                                                            <CheckCircle size={18}/> {language === 'th' ? 'ยืนยันรับเงิน & เริ่มทำเลย' : 'Confirm Payment & Cook'}
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <button onClick={() => handleReprintOrder(order)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Print Receipt">
+                                                            <Printer size={12}/> Print
+                                                        </button>
+                                                        <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Force Complete">
+                                                            <Check size={12}/> Clear
+                                                        </button>
+                                                        <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Cancel Order">
+                                                            <X size={12}/> Cancel
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            )}
-                                            {order.source !== 'store' && (
-                                                <div className="mt-2 flex justify-between items-center bg-orange-50 p-2 rounded border border-orange-100">
-                                                    <span className="text-sm font-bold text-orange-800">GP Deduction</span>
-                                                    <button onClick={() => handleUpdateGPDeduction(order)} className="text-xs bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 font-bold shadow-sm">Edit GP</button>
+                                            </div>
+                                        );
+                                    } catch (e: any) {
+                                        console.error("Error rendering order card:", order, e);
+                                        return (
+                                            <div key={order?.id || Math.random().toString()} className="bg-red-50 p-5 rounded-2xl border-2 border-dashed border-red-200 shadow-sm flex flex-col justify-between text-left h-full min-h-[300px]">
+                                                <div className="space-y-2">
+                                                    <div className="text-xs uppercase font-extrabold text-red-500">❌ Error Loading Order</div>
+                                                    <h4 className="font-extrabold text-[#7c2d12] text-sm truncate">ID: {order?.id || 'Unknown'}</h4>
+                                                    <p className="text-xs text-red-900 font-mono leading-relaxed bg-white p-3 rounded-xl border border-red-100 overflow-y-auto max-h-36">
+                                                        {e?.message || String(e)}
+                                                    </p>
                                                 </div>
-                                            )}
-                                        </div>
-                                        <div className="p-4 border-t bg-gray-50 space-y-2.5">
-                                            {(order.status === 'pending' || order.status === 'confirmed') && (
-                                                <button onClick={() => handleConfirmPaymentAndCook(order.id)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base">
-                                                    <CheckCircle size={18}/> {language === 'th' ? 'ยืนยันรับเงิน & เริ่มทำเลย' : 'Confirm Payment & Cook'}
-                                                </button>
-                                            )}
-                                            <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <button onClick={() => handleReprintOrder(order)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Print Receipt">
-                                                    <Printer size={12}/> Print
-                                                </button>
-                                                <button onClick={() => handleCloseTable(order.id)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Force Complete">
-                                                    <Check size={12}/> Clear
-                                                </button>
-                                                <button onClick={() => handleCancelTable(order.id)} className="bg-red-100 hover:bg-red-200 text-red-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Cancel Order">
-                                                    <X size={12}/> Cancel
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (order?.id && window.confirm(language === 'th' ? `ลบออเดอร์ที่เสียหายรหัส #${order.id} หรือไม่?` : `Remove corrupted order record #${order.id}?`)) {
+                                                            await deleteOrder(order.id);
+                                                        }
+                                                    }}
+                                                    className="mt-4 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-xs shadow transition active:scale-95 cursor-pointer text-center"
+                                                >
+                                                    {language === 'th' ? '🗑️ ลบข้อมูลเสียหายนี้' : '🗑️ Remove Corrupted Record'}
                                                 </button>
                                             </div>
-                                        </div>
-                                    </div>
-                                ))}</div>
+                                        );
+                                    }
+                                })}</div>
                             }
                         </div>
                     </div>
@@ -2329,6 +2568,7 @@ export const POSView: React.FC = () => {
                                                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition"
                                                 >
                                                     <option value="system">🖥️ {language === 'th' ? 'System Print (แนะนำเสถียรที่สุด)' : 'System Print (Recommended)'}</option>
+                                                    <option value="bluetooth">🔵 {language === 'th' ? 'Bluetooth Direct Printer001 (สำหรับเครื่อง Welltech G5)' : 'Bluetooth Direct Printer001 (Welltech G5)'}</option>
                                                     <option value="rawbt">📱 {language === 'th' ? 'RawBT App / Android WiFi' : 'RawBT Companion App (Android)'}</option>
                                                     <option value="local_proxy">🔌 {language === 'th' ? 'Direct Local Network Proxy' : 'Local Network Proxy/Bridge'}</option>
                                                 </select>
@@ -2348,6 +2588,85 @@ export const POSView: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {printerType === 'bluetooth' && (
+                                            <div className="p-4 rounded-2xl bg-brand-50/50 border border-brand-200 space-y-3 animate-fade-in text-left">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-1.5 font-bold text-brand-900 text-sm">
+                                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
+                                                        <span>{language === 'th' ? 'สเตตัสการเชื่อมต่อบลูทูธ (Bluetooth Printer001)' : 'Bluetooth Thermal Printer Status'}</span>
+                                                    </div>
+                                                    <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase ${
+                                                        btStatus === 'connected' ? 'bg-emerald-100 text-emerald-800' :
+                                                        btStatus === 'connecting' ? 'bg-amber-100 text-amber-800 animate-pulse' :
+                                                        'bg-gray-200 text-gray-700'
+                                                    }`}>
+                                                        {btStatus}
+                                                    </span>
+                                                </div>
+
+                                                <div className="text-xs text-gray-500 font-sans leading-relaxed">
+                                                    {language === 'th' 
+                                                        ? 'กดเชื่อมต่อบลูทูธด้านล่างเพื่อจับคู่โปรแกรมหน้าเว็บ POS กับเครื่องพิมพ์ Welltech G5 (Printer001) ของคุณโดยตรง' 
+                                                        : 'Pair your browser environment directly with your Welltech G5 (Printer001) thermal printer below.'}
+                                                </div>
+
+                                                {btDevice && (
+                                                    <div className="text-xs font-mono bg-white p-3 rounded-xl border border-brand-100 space-y-1 animate-fade-in">
+                                                        <div>🔧 <strong>Device Name:</strong> {btDevice.name || 'Printer001'}</div>
+                                                        <div>📶 <strong>ID:</strong> {btDevice.id || 'N/A'}</div>
+                                                        <div>🔋 <strong>GATT Server:</strong> Connected</div>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    {btStatus !== 'connected' ? (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={connectBluetoothPrinter}
+                                                            className="flex-1 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-sm transition-all"
+                                                        >
+                                                            🔗 {btStatus === 'connecting' ? 'กำลังเชื่อมต่อ...' : 'ค้นหา & เชื่อมต่อเครื่องพิมพ์'}
+                                                        </button>
+                                                    ) : (
+                                                        <>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    const testPayload = {
+                                                                        storeName: "Pizza Damac Nonthaburi",
+                                                                        address: "TEST PRINT SUCCESSFUL",
+                                                                        phone: "099-497-9199",
+                                                                        queueNo: "Printer001 TEST",
+                                                                        date: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }),
+                                                                        items: [{ name: "Test Pizza Margherita", quantity: 1, totalPrice: 0 }],
+                                                                        total: 0,
+                                                                        paymentMethod: "BLUETOOTH FEED"
+                                                                    };
+                                                                    try {
+                                                                        const bytes = generateEscPosData(testPayload);
+                                                                        await writeBtInChunks(btCharacteristic, bytes);
+                                                                        alert("🎉 ส่งใบทดสอบสำเร็จกรุณาดูที่เครื่องพิมพ์!");
+                                                                    } catch (err: any) {
+                                                                        alert("❌ ไม่สามารถพิมพ์ได้: " + err.message);
+                                                                    }
+                                                                }}
+                                                                className="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs hover:shadow transition-all"
+                                                            >
+                                                                📝 ทดสอบพิมพ์ใบเสร็จ
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={disconnectBluetoothPrinter}
+                                                                className="flex-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs hover:shadow transition-all"
+                                                            >
+                                                                ❌ ตัดการเชื่อมต่อบลูทูธ
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Dynamic System Instructions Guide Box */}
                                         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-xs text-amber-900 space-y-3.5">
