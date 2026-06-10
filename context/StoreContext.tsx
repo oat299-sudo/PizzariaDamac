@@ -281,9 +281,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               }
               return cp;
           }
-          return 'tis620-26'; // Default to TIS-620 Page 26
+          return 'graphic-58'; // Default to Graphic 58mm to fix Thai on Welltech/Xprinter out of the box!
       }
-      return 'tis620-26';
+      return 'graphic-58';
   });
   const setThaiCodePage = (cp: string) => {
       setThaiCodePageState(cp);
@@ -401,6 +401,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const generateEscPosGraphicData = async (payload: any, isKitchen: boolean, lang: Language, width: number): Promise<Uint8Array> => {
       if (typeof document === 'undefined') return new Uint8Array();
+
+      // Ensure browser web fonts are fully loaded before rendering to canvas
+      try {
+          if (document.fonts && typeof document.fonts.ready !== 'undefined') {
+              await document.fonts.ready;
+          }
+      } catch (e) {
+          console.warn("Fonts ready API not fully supported or timed out:", e);
+      }
 
       const lines: any[] = [];
       const addLineText = (left: string, right: string = '', options: any = {}) => {
@@ -600,8 +609,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               else if (line.size === 'large') fontSize = '24px';
               else if (line.size === 'huge') fontSize = '34px';
 
-              // Beautiful modern and accessible font specs for crisp details
-              ctx.font = `${fontStyle}${fontSize} "Sarabun", "Inter", "Helvetica Neue", "Arial", sans-serif`;
+              // Beautiful modern and accessible font specs for crisp details with Tahoma and Leelawadee fallbacks
+              ctx.font = `${fontStyle}${fontSize} "Sarabun", "Tahoma", "Leelawadee", "Segoe UI", sans-serif`;
               ctx.fillStyle = '#000000';
               ctx.textBaseline = 'middle';
 

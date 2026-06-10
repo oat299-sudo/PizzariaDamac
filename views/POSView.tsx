@@ -2523,9 +2523,10 @@ export const POSView: React.FC = () => {
                                                                         paymentMethod: "BLUETOOTH FEED"
                                                                     };
                                                                     try {
-                                                                        const bytes = generateEscPosData(testPayload, language);
-                                                                        await writeBtInChunks(btCharacteristic, bytes);
-                                                                        alert("🎉 ส่งใบทดสอบสำเร็จกรุณาดูที่เครื่องพิมพ์!");
+                                                                        await triggerReceiptPrint(testPayload);
+                                                                        if (printerType === 'bluetooth' && btCharacteristic) {
+                                                                            alert("🎉 ส่งใบทดสอบสำเร็จกรุณาดูที่เครื่องพิมพ์!");
+                                                                        }
                                                                     } catch (err: any) {
                                                                         alert("❌ ไม่สามารถพิมพ์ได้: " + err.message);
                                                                     }
