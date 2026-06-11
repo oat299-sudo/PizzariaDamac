@@ -868,11 +868,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const writeBtInChunks = async (characteristic: any, data: Uint8Array) => {
-      const chunkSize = 20; // Stable BLE write packet limit
+      // Dynamic high-performance BLE chunk writing:
+      // Text mode (< 1500 bytes) uses 120-byte chunks and 3ms delay for instant prints.
+      // Graphic mode (> 1500 bytes) uses 96-byte chunks and 8ms delay for fast, buffered graphics without choke.
+      const isLarge = data.length > 1500;
+      const chunkSize = isLarge ? 96 : 120;
+      const delay = isLarge ? 8 : 3;
+      
       for (let i = 0; i < data.length; i += chunkSize) {
           const chunk = data.slice(i, i + chunkSize);
           await characteristic.writeValue(chunk);
-          await new Promise(r => setTimeout(r, 15)); // Prevents buffer overflow
+          await new Promise(r => setTimeout(r, delay)); // Micro-delay to avoid buffer overflow
       }
   };
 
