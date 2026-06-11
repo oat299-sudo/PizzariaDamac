@@ -1250,12 +1250,6 @@ export const POSView: React.FC = () => {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
                     }
-                    body > *:not(.printable-area) {
-                        display: none !important;
-                    }
-                    #root > *:not(.printable-area) {
-                        display: none !important;
-                    }
                     .printable-area {
                         width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
                         padding: ${receiptPadding}mm !important;
@@ -2440,7 +2434,7 @@ export const POSView: React.FC = () => {
                                                 {/* Dynamic Thai Encoding / Code Page Sector Selection */}
                                                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2 text-left mb-3">
                                                     <label className="text-xs font-bold text-gray-700 block flex items-center gap-1">
-                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / Encodings)' : 'Thai Code Page / Encodings'}
+                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Print Mode)' : 'Thai Print Mode'}
                                                     </label>
                                                     <select
                                                         value={thaiCodePage.startsWith('custom-') ? 'custom' : thaiCodePage}
@@ -2454,17 +2448,17 @@ export const POSView: React.FC = () => {
                                                         }}
                                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition cursor-pointer"
                                                     >
-                                                        <optgroup label="👑 แนะนำเพื่อภาษาไทยพิมพ์สวยสระไม่ลอย (โหมดรูปภาพ)">
-                                                            <option value="graphic-58">🖼️ โหมดรูปภาพ 58 มม. (ดีที่สุดสำหรับ Welltech G5 / Xprinter ✅)</option>
-                                                            <option value="graphic-80">🖼️ โหมดรูปภาพ 80 มม. (สำหรับเครื่องพิมพ์หน้ากว้าง)</option>
+                                                        <optgroup label="🌟 โหมดข้อความธรรมดา (แนะนำมากสุด 👍 พิมพ์เร็ว ประหยัดกระดาษ)">
+                                                            <option value="tis620-26">Code Page 26 (แนะนำพิเศษสำหรับ Welltech G5 / Xprinter ✅)</option>
+                                                            <option value="tis620-18">Code Page 18 (สำหรับเครื่องพิมพ์ CP874 / Epson 💾)</option>
+                                                            <option value="utf8-epson">UTF-8 Mode (สำหรับเครื่องพิมพ์ภาษาสากล 💾)</option>
                                                         </optgroup>
-                                                        <optgroup label="🌟 โหมดข้อความ (ขึ้นกับบอร์ดเครื่องพิมพ์)">
-                                                            <option value="tis620-26">Code Page 26 (TIS-620 ดั้งเดิม) 💾</option>
-                                                            <option value="tis620-18">Code Page 18 (CP874 ตัวหนังสือ) 💾</option>
-                                                            <option value="utf8-epson">UTF-8 (โหมดอักษรรวม) 💾</option>
+                                                        <optgroup label="🖼️ โหมดรูปภาพกราฟิก (กรณีภาษาไทยมีสระลอย / สลับที่)">
+                                                            <option value="graphic-58">🖼️ รูปภาพขนาด 58 มม. (พิมพ์แบบส่งข้อมูลรูป)</option>
+                                                            <option value="graphic-80">🖼️ รูปภาพขนาด 80 มม. (พิมพ์แบบส่งข้อมูลรูป)</option>
                                                         </optgroup>
-                                                        <optgroup label="⚙️ อื่นๆ">
-                                                            <option value="custom">{language === 'th' ? 'ระบุรหัส Code Page อื่นๆ...' : 'Specify Custom Code Page...'}</option>
+                                                        <optgroup label="⚙️ ตัวเลือกขั้นสูง">
+                                                            <option value="custom">{language === 'th' ? 'ระบุรหัสด้วยตัวเอง...' : 'Specify Custom Code Page...'}</option>
                                                         </optgroup>
                                                     </select>
 
@@ -2522,6 +2516,7 @@ export const POSView: React.FC = () => {
                                                                         paymentMethod: "BLUETOOTH FEED"
                                                                     };
                                                                     try {
+                                                                        setReceiptData(testPayload);
                                                                         await triggerReceiptPrint(testPayload);
                                                                         if (printerType === 'bluetooth' && btCharacteristic) {
                                                                             alert("🎉 ส่งใบทดสอบสำเร็จกรุณาดูที่เครื่องพิมพ์!");

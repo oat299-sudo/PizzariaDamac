@@ -281,9 +281,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               }
               return cp;
           }
-          return 'graphic-58'; // Default to Graphic 58mm to fix Thai on Welltech/Xprinter out of the box!
+          return 'tis620-26'; // Default to Code Page 26 (recommended text-mode, lightning-fast and stable!)
       }
-      return 'graphic-58';
+      return 'tis620-26';
   });
   const setThaiCodePage = (cp: string) => {
       setThaiCodePageState(cp);
@@ -393,7 +393,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       // Feed paper to clear mechanical knife & cut
-      escposBytes.push(ESC, 0x64, 0x04); // Feed 4 lines
+      escposBytes.push(ESC, 0x64, 0x02); // Economical feed: 2 lines is perfect to clear cutter line
       escposBytes.push(GS, 0x56, 0x42, 0x00); // Standard Auto-Cut command
 
       return new Uint8Array(escposBytes);
@@ -766,11 +766,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       
       centerAlign();
       addLine(lang === 'th' ? "ขอบคุณค่ะ/ครับ - พิซซ่า ดามัค นนทบุรี 🍕" : "Thank you! - Pizza Damac Nonthaburi 🍕");
-      addLine("\n\n\n\n"); // Feed lines
       
-      // Standard Paper Cut Sequence:
-      // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
-      commands.push(ESC, 0x64, 0x04);
+      // Economical Paper Cut Sequence:
+      // Feed paper 2 lines using ESC d to safely clear the mechanical cutter line with minimum paper waste
+      commands.push(ESC, 0x64, 0x02);
       
       // Send exact single paper cut command: GS V 66 0 (1D 56 42 00)
       commands.push(GS, 0x56, 0x42, 0x00);
@@ -857,11 +856,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       
       centerAlign();
       addLine(lang === 'th' ? "เร่งมือทำความอร่อยเลยค่ะ/ครับ! 🍕" : "Let's Pizza! 🍕");
-      addLine("\n\n\n\n"); // Feed lines
 
-      // Standard Paper Cut Sequence:
-      // First feed paper 4 lines using ESC d to safely clear the mechanical cutter line
-      commands.push(ESC, 0x64, 0x04);
+      // Economical Paper Cut Sequence:
+      // Feed paper 2 lines using ESC d to safely clear the mechanical cutter line with minimum paper waste
+      commands.push(ESC, 0x64, 0x02);
       
       // Send exact single paper cut command: GS V 66 0 (1D 56 42 00)
       commands.push(GS, 0x56, 0x42, 0x00);

@@ -868,12 +868,6 @@ export const KitchenView: React.FC = () => {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            body > *:not(.printable-area) {
-                display: none !important;
-            }
-            #root > *:not(.printable-area) {
-                display: none !important;
-            }
             .printable-area {
                 width: ${paperSize === '58mm' ? '58mm' : '80mm'} !important;
                 padding: ${receiptPadding}mm !important;
