@@ -1496,7 +1496,15 @@ export const POSView: React.FC = () => {
                     {shopLogo ? <img src={shopLogo} alt="Logo" className="w-8 h-8 rounded-full object-cover" /> : <div className="bg-brand-600 p-1 rounded-lg"><DollarSign size={16} /></div>}
                     <span className="font-bold text-lg tracking-tight">POS v2.1</span>
                 </div>
-                 <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-2.5">
+                    {/* Clear prominent language selection button right on mobile POS page */}
+                    <button 
+                        onClick={() => { playClickSound(); toggleLanguage(); }} 
+                        className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-black py-1.5 px-3 rounded-xl flex items-center gap-1 transition active:scale-95 shadow-md shadow-brand-500/20"
+                        title={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
+                    >
+                        {language === 'th' ? '🇺🇸 ENG' : '🇹🇭 ภาษาไทย'}
+                    </button>
                     {activeTab === 'order' && <button onClick={() => setIsEditMode(!isEditMode)} className={`p-1.5 rounded-full ${isEditMode ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-800 text-gray-400'}`}><Edit2 size={16}/></button>}
                     <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 ${isStoreOpen ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}><div className={`w-2 h-2 rounded-full ${isStoreOpen ? 'bg-green-500' : 'bg-red-500'}`}></div>{isStoreOpen ? 'OPEN' : 'CLOSED'}</div>
                  </div>
@@ -1549,6 +1557,15 @@ export const POSView: React.FC = () => {
                                 <button onClick={() => setIsEditMode(!isEditMode)} className={`hidden lg:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}><Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? 'Editing' : 'Order'}</span></button>
                                 {CATEGORIES.map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-6 py-3 rounded-xl text-base font-bold transition ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-md scale-105' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>{language === 'th' ? cat.labelTh : cat.label}</button>))}
                                 {isEditMode && <button onClick={handleOpenAddModal} className="whitespace-nowrap px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto"><Plus size={18}/> New Item</button>}
+                                
+                                {/* Visible desktop language choice right at main POS header */}
+                                <button 
+                                    onClick={() => { playClickSound(); toggleLanguage(); }}
+                                    className="hidden lg:flex items-center gap-1.5 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-black bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition scale-100 hover:scale-105 ml-auto cursor-pointer"
+                                    title={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
+                                >
+                                    <span>{language === 'th' ? '🇺🇸 ENG' : '🇹🇭 ภาษาไทย'}</span>
+                                </button>
                             </div>
                             <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
@@ -2423,7 +2440,7 @@ export const POSView: React.FC = () => {
                                                 {/* Dynamic Thai Encoding / Code Page Sector Selection */}
                                                 <div className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2 text-left mb-3">
                                                     <label className="text-xs font-bold text-gray-700 block flex items-center gap-1">
-                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / Encoding)' : 'Thai Code Page / Encoding'}
+                                                        🔤 {language === 'th' ? 'การตั้งค่ารหัสภาษาไทย (Thai Code Page / Encodings)' : 'Thai Code Page / Encodings'}
                                                     </label>
                                                     <select
                                                         value={thaiCodePage.startsWith('custom-') ? 'custom' : thaiCodePage}
@@ -2437,35 +2454,17 @@ export const POSView: React.FC = () => {
                                                         }}
                                                         className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 bg-white focus:border-brand-500 outline-none transition cursor-pointer"
                                                     >
-                                                        <optgroup label="👑 โหมดรูปภาพ (แก้ปัญหาสระลอยและภาษาต่างดาวได้ 100% 🎯)">
-                                                            <option value="graphic-58">🖼️ โหมดรูปภาพ 58 มม. (แนะนำพิเศษสำหรับ Welltech G5 / Xprinter ✅)</option>
-                                                            <option value="graphic-80">🖼️ โหมดรูปภาพ 80 มม. (สำหรับเครื่องรุ่นใหญ่หน้ากว้าง)</option>
+                                                        <optgroup label="👑 แนะนำเพื่อภาษาไทยพิมพ์สวยสระไม่ลอย (โหมดรูปภาพ)">
+                                                            <option value="graphic-58">🖼️ โหมดรูปภาพ 58 มม. (ดีที่สุดสำหรับ Welltech G5 / Xprinter ✅)</option>
+                                                            <option value="graphic-80">🖼️ โหมดรูปภาพ 80 มม. (สำหรับเครื่องพิมพ์หน้ากว้าง)</option>
                                                         </optgroup>
-                                                        <optgroup label="🌟 UTF-8 (แนะนำสำหรับเครื่องพิมพ์ยุคใหม่)">
-                                                            <option value="utf8-epson">UTF-8 (Epson Setup - สระเรียงซ้อน สวยงามที่สุด ⭐)</option>
-                                                            <option value="utf8-xprinter">UTF-8 (Xprinter Multi-byte Command)</option>
-                                                            <option value="utf8-raw">UTF-8 (Raw / Direct Unicode - เครื่องพิมพ์สติกเกอร์ทั่วไป)</option>
-                                                        </optgroup>
-                                                        <optgroup label="💾 TIS-620 / CP874 (สำหรับถอดรหัสแบบ 1 ไบต์ดั้งเดิม)">
-                                                            <option value="tis620-26">Code Page 26 - TIS-620 (แนะนำสำหรับ Welltech G5 / Xprinter ✅)</option>
-                                                            <option value="tis620-18">Code Page 18 - CP874 (มาตรฐาน Xprinter เก่า / Epson)</option>
-                                                            <option value="tis620-17">Code Page 17 - TIS-620 Alt</option>
-                                                            <option value="tis620-40">Code Page 40 - CP874 Alt 2</option>
-                                                            <option value="tis620-51">Code Page 51 - CP874 Alt 3 (เครื่องพิมพ์จีนไร้แบรนด์)</option>
-                                                            <option value="tis620-41">Code Page 41 - Space/Thai Alt 4</option>
-                                                            <option value="tis620-12">Code Page 12 - Thai Alt 5</option>
-                                                            <option value="tis620-19">Code Page 19 - Thai Alt 6</option>
-                                                            <option value="tis620-20">Code Page 20 - Thai Alt 7</option>
-                                                            <option value="tis620-21">Code Page 21 - Thai Alt 8</option>
-                                                            <option value="tis620-22">Code Page 22 - Thai Alt 9</option>
-                                                            <option value="tis620-23">Code Page 23 - Thai Alt 10</option>
-                                                            <option value="tis620-24">Code Page 24 - Thai Alt 11</option>
-                                                            <option value="tis620-25">Code Page 25 - Thai Alt 12</option>
-                                                            <option value="tis620-30">Code Page 30 - Thai Alt 13</option>
-                                                            <option value="tis620-255">Code Page 255 - Thai Alternate 14</option>
+                                                        <optgroup label="🌟 โหมดข้อความ (ขึ้นกับบอร์ดเครื่องพิมพ์)">
+                                                            <option value="tis620-26">Code Page 26 (TIS-620 ดั้งเดิม) 💾</option>
+                                                            <option value="tis620-18">Code Page 18 (CP874 ตัวหนังสือ) 💾</option>
+                                                            <option value="utf8-epson">UTF-8 (โหมดอักษรรวม) 💾</option>
                                                         </optgroup>
                                                         <optgroup label="⚙️ อื่นๆ">
-                                                            <option value="custom">{language === 'th' ? 'ระบุรหัส Code Page อื่นๆ ด้วยตัวเอง...' : 'Specify Custom Code Page Number...'}</option>
+                                                            <option value="custom">{language === 'th' ? 'ระบุรหัส Code Page อื่นๆ...' : 'Specify Custom Code Page...'}</option>
                                                         </optgroup>
                                                     </select>
 
