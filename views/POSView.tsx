@@ -587,16 +587,8 @@ export const POSView: React.FC = () => {
                 const isNewSessionOrder = orderTime > sessionStartTimeRef.current - 15000; // within 15 seconds of or after session start
 
                 if (isNewSessionOrder) {
-                    // Condition 1: Dine-in / Walk-in / Store order created & confirmed (Pay Later)
-                    if (order.type === 'dine-in' && order.status === 'confirmed') {
-                        handleReprintOrder(order);
-                    }
-                    // Condition 2: Delivery order first received (status pending / confirmed)
-                    else if (order.type === 'delivery' && (order.status === 'pending' || order.status === 'confirmed')) {
-                        handleReprintOrder(order);
-                    }
-                    // Condition 3: Any order instantly created as completed/paid
-                    else if (order.status === 'completed') {
+                    // Auto-print any newly received orders (pending/confirmed/completed) regardless of order type
+                    if (order.status === 'pending' || order.status === 'confirmed' || order.status === 'completed') {
                         handleReprintOrder(order);
                     }
                 }
@@ -2242,6 +2234,35 @@ export const POSView: React.FC = () => {
                                     <p className="text-sm text-gray-500">
                                         {language === 'th' ? 'เลือกความกว้างกระดาษเครื่องพิมพ์ความร้อนที่คุณใช้อยู่ เพื่อจัดสัดส่วนใบเสร็จให้สวยงาม ไม่ตกขอบกระดาษ' : 'Choose your physical thermal printer paper width so that receipt formats align perfectly without margins clipping.'}
                                     </p>
+
+                                    {/* Multi-Tablet Setup & Alien Characters Troubleshooting Guide */}
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 space-y-2 leading-relaxed font-sans text-left">
+                                        <p className="font-bold text-sm flex items-center gap-1.5 text-amber-950">
+                                            💡 {language === 'th' ? 'คู่มือแก้พิมพ์ต่างต่างดาว / ตั้งค่าแท็บเล็ตเครื่องอื่น' : 'Thai Character and Multi-Tablet Setup Guide'}
+                                        </p>
+                                        <p className="font-medium text-amber-800">
+                                            {language === 'th' 
+                                                ? 'เนื่องจากบลูทูธและเบราว์เซอร์จะเชื่อมโยงแยกกันเฉพาะเครื่อง หากเปลี่ยนไปเปิดบนแท็บเล็ตเครื่องใหม่ หรือ iPad แล้วเจอปัญหากดไม่ติด หรือปริ้นออกมาเป็นภาษาต่างดาว ให้ทำตามขั้นตอนดังนี้บนเครื่องนั้นๆ:' 
+                                                : 'Because browser Bluetooth authorization is bound locally, physical tablets/iPads require separate configuration on first login. If they print alien symbols or do not connect, follow these fast checks on that tablet:'}
+                                        </p>
+                                        <ol className="list-decimal pl-4.5 space-y-1.5 text-amber-800/90 font-medium">
+                                            <li>
+                                                {language === 'th' 
+                                                    ? 'เปลี่ยนหัวข้อ "วิธีการสั่งพิมพ์ (Printing Mode)" ด้านล่างนี้ ให้ตรงตามที่ใช้ (เช่น Bluetooth หรือ Wi-Fi)' 
+                                                    : 'Amend the "Printing Mode" configuration below to match either "Bluetooth" or "Wi-Fi".'}
+                                            </li>
+                                            <li>
+                                                {language === 'th' 
+                                                    ? 'หากใช้ Bluetooth: ต้องกดปุ่มสีน้ำเงิน "ค้นหา & เชื่อมต่อเครื่องพิมพ์" บนหน้าจอนี้ผ่านแท็บเล็ตเครื่องใหม่นั้นๆ 1 ครั้งซ้ำ เพื่อลงทะเบียนจับคู่กับเครื่องปริ้นเตอร์' 
+                                                    : 'If on Bluetooth: Click "Connect Printer" once directly from this new tablet to verify permissions and pair with your physical hardware.'}
+                                            </li>
+                                            <li>
+                                                {language === 'th' 
+                                                    ? 'หากพิมพ์ภาษาไทยเพี้ยน/สระซ้อน: เลือกหัวข้อ "การตั้งค่ารหัสภาษาไทย" เป็น "Code Page 26" (สำหรับ Welltech G5 / Xprinter) หรือ แนะนำเลือก "โหมดรูปภาพกราฟิก (Graphic-58 หรือ Graphic-80)" ซึ่งจะส่งข้อมูลเป็นรูปภาพ คมชัด ปริ้นภาษาไทยได้ 100% บนทุกเครื่องพิมพ์' 
+                                                    : 'If characters are scrambled: Select "Code Page 26" (Welltech G5 / Xprinter) or switch to "Graphic-58 or Graphic-80 (Graphic Mode)" which converts print texts into pixel graphics, delivering 100% perfect Thai layout compatibility anywhere.'}
+                                            </li>
+                                        </ol>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4 font-sans">
                                         <button 
                                             key="btn-58"
