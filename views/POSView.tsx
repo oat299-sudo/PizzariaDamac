@@ -5,7 +5,7 @@ import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -197,6 +197,110 @@ export const POSView: React.FC = () => {
             alert("Error updating order: " + e.message);
         }
     };
+
+    const startEditingOrderItems = (order: Order) => {
+        const password = prompt(language === 'th' ? "กรุณากรอกรหัสผ่านเพื่อแก้ไขรายการออเดอร์:" : "Please enter the password to edit this order:");
+        if (password !== '1234') {
+            alert(language === 'th' ? "รหัสผ่านไม่ถูกต้อง!" : "Incorrect password!");
+            return;
+        }
+        setEditingOrderForItems(order);
+        setEditedItemsList(JSON.parse(JSON.stringify(order.items || []))); // deep clone
+        setEditedOrderNote(order.note || '');
+        setEditedOrderTableNumber(order.tableNumber || '');
+        setEditedOrderCustomerName(order.customerName || '');
+        setEditedOrderSource(order.source || 'store');
+        setAddSearchQuery('');
+        setAddCategoryFilter('all');
+        setShowOrderItemsEditor(true);
+    };
+
+    const handleSaveEditedOrderItems = async () => {
+        if (!editingOrderForItems) return;
+        
+        if (editedItemsList.length === 0) {
+            alert(language === 'th' ? "กรุณาใส่รายการอาหารอย่างน้อย 1 รายการ!" : "Please include at least 1 item in the order!");
+            return;
+        }
+
+        const totalAmount = editedItemsList.reduce((sum, item) => sum + item.totalPrice, 0);
+        
+        // Retain delivery settings if any
+        const oldTotal = editingOrderForItems.totalAmount || 1;
+        const oldNet = editingOrderForItems.netAmount || oldTotal;
+        const gpDeductionRatio = (oldTotal - oldNet) / oldTotal;
+        const netAmount = Math.max(0, totalAmount - Math.round(totalAmount * gpDeductionRatio));
+
+        try {
+            await updateOrderFields(editingOrderForItems.id, {
+                items: editedItemsList,
+                totalAmount: totalAmount,
+                netAmount: netAmount,
+                note: editedOrderNote,
+                tableNumber: editedOrderTableNumber,
+                customerName: editedOrderCustomerName,
+                source: editedOrderSource
+            });
+            
+            setShowOrderItemsEditor(false);
+            setEditingOrderForItems(null);
+            playAlertSound();
+            alert(language === 'th' ? "💾 บันทึกการแก้ไขรายการออเดอร์สำเร็จแล้ว!" : "💾 Order items updated successfully!");
+        } catch (e: any) {
+            alert("Error saving: " + e.message);
+        }
+    };
+
+    const incrementEditedItemQty = (id: string) => {
+        setEditedItemsList(prev => prev.map(item => {
+            if (item.id === id) {
+                const newQty = item.quantity + 1;
+                const unitPrice = item.totalPrice / item.quantity;
+                return { ...item, quantity: newQty, totalPrice: unitPrice * newQty };
+            }
+            return item;
+        }));
+    };
+
+    const decrementEditedItemQty = (id: string) => {
+        setEditedItemsList(prev => prev.map(item => {
+            if (item.id === id) {
+                const newQty = Math.max(1, item.quantity - 1);
+                const unitPrice = item.totalPrice / item.quantity;
+                return { ...item, quantity: newQty, totalPrice: unitPrice * newQty };
+            }
+            return item;
+        }));
+    };
+
+    const deleteEditedItem = (id: string) => {
+        if (confirm(language === 'th' ? "ลบรายการนี้ออกจากออเดอร์?" : "Remove this item from the order?")) {
+            setEditedItemsList(prev => prev.filter(item => item.id !== id));
+        }
+    };
+
+    const addMenuItemToEditedList = (pizza: Pizza) => {
+        setEditedItemsList(prev => {
+            const existing = prev.find(item => item.pizzaId === pizza.id && (!item.selectedToppings || item.selectedToppings.length === 0));
+            if (existing) {
+                const unitPrice = existing.totalPrice / existing.quantity;
+                return prev.map(item => item.id === existing.id ? { ...item, quantity: item.quantity + 1, totalPrice: unitPrice * (item.quantity + 1) } : item);
+            } else {
+                const newItem: CartItem = {
+                    id: Date.now() + Math.random().toString(),
+                    pizzaId: pizza.id,
+                    name: pizza.name,
+                    nameTh: pizza.nameTh || pizza.name,
+                    basePrice: pizza.basePrice,
+                    selectedToppings: [],
+                    quantity: 1,
+                    totalPrice: pizza.basePrice,
+                    subItems: []
+                };
+                return [...prev, newItem];
+            }
+        });
+    };
     const [selectedToppings, setSelectedToppings] = useState<Topping[]>([]);
     const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
     const [activeCategory, setActiveCategory] = useState<ProductCategory>('pizza');
@@ -285,6 +389,17 @@ export const POSView: React.FC = () => {
         tableNumber: '',
         note: ''
     });
+
+    // --- ACTIVE ORDER ITEMS EDIT STATES ---
+    const [editingOrderForItems, setEditingOrderForItems] = useState<Order | null>(null);
+    const [showOrderItemsEditor, setShowOrderItemsEditor] = useState<boolean>(false);
+    const [editedItemsList, setEditedItemsList] = useState<CartItem[]>([]);
+    const [editedOrderNote, setEditedOrderNote] = useState<string>('');
+    const [editedOrderTableNumber, setEditedOrderTableNumber] = useState<string>('');
+    const [editedOrderCustomerName, setEditedOrderCustomerName] = useState<string>('');
+    const [editedOrderSource, setEditedOrderSource] = useState<OrderSource>('store');
+    const [addSearchQuery, setAddSearchQuery] = useState<string>('');
+    const [addCategoryFilter, setAddCategoryFilter] = useState<ProductCategory | 'all'>('all');
 
     // --- POS AUDIO ALERTS AND SYSTEM SOUND FEEDBACK ---
     const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -1180,6 +1295,15 @@ export const POSView: React.FC = () => {
         return raw;
     }, [menu, activeCategory]);
 
+    const filteredAddMenuMatches = useMemo(() => {
+        return menu.filter(item => {
+            const matchesCategory = addCategoryFilter === 'all' || item.category === addCategoryFilter;
+            const itemSearchStr = `${item.name} ${item.nameTh || ''} ${item.description || ''} ${item.descriptionTh || ''}`.toLowerCase();
+            const matchesSearch = itemSearchStr.includes(addSearchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+        });
+    }, [menu, addCategoryFilter, addSearchQuery]);
+
     // Export Handlers
     const handleExportSales = () => {
         if (filteredOrders.length === 0) { alert("No sales data to export"); return; }
@@ -1913,6 +2037,17 @@ export const POSView: React.FC = () => {
                                                         </button>
                                                     )}
                                                     <button onClick={() => handleCheckTableBill(order)} className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-sm transition text-base"><Receipt size={18}/> Check Bill & Print</button>
+                                                    
+                                                    <button 
+                                                        onClick={() => {
+                                                            playClickSound();
+                                                            startEditingOrderItems(order);
+                                                        }} 
+                                                        className="w-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-sm transition-all duration-200 active:scale-95"
+                                                    >
+                                                        <Edit2 size={15}/> {language === 'th' ? '📝 แก้ไขรายการอาหาร (1234)' : '📝 Edit Items (1234)'}
+                                                    </button>
+
                                                     <div className="grid grid-cols-3 gap-2">
                                                         <button onClick={() => handleReprintOrder(order)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all active:scale-95" title="Print Receipt">
                                                             <Printer size={12}/> Print
@@ -2799,42 +2934,17 @@ export const POSView: React.FC = () => {
                                                                     <strong className="text-blue-700">ระบบวินโดวส์ (Windows PC):</strong> ไปที่ Devices and Printers → Add Printer → Add using TCP/IP address → กรอกไอพีของ Welltech แล้วเลือกไดรเวอร์ผู้ผลิต Welltech หรือเลือก "Generic / Text Only" จากนั้นกดสั่งพิมพ์ใบเสร็จในระบบได้ทันที
                                                                 </li>
                                                                 <li>
-                                                                    <strong className="text-blue-700">ระบบ iOS (iPad/iPhone):</strong> หากเครื่องพิมพ์ไม่รองรับ AirPrint ให้ใช้แอปใน App Store เช่น "ESC/POS WiFi Print" ช่วยทำหน้าที่ส่ง IP ตรง
+                                                                    <strong className="text-blue-700">ระบบ iOS (iPhone / iPad):</strong> แนะนำให้เชื่อมต่อผ่าน Wi-Fi เครือข่ายเดียวกัน และเลือกสั่งพิมพ์ผ่านแอปพลิเคชันที่รองรับมาตรฐาน ESC/POS ของ Welltech
                                                                 </li>
-                                                            </ul>
-                                                        </div>
-
-                                                        <div className="bg-amber-100/50 p-3 rounded-xl border border-amber-200 mt-2 text-[11px] font-sans">
-                                                            <strong className="text-amber-950 font-extrabold block mb-1">💡 ขั้นตอนที่ 5: การตั้งค่าขนาดหน้าต่างพิมพ์ (สิ่งสำคัญที่สุด)</strong>
-                                                            <p className="text-gray-700 mb-1 leading-relaxed">เมื่อกด "ทดสอบสั่งพิมพ์" หรือ สั่งพิมพ์บนบิล จะปรากฏหน้าต่างเบราเซอร์ ให้ตรวจสอบการตั้งค่า 3 อย่างดังนี้เพื่อให้เข้าขนาด Welltech:</p>
-                                                            <ul className="list-inside list-disc space-y-0.5 text-gray-700">
-                                                                <li><strong>1. ขนาดกระดาษ (Paper size):</strong> ม้วน Welltech ให้เลือกขนาดเป็น <span className="text-brand-650 font-bold">"58mm x Roll"</span> หรือ <span className="text-brand-650 font-bold">"80mm x Roll"</span></li>
-                                                                <li><strong>2. ระยะขอบ (Margins):</strong> สำคัญมาก! ปรับเป็น <span className="text-red-700 font-bold">"None" / "ไม่มี"</span> เพื่อแก้ปัญหาสลิปเยื้องหรือหดตัว</li>
-                                                                <li><strong>3. หัว/ท้ายกระดาษ (Headers/Footers):</strong> ให้ <span className="font-bold text-red-700">ตีกถูกออก</span> เพื่อไม่ให้มีที่อยู่เว็บโผล่ในกระดาษ</li>
-                                                                <li>ปรับขนาดตัวอักษร 🔎 และขอบข้าง 📐 ได้ด้วยปุ่มควิกคอนฟิกสีเขียวด้านบนนี้ได้เลยครับ</li>
                                                             </ul>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-3 leading-relaxed">
-                                                    <p className="font-medium text-amber-900">
-                                                        <strong className="font-extrabold text-[#d97706]">Welltech</strong> receipt printers are standard ESC/POS devices performing on Port <strong className="font-extrabold text-blue-700">9100</strong>. Follow these 4 easy steps to check your setup:
+                                                <div className="space-y-3 text-[11.5px] leading-relaxed">
+                                                    <p>
+                                                        Welltech thermal printer uses ESC/POS connection on port 9100. Please ensure the printer and this device are on the same Wi-Fi subnet.
                                                     </p>
-                                                    <ul className="list-decimal list-inside space-y-2 text-gray-705">
-                                                        <li>
-                                                            <strong className="text-amber-950 font-black">Find Welltech Real IP (Self-Test Slip):</strong> Turn off Welltech power switch. Press and hold physical <span className="font-mono bg-white inline-block px-1 rounded shadow-sm border text-[10px]">FEED</span> button, turn back on switch and hold <span className="font-mono bg-white inline-block px-1 rounded shadow-sm border text-[10px]">FEED</span> for 3 seconds until it prints. Read <span className="font-mono font-bold text-blue-700">"IP Address: 192.168.1.xxx"</span>. (Do not confuse it with broadcasts like .255).
-                                                        </li>
-                                                        <li>
-                                                            <strong className="text-amber-950 font-black">Same Wi-Fi Network Required:</strong> Verify that your POS tablet/device is on the same local network subnet name.
-                                                        </li>
-                                                        <li>
-                                                            <strong className="text-amber-950 font-black">Enter IP & Port:</strong> Save the acquired IP into the configuration bar above.
-                                                        </li>
-                                                        <li>
-                                                            <strong className="text-amber-950 font-black">Device Spoolers:</strong> Install the standard <strong className="text-brand-650">RawBT Print Service</strong> (Android Play Store) or create a TCP/IP computer port pointing to Welltech inside Windows configurations for flawless automatic ticket output.
-                                                        </li>
-                                                    </ul>
                                                 </div>
                                             )}
                                         </div>
@@ -2846,454 +2956,303 @@ export const POSView: React.FC = () => {
                 )}
             </main>
 
-            
-{/* 1. Item Customization Modal / Add to Cart Modal */}
-{selectedPizza && (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 print:hidden">
-        <div className="bg-white max-w-xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full">
-            <div className="relative h-48 bg-gray-100 flex-shrink-0">
-                <img src={selectedPizza.image} alt={selectedPizza.name} className="w-full h-full object-cover" />
-                <button onClick={() => { setSelectedPizza(null); setComboSelections([]); }} className="absolute top-4 right-4 bg-white/50 backdrop-blur p-2 rounded-full hover:bg-white transition"><X size={24} /></button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1">
-                <h2 className="text-2xl font-bold text-gray-800">{getLocalizedItem(selectedPizza).name}</h2>
-                <div className="text-xl font-bold text-brand-600 mt-1 mb-4">฿{selectedPizza.basePrice}</div>
-                <p className="text-sm text-gray-500 mb-6">{getLocalizedItem(selectedPizza).description}</p>
-                
-                {/* Combo Selector */}
-                {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
-                    <div className="mb-6">
-                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                            <Utensils size={18}/> 
-                            {language === 'th' ? 'เลือกของทานในเซ็ต' : 'Select Your Items'}
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            {Array.from({ length: selectedPizza.comboCount }).map((_, idx) => (
-                                <button key={idx} onClick={() => handleComboSlotClick(idx)} className={`p-4 border-2 rounded-xl text-left transition ${activeComboSlot === idx ? 'border-brand-500 bg-brand-50' : comboSelections[idx] ? 'border-green-500 bg-green-50' : 'border-dashed border-gray-300 hover:border-gray-400'}`}>
-                                    <div className="text-sm font-bold text-gray-500 mb-1">
-                                        {language === 'th' ? `จานที่ ${idx + 1}` : `Item ${idx + 1}`}
-                                    </div>
-                                    <div className="font-bold text-gray-900">
-                                        {comboSelections[idx] 
-                                            ? (language === 'th' && comboSelections[idx].nameTh ? comboSelections[idx].nameTh : comboSelections[idx].name) 
-                                            : (language === 'th' ? 'แตะระบุเมนู' : 'Tap to select')}
-                                    </div>
-                                </button>
-                            ))}
+            {selectedPizza && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-gray-800 animate-fade-in text-left">
+                        <div className="bg-brand-600 px-6 py-4 flex items-center justify-between text-white sticky top-0 z-10">
+                            <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                🍕 {editingCartItem ? (language === 'th' ? 'แก้ไขรายการอาหาร' : 'Edit Item') : (language === 'th' ? 'เลือกตัวเลือกเพิ่มเติม' : 'Customize Item')}
+                            </h3>
+                            <button onClick={() => { playClickSound(); setSelectedPizza(null); setSelectedToppings([]); setEditingCartItem(null); setSpecialInstructions(''); setQuantity(1); }} className="text-white/80 hover:text-white font-bold text-2xl leading-none">&times;</button>
                         </div>
                         
-                        {activeComboSlot !== null && (
-                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in">
-                                <div className="text-sm font-bold text-gray-800 mb-2">
-                                    {language === 'th' ? `ตัวเลือกสำหรับจานที่ ${activeComboSlot + 1}:` : `Options for Item ${activeComboSlot + 1}:`}
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                                    {menu.filter(m => !m.comboCount).map(m => { // Exclude combos from combo
-                                        const promoBadge = language === 'th' ? (m.badgeTh || m.badge) : (m.badge || m.badgeTh);
-                                        return (
-                                            <button key={m.id} onClick={() => handleComboPizzaSelect(m)} className="text-left p-2.5 border rounded-lg bg-white hover:border-brand-300 flex flex-col justify-between gap-1 transition">
-                                                <div className="text-sm font-bold text-gray-800 line-clamp-1 flex items-center justify-between w-full gap-1">
-                                                    <span className="truncate">{language === 'th' && m.nameTh ? m.nameTh : m.name}</span>
-                                                    {promoBadge && (
-                                                        <span className="bg-gradient-to-r from-red-600 to-amber-500 text-white text-[8px] font-extrabold uppercase px-1 py-0.5 rounded shrink-0 animate-pulse">{promoBadge}</span>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-brand-600 font-bold">฿{m.basePrice}</div>
-                                            </button>
-                                        );
-                                    })}
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            {/* Pizza Info Banner */}
+                            <div className="flex gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-150">
+                                {selectedPizza.image && (
+                                    <img src={selectedPizza.image} alt={selectedPizza.name} className="w-16 h-16 rounded-lg object-cover border border-gray-200" referrerPolicy="no-referrer" />
+                                )}
+                                <div>
+                                    <h4 className="font-bold text-gray-900 text-sm">{language === 'th' ? selectedPizza.nameTh || selectedPizza.name : selectedPizza.name}</h4>
+                                    <p className="text-xs text-brand-600 font-extrabold">฿{selectedPizza.basePrice} {language === 'th' ? '(ราคาเริ่มต้น)' : '(Base Price)'}</p>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                ) : null}
 
-                {/* Half-Half Selector (POS) */}
-                {selectedPizza.id === 'p_half_half' && (
-                    <div className="mb-6 bg-amber-50 p-4 rounded-xl border border-amber-200 text-left">
-                        <h3 className="font-bold text-amber-950 mb-3 flex items-center gap-2">🌓 {language === 'th' ? 'เลือกสองหน้าลูกครึ่ง (Half-Half)' : 'Select Two Halves'}</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกแรก (Side A)' : 'Side A (First Half)'}</label>
-                                <select 
-                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
-                                    value={halfA?.id || ''}
-                                    onChange={(e) => setHalfA(menu.find(p => p.id === e.target.value) || null)}
-                                >
-                                    <option value="">{language === 'th' ? '-- เลือกซีกแรก A --' : '-- Select Side A --'}</option>
-                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
-                                        <option key={pItem.id} value={pItem.id}>
-                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกสอง (Side B)' : 'Side B (Second Half)'}</label>
-                                <select 
-                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
-                                    value={halfB?.id || ''}
-                                    onChange={(e) => setHalfB(menu.find(p => p.id === e.target.value) || null)}
-                                >
-                                    <option value="">{language === 'th' ? '-- เลือกซีกสอง B --' : '-- Select Side B --'}</option>
-                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
-                                        <option key={pItem.id} value={pItem.id}>
-                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Toppings (Only for non-combo items, though you can adapt logic as needed) */}
-                {!(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) && (
-                    <div className="mb-6">
-                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                            <Layers size={18}/> 
-                            {language === 'th' ? 'เลือกส่วนประกอบเพิ่มเติม' : 'Extra Options'}
-                        </h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                            {toppings.filter(t => t.available).map(t => {
-                                const isSelected = selectedToppings.some(st => st.id === t.id);
-                                return (
-                                    <button key={t.id} onClick={() => toggleTopping(t)} className={`w-full flex items-center justify-between p-3 border rounded-xl transition ${isSelected ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${isSelected ? 'bg-brand-500 border-brand-500 text-white' : 'border-gray-300'}`}>
-                                                {isSelected && <Check size={14}/>}
-                                            </div>
-                                            <span className="font-bold text-sm text-gray-700">{language === 'en' ? t.name : (t.nameTh || t.name)}</span>
-                                        </div>
-                                        <span className="text-sm font-bold text-gray-500">+฿{t.price}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-                
-                {/* Note */}
-                <div className="mb-6">
-                    <h3 className="font-bold text-gray-800 mb-2">{language === 'th' ? 'หมายเหตุพิเศษ' : 'Special Instructions'}</h3>
-                    <input 
-                        type="text" 
-                        placeholder={language === 'th' ? 'เช่น ไม่ใส่หอมใหญ่, เผ็ดพิเศษ' : 'e.g., No onions, extra spicy'} 
-                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 outline-none" 
-                        value={specialInstructions} 
-                        onChange={(e) => setSpecialInstructions(e.target.value)} 
-                    />
-                </div>
-            </div>
-            
-            <div className="p-4 bg-gray-50 border-t flex items-center gap-4">
-                <div className="flex items-center bg-white rounded-xl border border-gray-200 p-1">
-                    <button onClick={() => quantity > 1 && setQuantity(q => q - 1)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition"><Minus size={18}/></button>
-                    <span className="w-12 text-center font-bold text-lg">{quantity}</span>
-                    <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition"><Plus size={18}/></button>
-                </div>
-                <button 
-                    onClick={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? confirmAddComboToCart : confirmAddToCart} 
-                    disabled={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
-                    className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    {editingCartItem 
-                        ? (language === 'th' ? 'อัปเดตรายการ' : 'Update Order') 
-                        : (language === 'th' ? 'เพิ่มลงออเดอร์' : 'Add to Order')} • ฿{
-                        ((selectedPizza.id === 'p_half_half' 
-                            ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
-                            : selectedPizza.basePrice) 
-                        + selectedToppings.reduce((s,t)=>s+t.price,0)) * quantity
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
-)}
-
-{/* 2. Menu Item Editor Modal */}
-{showItemModal && (
-    <div className="fixed inset-0 z-50 bg-black/50 flex flex-col items-center justify-center p-4 print:hidden">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">{itemForm.id ? 'Edit Menu Item' : 'New Menu Item'}</h2>
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Name (EN)</label>
-                        <input className="w-full border rounded-lg px-3 py-2" value={itemForm.name || ''} onChange={e => setItemForm({...itemForm, name: e.target.value})}/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Name (TH)</label>
-                        <input className="w-full border rounded-lg px-3 py-2" value={itemForm.nameTh || ''} onChange={e => setItemForm({...itemForm, nameTh: e.target.value})}/>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Category</label>
-                        <select className="w-full border rounded-lg px-3 py-2" value={itemForm.category || 'pizza'} onChange={e => setItemForm({...itemForm, category: e.target.value as ProductCategory})}>
-                            {CATEGORIES.map(cat => (
-                                <option key={cat.id} value={cat.id}>
-                                    {cat.label} / {cat.labelTh}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Base Price (฿)</label>
-                        <input type="number" className="w-full border rounded-lg px-3 py-2" value={itemForm.basePrice || 0} onChange={e => setItemForm({...itemForm, basePrice: Number(e.target.value)})}/>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Promo Badge (EN) (e.g. New)</label>
-                        <input className="w-full border rounded-lg px-3 py-2" placeholder="e.g. New, Promo" value={itemForm.badge || ''} onChange={e => setItemForm({...itemForm, badge: e.target.value})}/>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">ป้ายโปรโมชั่น (TH)</label>
-                        <input className="w-full border rounded-lg px-3 py-2" placeholder="เช่น เมนูใหม่, แนะนำ" value={itemForm.badgeTh || ''} onChange={e => setItemForm({...itemForm, badgeTh: e.target.value})}/>
-                    </div>
-                </div>
-                
-                {itemForm.category === 'promotion' && (
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Items allowed in Combo</label>
-                        <input type="number" className="w-full border rounded-lg px-3 py-2" value={itemForm.comboCount || 2} onChange={e => setItemForm({...itemForm, comboCount: Number(e.target.value)})}/>
-                    </div>
-                )}
-                
-                <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-3">
-                     <div>
-                          <label className="block text-xs font-bold text-gray-750 mb-1">ตัวเลือกที่ 1: อัปโหลดไฟล์รูปภาพ (Upload File)</label>
-                          <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer" 
-                              onChange={handleImageUpload}
-                          />
-                     </div>
-                     <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold justify-center">
-                          <span className="h-[1px] bg-gray-200 flex-1"></span>
-                          <span>หรือ (OR)</span>
-                          <span className="h-[1px] bg-gray-200 flex-1"></span>
-                     </div>
-                     <div>
-                          <label className="block text-xs font-bold text-gray-750 mb-1 flex items-center justify-between">
-                             <span>ตัวเลือกที่ 2: ระบุลิงก์รูปภาพ (Image URL)</span>
-                             <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded font-semibold animate-pulse">รองรับ Google Drive!</span>
-                          </label>
-                          <input 
-                              type="text"
-                              placeholder="วางลิงก์รูปภาพทั่วไป หรือลิงก์แชร์จาก Google Drive..." 
-                              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white" 
-                              value={itemForm.image || ''} 
-                              onChange={e => {
-                                  const val = e.target.value;
-                                  const converted = convertGoogleDriveUrl(val);
-                                  setItemForm({...itemForm, image: converted});
-                              }}
-                          />
-                     </div>
-                     {itemForm.image && (
-                          <div className="flex flex-col items-center gap-2 pt-2 border-t border-gray-150">
-                              <span className="text-xs font-bold text-gray-500">ภาพตัวอย่าง (Preview)</span>
-                              {isDriveUrl(itemForm.image) && (
-                                  <div className="text-green-700 text-xs font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 w-full justify-center">
-                                      <span>✨ แปลงลิงก์ Google Drive สำเร็จ!</span>
-                                  </div>
-                              )}
-                              {isPhotosUrl(itemForm.image) && (
-                                  <div className="text-amber-800 text-xs font-sans p-3 rounded-lg border border-amber-250 bg-amber-50 w-full leading-relaxed space-y-1.5 text-left">
-                                      <p className="font-bold flex items-center gap-1 text-amber-900">⚠️ ตรวจพบลิงก์อัลบั้ม Google Photos!</p>
-                                      <p>ลิงก์ประเภทอัลบั้มแชร์จะไม่แสดงรูปภาพอ้างอิงของระบบ ให้แก้ไขดังนี้:</p>
-                                      <ol className="list-decimal pl-4 space-y-1">
-                                          <li>เปิดรูปภาพของคุณในแถบใหม่ของเบราว์เซอร์</li>
-                                          <li>คลิกขวาที่ตัวรูปภาพ แล้วเลือกเมนู <span className="font-bold bg-white px-1 py-0.5 rounded shadow-xs border">"คัดลอกที่อยู่อิมเมจ" (Copy image address)</span></li>
-                                          <li>ก๊อปปี้ลิงก์ตรงนั้น (ขึ้นต้นด้วย <span className="font-mono text-[10px] text-brand-700">https://lh3.googleusercontent.com/...</span>) มาวางแทนที่</li>
-                                      </ol>
-                                  </div>
-                              )}
-                              <img src={itemForm.image} className="w-36 h-36 object-cover rounded-xl border-2 border-brand-200 shadow-md bg-gray-100" />
-                          </div>
-                     )}
-                </div>
-            </div>
-            
-            <div className="mt-6 flex flex-wrap gap-3">
-                {itemForm.id && itemForm.id !== 'p_half_half' && itemForm.id !== 'custom_base' && (
-                    <button 
-                        onClick={async () => {
-                            if (confirm(language === 'th' ? `คุณแน่ใจหรือไม่ที่จะลบเมนูนี้ออกจากระบบอย่างถาวร?` : 'Are you sure you want to permanently delete this menu item?')) {
-                                await deletePizza(itemForm.id!);
-                                setShowItemModal(false);
-                            }
-                        }} 
-                        className="px-4 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-650 flex items-center justify-center gap-1.5 shadow"
-                        title="Delete permanently"
-                    >
-                        <Trash2 size={16}/>
-                        <span className="text-sm">{language === 'th' ? 'ลบเมนู' : 'Delete'}</span>
-                    </button>
-                )}
-                <button onClick={() => setShowItemModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 text-sm">Cancel</button>
-                <button onClick={handleSaveItem} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700 text-sm">Save Item</button>
-            </div>
-        </div>
-    </div>
-)}
-
-{/* 3. Add Topping Modal */}
-{showToppingsModal && (
-    <div className="fixed inset-0 z-50 bg-black/50 flex flex-col items-center justify-center p-4 print:hidden">
-        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-xl font-bold mb-4">{toppingForm.id ? 'Edit Topping Option' : 'New Topping Option'}</h2>
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1">Name (EN)</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={toppingForm.name || ''} onChange={e => setToppingForm({...toppingForm, name: e.target.value})}/>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1">Name (TH)</label>
-                    <input className="w-full border rounded-lg px-3 py-2" value={toppingForm.nameTh || ''} onChange={e => setToppingForm({...toppingForm, nameTh: e.target.value})}/>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 mb-1">Price Add-on (฿)</label>
-                    <input type="number" className="w-full border rounded-lg px-3 py-2" value={toppingForm.price || 0} onChange={e => setToppingForm({...toppingForm, price: Number(e.target.value)})}/>
-                </div>
-            </div>
-            <div className="mt-6 flex gap-3">
-                <button onClick={() => setShowToppingsModal(false)} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200">Cancel</button>
-                <button onClick={handleSaveTopping} className="flex-1 bg-brand-600 text-white font-bold py-3 rounded-xl hover:bg-brand-700">Save Topping</button>
-            </div>
-        </div>
-    </div>
-)}
-
-
-            {showPaymentModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-0 lg:p-4 print:hidden">
-                    {/* Updated Modal Container: Full Screen on Mobile/Tablet, Centered on Desktop */}
-                    <div className="bg-white w-full h-full lg:h-[85vh] lg:max-w-4xl lg:rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden animate-fade-in">
-                        
-                        {/* Order Summary Column */}
-                        <div className="hidden lg:flex lg:w-1/2 bg-gray-50 border-r border-gray-200 p-6 flex-col">
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800"><Receipt size={24}/> {selectedOrder ? `Bill for Table ${selectedOrder.tableNumber}` : 'Current Order'}</h2>
-                            <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                                {((selectedOrder ? selectedOrder.items : cart) || []).map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-start bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                            {/* Half-Half Selector (POS) */}
+                            {selectedPizza.id === 'p_half_half' && (
+                                <div className="mb-6 bg-amber-50 p-4 rounded-xl border border-amber-200 text-left">
+                                    <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">🌓 {language === 'th' ? 'เลือกสองหน้าลูกครึ่ง (Half-Half)' : 'Select Two Halves'}</h3>
+                                    <div className="space-y-4 font-bold text-gray-800 text-xs text-left">
                                         <div>
-                                            <div className="font-bold text-gray-800">{item.quantity}x {item.name}</div>
-                                            <div className="text-xs text-gray-500">
-                                                {(item.selectedToppings || []).map(t => t.name).join(', ')}
-                                                {(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}
+                                            <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกแรก (Side A)' : 'Side A (First Half)'}</label>
+                                            <select 
+                                                className="w-full border border-gray-300 rounded-lg p-2.5 bg-white text-sm font-bold text-gray-800 outline-none"
+                                                value={halfA?.id || ''}
+                                                onChange={(e) => setHalfA(menu.find(p => p.id === e.target.value) || null)}
+                                            >
+                                                <option value="">{language === 'th' ? '-- เลือกซีกแรก A --' : '-- Choose Side A --'}</option>
+                                                {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                    <option key={pItem.id} value={pItem.id}>
+                                                        {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกสอง (Side B)' : 'Side B (Second Half)'}</label>
+                                            <select 
+                                                className="w-full border border-gray-300 rounded-lg p-2.5 bg-white text-sm font-bold text-gray-800 outline-none"
+                                                value={halfB?.id || ''}
+                                                onChange={(e) => setHalfB(menu.find(p => p.id === e.target.value) || null)}
+                                            >
+                                                <option value="">{language === 'th' ? '-- เลือกซีกสอง B --' : '-- Choose Side B --'}</option>
+                                                {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                    <option key={pItem.id} value={pItem.id}>
+                                                        {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Toppings (Only for non-combo items) */}
+                            {!(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) && (
+                                <div className="mb-6 text-left">
+                                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                        <Layers size={18}/> 
+                                        {language === 'th' ? 'เลือกส่วนประกอบเพิ่มเติม' : 'Extra Options'}
+                                    </h3>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                                        {toppings.filter(t => t.available).map(t => {
+                                            const isSelected = selectedToppings.some(st => st.id === t.id);
+                                            return (
+                                                <button key={t.id} onClick={() => toggleTopping(t)} className={`w-full flex items-center justify-between p-3 border rounded-xl transition ${isSelected ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-gray-350'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${isSelected ? 'bg-brand-500 border-brand-500 text-white' : 'border-gray-300'}`}>
+                                                            {isSelected && <Check size={14}/>}
+                                                        </div>
+                                                        <span className="font-bold text-sm text-gray-700">{language === 'en' ? t.name : (t.nameTh || t.name)}</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-gray-500">+฿{t.price}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Note */}
+                            <div className="mb-6 text-left">
+                                <h3 className="font-bold text-gray-800 mb-2">{language === 'th' ? 'หมายเหตุพิเศษ' : 'Special Instructions'}</h3>
+                                <input 
+                                    type="text" 
+                                    placeholder={language === 'th' ? 'เช่น ไม่ใส่หอมใหญ่, เผ็ดพิเศษ' : 'e.g., No onions, extra spicy'} 
+                                    className="w-full border bg-white border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 outline-none" 
+                                    value={specialInstructions} 
+                                    onChange={(e) => setSpecialInstructions(e.target.value)} 
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gray-50 border-t flex items-center gap-4 shrink-0">
+                            <div className="flex items-center bg-white rounded-xl border border-gray-200 p-1 shrink-0">
+                                <button onClick={() => quantity > 1 && setQuantity(q => q - 1)} className="w-10 h-10 flex items-center justify-center text-gray-650 hover:bg-gray-100 rounded-lg transition"><Minus size={18}/></button>
+                                <span className="w-12 text-center font-bold text-lg text-gray-800">{quantity}</span>
+                                <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-655 hover:bg-gray-100 rounded-lg transition"><Plus size={18}/></button>
+                            </div>
+                            <button 
+                                onClick={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? confirmAddComboToCart : confirmAddToCart} 
+                                disabled={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
+                                className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                {editingCartItem 
+                                    ? (language === 'th' ? 'อัปเดตรายการ' : 'Update Order') 
+                                    : (language === 'th' ? 'เพิ่มลงออเดอร์' : 'Add to Order')} • ฿{
+                                    (((selectedPizza.id === 'p_half_half' 
+                                        ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
+                                        : selectedPizza.basePrice) 
+                                    + selectedToppings.reduce((s, t) => s + t.price, 0)) * quantity).toLocaleString()
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- PAYMENT MODAL (CHECKOUT & CASHIERING) --- */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 print:hidden text-left">
+                    <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col lg:flex-row h-[90vh] lg:h-[80vh] text-gray-800 border border-gray-150 animate-fade-in overflow-hidden">
+                        
+                        {/* Left Side: Order Summary */}
+                        <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 p-6 overflow-y-auto">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-black text-gray-800">{language === 'th' ? 'สรุปรายการอาหาร' : 'Order Summary'}</h2>
+                                <span className="px-3 py-1 bg-amber-50 text-amber-850 rounded-full text-xs font-bold border border-amber-200">
+                                    {selectedOrder ? `Order #${String(selectedOrder.id).slice(-4)}` : 'New Bill'}
+                                </span>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[40vh] lg:max-h-none border border-gray-150 rounded-xl p-3 bg-gray-50/50 text-left">
+                                {(selectedOrder ? selectedOrder.items : cart).map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-start gap-4 py-2 border-b border-gray-100 last:border-0 text-xs text-left">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-extrabold text-gray-800">
+                                                {item.quantity}x {language === 'th' ? (item.nameTh || item.name) : item.name}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">
+                                                {item.selectedToppings && item.selectedToppings.length > 0 && (
+                                                    <div>+ {item.selectedToppings.map(t => language === 'th' ? (t.nameTh || t.name) : t.name).join(', ')}</div>
+                                                )}
+                                                {item.subItems && item.subItems.length > 0 && (
+                                                    <div>+ {item.subItems.map(s => language === 'th' ? (s.nameTh || s.name) : s.name).join(', ')}</div>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="font-bold text-gray-700">฿{item.totalPrice}</div>
+                                        <div className="font-bold text-gray-800">฿{item.totalPrice.toLocaleString()}</div>
                                     </div>
                                 ))}
                             </div>
-                            {selectedOrder && selectedOrder.type === 'delivery' && (
-                                <div className="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center text-sm font-bold text-gray-700">
-                                    <span>Delivery Fee</span>
-                                    <span>{selectedOrder.deliveryFee === 'pending' ? 'TBD' : `฿${selectedOrder.deliveryFee}`}</span>
+
+                            <div className="border-t border-gray-250 pt-4 space-y-2 mt-4 text-xs font-bold text-gray-550 shrink-0">
+                                <div className="flex justify-between">
+                                    <span>{language === 'th' ? 'ค่าอาหารและเครื่องดื่ม' : 'Subtotal'}</span>
+                                    <span>฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
                                 </div>
-                            )}
-                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                <div className="flex justify-between items-center text-2xl font-bold text-gray-900">
-                                    <span>Total Amount</span>
-                                    <span>฿{selectedOrder ? selectedOrder.totalAmount : cartTotal}</span>
+                                <div className="flex justify-between text-base font-black text-gray-800 pt-2 border-t border-gray-200">
+                                    <span>{language === 'th' ? 'ยอดรวมทั้งสิ้น' : 'Total Amount'}</span>
+                                    <span>฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
                                 </div>
-                                {selectedOrder && selectedOrder.deliveryFee === 'pending' && (
-                                    <div className="text-xs text-red-500 font-bold mt-1 text-right">
-                                        * Please update delivery fee before payment
-                                    </div>
-                                )}
                             </div>
                         </div>
 
-                        {/* Payment Action Column */}
-                        <div className="w-full lg:w-1/2 p-4 lg:p-6 flex flex-col bg-white h-full">
-                            <div className="flex justify-between items-center mb-4 lg:mb-6">
-                                <div className="lg:hidden">
-                                    <h3 className="font-bold text-lg text-gray-900">{selectedOrder ? `Table ${selectedOrder.tableNumber}` : 'Payment'}</h3>
-                                    <p className="text-sm text-brand-600 font-bold">Total: ฿{selectedOrder ? selectedOrder.totalAmount : cartTotal}</p>
-                                    {selectedOrder && selectedOrder.deliveryFee === 'pending' && (
-                                        <p className="text-xs text-red-500 font-bold mt-1">* Update delivery fee first</p>
-                                    )}
+                        {/* Right Side: Payment Methods Form */}
+                        <div className="w-full lg:w-1/2 flex flex-col p-6 overflow-y-auto text-left">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-black text-gray-800">{language === 'th' ? 'ช่องทางการชำระเงิน' : 'Payment Type'}</h2>
+                                <button 
+                                    onClick={() => { playClickSound(); setShowPaymentModal(false); }} 
+                                    className="text-gray-400 hover:text-gray-655 font-extrabold text-lg p-1"
+                                >
+                                    <X size={18}/>
+                                </button>
+                            </div>
+
+                            {/* Total Due */}
+                            <div className="mb-4 bg-brand-50 p-4 rounded-xl border border-brand-100 flex justify-between items-center">
+                                <span className="font-bold text-gray-655 text-xs">{language === 'th' ? 'ยอดที่ต้องชำระ:' : 'Total Due:'}</span>
+                                <span className="text-2xl font-black text-[#b91c1c]">
+                                    ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}
+                                </span>
+                            </div>
+
+                            {/* Payment Method Selector Grid */}
+                            <div className="mb-4">
+                                <label className="text-[10.5px] font-black uppercase text-gray-400 block mb-2">{language === 'th' ? 'เลือกประเภทการจ่ายเงิน' : 'Select Method'}</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { playClickSound(); setPaymentMethod('cash'); setCashReceived(''); }}
+                                        className={`py-3.5 px-1.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition duration-150 cursor-pointer ${paymentMethod === 'cash' ? 'bg-amber-500 border-amber-600 text-white font-black' : 'bg-gray-50 border-gray-200 text-gray-650 hover:bg-gray-100'}`}
+                                    >
+                                        <Banknote size={15}/>
+                                        <span className="text-[10px] whitespace-nowrap">{language === 'th' ? 'เงินสด (Cash)' : 'Cash'}</span>
+                                    </button>
+                                    
+                                    <button 
+                                        type="button"
+                                        onClick={() => { playClickSound(); setPaymentMethod('qr_transfer'); }}
+                                        className={`py-3.5 px-1.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition duration-150 cursor-pointer ${paymentMethod === 'qr_transfer' ? 'bg-amber-500 border-amber-600 text-white font-black' : 'bg-gray-50 border-gray-200 text-gray-655 hover:bg-gray-100'}`}
+                                    >
+                                        <QrCode size={15}/>
+                                        <span className="text-[10px] whitespace-nowrap">{language === 'th' ? 'เงินโอน (QR)' : 'QR Transfer'}</span>
+                                    </button>
+
+                                    <button 
+                                        type="button"
+                                        onClick={() => { playClickSound(); setPaymentMethod('thai_chuay_thai'); }}
+                                        className={`py-3.5 px-1.5 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition duration-150 cursor-pointer ${paymentMethod === 'thai_chuay_thai' ? 'bg-amber-500 border-amber-600 text-white font-black' : 'bg-gray-50 border-gray-200 text-gray-655 hover:bg-gray-100'}`}
+                                    >
+                                        <Sparkles size={15}/>
+                                        <span className="text-[10px] whitespace-nowrap">{language === 'th' ? 'ไทยช่วยไทย' : 'Thai scheme'}</span>
+                                    </button>
                                 </div>
-                                <h3 className="hidden lg:block font-bold text-lg text-gray-500 uppercase">Payment Method</h3>
-                                <button onClick={() => setShowPaymentModal(false)} className="bg-gray-100 p-3 rounded-full hover:bg-gray-200"><X size={24}/></button>
                             </div>
 
-                            {/* Method Selector */}
-                            <div className="grid grid-cols-3 gap-2 mb-6">
-                                <button onClick={() => setPaymentMethod('cash')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'cash' ? 'border-brand-500 bg-brand-50 text-brand-700 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <Banknote size={24} className="lg:w-7 lg:h-7"/>
-                                    <span className="font-bold text-xs lg:text-sm">CASH</span>
-                                </button>
-                                <button onClick={() => setPaymentMethod('qr_transfer')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'qr_transfer' ? 'border-brand-500 bg-brand-50 text-brand-700 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <QrCode size={24} className="lg:w-7 lg:h-7"/>
-                                    <span className="font-bold text-xs lg:text-sm">SCAN QR</span>
-                                </button>
-                                <button onClick={() => setPaymentMethod('thai_chuay_thai')} className={`p-3 rounded-2xl border-2 flex flex-col items-center gap-1.5 transition ${paymentMethod === 'thai_chuay_thai' ? 'border-sky-500 bg-sky-50 text-sky-750 font-extrabold shadow-sm' : 'border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                    <Sparkles size={24} className={`lg:w-7 lg:h-7 ${paymentMethod === 'thai_chuay_thai' ? 'text-sky-600 animate-pulse' : 'text-gray-400'}`}/>
-                                    <span className="font-bold text-xs lg:text-sm whitespace-nowrap">ไทยช่วยไทย</span>
-                                </button>
-                            </div>
-
-                            {/* Content Area */}
-                            <div className="flex-1 flex flex-col justify-center mb-4 min-h-[220px]">
-                                {paymentMethod === 'cash' ? (
-                                    <div className="space-y-4 animate-fade-in">
+                            {/* Method Content Panel */}
+                            <div className="flex-1 min-h-[160px]">
+                                {paymentMethod === 'cash' && (
+                                    <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in text-left">
                                         <div>
-                                            <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Cash Received</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-400">฿</span>
-                                                <input type="number" autoFocus className="w-full pl-10 pr-4 py-4 text-4xl font-bold border-2 border-gray-200 rounded-xl focus:border-brand-500 outline-none" value={cashReceived} onChange={e => setCashReceived(e.target.value)} placeholder="0"/>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                            <span className="font-bold text-gray-500 uppercase text-sm">Change</span>
-                                            <span className={`text-4xl font-bold ${change < 0 ? 'text-red-500' : 'text-green-600'}`}>฿{change >= 0 ? change.toLocaleString() : '0'}</span>
-                                        </div>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {[100, 500, 1000].map(amt => (
-                                                <button key={amt} onClick={() => setCashReceived(String(amt))} className="py-3 bg-gray-100 rounded-lg font-bold text-gray-600 hover:bg-gray-200 text-lg">{amt}</button>
-                                            ))}
-                                            <button onClick={() => setCashReceived(String(selectedOrder ? selectedOrder.totalAmount : cartTotal))} className="py-3 bg-brand-100 rounded-lg font-bold text-brand-600 hover:bg-brand-200 text-sm">Exact</button>
-                                        </div>
-                                    </div>
-                                ) : paymentMethod === 'qr_transfer' ? (
-                                    <div className="flex flex-col items-center animate-fade-in justify-center h-full">
-                                        <div className="bg-white p-4 rounded-xl border-2 border-brand-500 shadow-lg mb-4">
-                                            <img src={promptPayQRUrl} className="w-56 h-56 lg:w-64 lg:h-64 mix-blend-multiply" />
-                                        </div>
-                                        <p className="text-center text-gray-500 text-sm font-bold">Scan with any Banking App</p>
-                                        <div className="mt-2 text-3xl font-bold text-brand-600">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</div>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col animate-fade-in justify-center bg-sky-50 border border-sky-100 rounded-2xl p-4 lg:p-5 space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-650 font-extrabold shrink-0 animate-bounce">
-                                                <Sparkles size={20}/>
-                                            </div>
-                                            <div>
-                                                <p className="font-extrabold text-sky-950 text-xs md:text-sm">บันทึกผ่าน "โครงการไทยช่วยไทย"</p>
-                                                <p className="text-[10px] text-sky-700 font-medium leading-none">โครงการช่วยเหลือสวัสดิการสิทธิ์หลัก (แอปถุงเงิน)</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-white p-3 rounded-xl border border-sky-200 flex justify-between items-center w-full shadow-sm">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase">ยอดระบุชำระสิทธิ์</span>
-                                            <span className="text-xl font-black text-sky-605">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
+                                            <label className="text-[10.5px] font-extrabold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ระบุยอดรับเงินสด (฿)' : 'Received'}</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-1.5 font-extrabold text-sm text-gray-855 outline-none focus:border-amber-500"
+                                                placeholder="e.g. 1000"
+                                                value={cashReceived}
+                                                onChange={e => setCashReceived(e.target.value)}
+                                            />
                                         </div>
 
-                                        <div className="text-[10.5px] text-gray-650 space-y-1 bg-white/50 p-2.5 rounded-xl border leading-relaxed font-medium">
-                                            <p className="font-extrabold text-sky-950">📋 คู่มือสำหรับแคชเชียร์:</p>
-                                            <p>1. เปิดแอป <strong className="text-sky-850 font-bold">"ถุงเงิน"</strong> บนโทรศัพท์ของร้านค้า</p>
-                                            <p>2. กดสร้างคิวอาร์โค้ดรับชำระเงินสิทธิ์ <strong className="font-bold text-sky-800">"ไทยช่วยไทย"</strong></p>
-                                            <p>3. กรอกยอดเงิน <strong className="font-bold text-sky-800">฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</strong> แล้วให้ลูกค้าสแกนชำระที่หน้าร้าน</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <button 
+                                                type="button"
+                                                onClick={() => { playClickSound(); setCashReceived(String(selectedOrder ? selectedOrder.totalAmount : cartTotal)); }}
+                                                className="px-2.5 py-1 bg-white border border-gray-200 hover:border-amber-400 text-gray-700 rounded-md text-[10px] font-bold transition shadow-sm cursor-pointer"
+                                            >
+                                                Exact (พอดี)
+                                            </button>
+                                            {[55, 100, 500, 1000].map(bill => (
+                                                <button 
+                                                    type="button"
+                                                    key={bill}
+                                                    onClick={() => { playClickSound(); setCashReceived(String(bill)); }}
+                                                    className="px-2.5 py-1 bg-white border border-gray-200 hover:border-amber-400 text-gray-700 rounded-md text-[10px] font-bold transition shadow-sm cursor-pointer"
+                                                >
+                                                    +{bill}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-xs font-bold">
+                                            <span className="text-gray-500">{language === 'th' ? 'เงินทอน (Change):' : 'Change Due:'}</span>
+                                            <span className={`text-base font-black font-mono ${change >= 0 ? 'text-green-600' : 'text-orange-500'}`}>
+                                                ฿{change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {paymentMethod === 'qr_transfer' && (
+                                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center animate-fade-in flex flex-col items-center">
+                                        <p className="text-[10px] font-black text-gray-550 uppercase mb-2">{language === 'th' ? 'สแกนจ่ายเงินด้วย PromptPay QR' : 'Scan to Transfer'}</p>
+                                        <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm inline-block">
+                                            <img 
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+                                                    generatePromptPayPayload(
+                                                        storeSettings.promptPayNumber || "0-9949-7919-9", 
+                                                        selectedOrder ? selectedOrder.totalAmount : cartTotal
+                                                    )
+                                                )}`}
+                                                alt="PromptPay QR Code" 
+                                                className="w-[120px] h-[120px] object-contain"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        </div>
+                                        <p className="text-[10.5px] font-black text-[#1e293b] mt-1.5">
+                                            PromptPay: {storeSettings.promptPayNumber || "0-9949-7919-9"}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {paymentMethod === 'thai_chuay_thai' && (
+                                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 animate-fade-in text-amber-955 text-xs text-left">
+                                        <p className="font-extrabold text-[10.5px] text-amber-800 uppercase block mb-1">วิธีการชำระโครงการไทยช่วยไทย</p>
+                                        <div className="space-y-1 text-[11px] font-bold leading-relaxed">
+                                            <p>1. เปิดแอปเป๋าตังสำหรับโครงการไทยช่วยไทย</p>
+                                            <p>2. ตรวจสอบยอดเงินร่วมกับสิทธิ์โครงการ</p>
+                                            <p>3. สแกนชำระที่หน้าร้าน</p>
                                             <p>4. เมื่อยอดและสิทธิ์ชำระเรียบร้อยในแอปหน้าร้านแล้ว ให้กดปุ่ม <strong>CONFIRM</strong> หน้าจอนี้เพื่อปิดบิล</p>
                                         </div>
                                     </div>
@@ -3301,21 +3260,21 @@ export const POSView: React.FC = () => {
                             </div>
 
                             {/* Tax Invoice Toggle */}
-                            <div className="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                            <div className="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-200 mt-4">
                                 <label className="flex items-center gap-2 cursor-pointer mb-2">
                                     <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked={taxInvoice.isRequested} onChange={(e) => setTaxInvoice({...taxInvoice, isRequested: e.target.checked})} />
-                                    <span className="font-bold text-gray-700 text-sm">ขอใบกำกับภาษีเต็มรูป (Tax Invoice)</span>
+                                    <span className="font-bold text-gray-750 text-xs">ขอใบกำกับภาษีเต็มรูป (Tax Invoice)</span>
                                 </label>
                                 {taxInvoice.isRequested && (
                                     <div className="space-y-3 mt-3 border-t border-gray-200 pt-3 animate-fade-in">
                                          <div>
-                                            <input type="text" placeholder="ชื่อบริษัท / Company Name" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.companyName} onChange={e => setTaxInvoice({...taxInvoice, companyName: e.target.value})} />
+                                            <input type="text" placeholder="ชื่อบริษัท / Company Name" className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold outline-none focus:border-amber-500" value={taxInvoice.companyName} onChange={e => setTaxInvoice({...taxInvoice, companyName: e.target.value})} />
                                          </div>
                                          <div>
-                                            <input type="text" placeholder="เลขประจำตัวผู้เสียภาษี / Tax ID" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.taxId} onChange={e => setTaxInvoice({...taxInvoice, taxId: e.target.value})} />
+                                            <input type="text" placeholder="เลขประจำตัวผู้เสียภาษี / Tax ID" className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold outline-none focus:border-amber-500" value={taxInvoice.taxId} onChange={e => setTaxInvoice({...taxInvoice, taxId: e.target.value})} />
                                          </div>
                                          <div>
-                                            <input type="text" placeholder="ที่อยู่ / Address" className="w-full px-3 py-2 border rounded-lg text-sm" value={taxInvoice.address} onChange={e => setTaxInvoice({...taxInvoice, address: e.target.value})} />
+                                            <input type="text" placeholder="ที่อยู่ / Address" className="w-full px-3 py-1.5 border rounded-lg text-xs font-bold outline-none focus:border-amber-500" value={taxInvoice.address} onChange={e => setTaxInvoice({...taxInvoice, address: e.target.value})} />
                                          </div>
                                     </div>
                                 )}
@@ -3323,14 +3282,178 @@ export const POSView: React.FC = () => {
 
                             {/* Action Buttons */}
                             <div className="mt-auto flex gap-3">
-                                <button onClick={handlePrintBill} className="px-6 py-4 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex flex-col items-center justify-center">
+                                <button type="button" onClick={handlePrintBill} className="px-6 py-4 rounded-xl font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition flex flex-col items-center justify-center cursor-pointer">
                                     <Printer size={24}/>
                                 </button>
-                                <button onClick={handleFinalizePayment} disabled={selectedOrder?.deliveryFee === 'pending'} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold text-xl shadow-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
-                                    {paymentMethod === 'cash' ? 'PAID' : 'CONFIRM'} <CheckCircle size={24}/>
+                                <button type="button" onClick={handleFinalizePayment} disabled={selectedOrder?.deliveryFee === 'pending'} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 cursor-pointer">
+                                    {paymentMethod === 'cash' ? 'PAID' : 'CONFIRM'} <CheckCircle size={22}/>
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ORDER ITEMS EDITOR MODAL (EDIT EXISTING UNPAID ORDERS) --- */}
+            {showOrderItemsEditor && editingOrderForItems && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 print:hidden text-left">
+                    <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col lg:flex-row h-[90vh] lg:h-[80vh] text-gray-800 border border-gray-150 animate-fade-in overflow-hidden">
+                        
+                        {/* Left Side: Order Items List */}
+                        <div className="w-full lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 p-6 overflow-y-auto">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-black text-gray-800">{language === 'th' ? 'แก้ไขรายการอาหารในออเดอร์' : 'Edit Order Items'}</h2>
+                                <span className="px-3 py-1 bg-amber-50 text-amber-850 rounded-full text-xs font-bold border border-amber-200">
+                                    {`Order #${String(editingOrderForItems.id).slice(-4)}`}
+                                </span>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[40vh] lg:max-h-none border border-gray-150 rounded-xl p-3 bg-gray-50/50 text-left">
+                                {editedItemsList.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-start gap-4 py-2 border-b border-gray-100 last:border-0 text-xs text-left">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-extrabold text-gray-800">
+                                                {item.quantity}x {language === 'th' ? (item.nameTh || item.name) : item.name}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">
+                                                {item.selectedToppings && item.selectedToppings.length > 0 && (
+                                                    <div>+ {item.selectedToppings.map(t => language === 'th' ? (t.nameTh || t.name) : t.name).join(', ')}</div>
+                                                )}
+                                                {item.subItems && item.subItems.length > 0 && (
+                                                    <div>+ {item.subItems.map(s => language === 'th' ? (s.nameTh || s.name) : s.name).join(', ')}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="font-bold text-gray-800">฿{item.totalPrice.toLocaleString()}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="border-t border-gray-250 pt-4 space-y-2 mt-4 text-xs font-bold text-gray-550 shrink-0">
+                                <div className="flex justify-between">
+                                    <span>{language === 'th' ? 'ค่าอาหารและเครื่องดื่ม' : 'Subtotal'}</span>
+                                    <span>฿{editedItemsList.reduce((sum, item) => sum + item.totalPrice, 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-base font-black text-gray-800 pt-2 border-t border-gray-200">
+                                    <span>{language === 'th' ? 'ยอดรวมทั้งสิ้น' : 'Total Amount'}</span>
+                                    <span>฿{editedItemsList.reduce((sum, item) => sum + item.totalPrice, 0).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Side: Order Editor Form */}
+                        <div className="w-full lg:w-1/2 flex flex-col p-6 overflow-y-auto text-left">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-black text-gray-800">{language === 'th' ? 'รายละเอียดออเดอร์' : 'Order Details'}</h2>
+                                <button 
+                                    onClick={() => { playClickSound(); setShowOrderItemsEditor(false); setEditingOrderForItems(null); }} 
+                                    className="text-gray-400 hover:text-gray-655 font-extrabold text-lg p-1 animate-fade-in"
+                                >
+                                    <X size={18}/>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 text-left">
+                                {/* Edit Table Number */}
+                                <div>
+                                    <label className="text-[10.5px] font-black text-gray-500 uppercase block mb-1">
+                                        👉 {language === 'th' ? 'เลขโต๊ะ / สถานที่ทาน' : 'Table Number / Room'}
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 font-extrabold text-xs text-gray-850 outline-none focus:border-amber-400"
+                                        placeholder="เช่น 1 หรือ Delivery"
+                                        value={editedOrderTableNumber}
+                                        onChange={e => setEditedOrderTableNumber(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Edit Customer Name */}
+                                <div>
+                                    <label className="text-[10.5px] font-black text-gray-500 uppercase block mb-1">
+                                        👉 {language === 'th' ? 'ชื่อลูกค้า / เบอร์' : 'Customer Name'}
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 font-extrabold text-xs text-gray-855 outline-none focus:border-amber-400"
+                                        placeholder="เช่น คุณกานต์"
+                                        value={editedOrderCustomerName}
+                                        onChange={e => setEditedOrderCustomerName(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Order Source */}
+                                <div>
+                                    <label className="text-[10.5px] font-black text-gray-500 uppercase block mb-1">
+                                        👉 {language === 'th' ? 'ช่องทางจำหน่าย' : 'Order Source'}
+                                    </label>
+                                    <select 
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 font-extrabold text-xs text-gray-855 outline-none focus:border-amber-400"
+                                        value={editedOrderSource}
+                                        onChange={e => setEditedOrderSource(e.target.value as OrderSource)}
+                                    >
+                                        <option value="store">Store (หน้าร้าน/โต๊ะ)</option>
+                                        <option value="grab">Grab Food</option>
+                                        <option value="lineman">LineMan</option>
+                                        <option value="foodpanda">FoodPanda</option>
+                                        <option value="robinhood">Robinhood</option>
+                                        <option value="shopeefood">ShopeeFood</option>
+                                    </select>
+                                </div>
+
+                                {/* Order Notes */}
+                                <div>
+                                    <label className="text-[10.5px] font-black text-gray-500 uppercase block mb-1">
+                                        👉 {language === 'th' ? 'คำแนะนำเพิ่มเติม (Note)' : 'Special Notes / Instructions'}
+                                    </label>
+                                    <textarea 
+                                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 font-extrabold text-xs text-gray-855 outline-none focus:border-amber-400 h-20 resize-none"
+                                        placeholder="เช่น ไม่ใส่พริกไทย"
+                                        value={editedOrderNote}
+                                        onChange={e => setEditedOrderNote(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Total summary info and Save keys */}
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 mt-auto">
+                                <div className="flex flex-col items-start gap-1">
+                                    <span className="text-[10px] font-extrabold text-gray-400 uppercase">
+                                        {language === 'th' ? '💸 ยอดรวมที่แก้ไขแล้ว:' : '💸 Recalculated Total:'}
+                                    </span>
+                                    <span className="text-2xl font-black text-[#b91c1c]">
+                                        ฿{editedItemsList.reduce((sum, item) => sum + item.totalPrice, 0).toLocaleString()}
+                                    </span>
+                                </div>
+
+                                <div className="flex gap-2 w-full md:w-auto shrink-0">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { 
+                                            playClickSound(); 
+                                            setShowOrderItemsEditor(false); 
+                                            setEditingOrderForItems(null); 
+                                        }} 
+                                        className="flex-1 md:flex-initial px-5 py-3 font-extrabold text-xs border border-gray-300 hover:bg-gray-150 text-gray-700 bg-white rounded-xl transition duration-150 cursor-pointer"
+                                    >
+                                        {language === 'th' ? '❌ ยกเลิก' : 'Cancel'}
+                                    </button>
+                                    
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            playClickSound();
+                                            handleSaveEditedOrderItems();
+                                        }} 
+                                        className="flex-1 md:flex-initial px-6 py-3 font-black text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-lg border border-amber-600 shadow-amber-500/10 hover:scale-[1.02] active:scale-95 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <Save size={13}/>
+                                        {language === 'th' ? '💾 บันทึกแก้ไข' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             )}
@@ -3481,7 +3604,263 @@ export const POSView: React.FC = () => {
                 </div>
             )}
 
-            {/* ... (Rest of Modals) ... */}
+            {/* --- ACTIVE ORDER ITEMS EDITOR MODAL --- */}
+            {showOrderItemsEditor && editingOrderForItems && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 print:hidden text-left">
+                    <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl flex flex-col h-[90vh] text-gray-800 border border-gray-150 animate-fade-in overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-amber-600 px-6 py-4 flex items-center justify-between text-white shrink-0">
+                            <div>
+                                <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                    📝 {language === 'th' ? `แก้ไขรายการออเดอร์ #${String(editingOrderForItems.id).slice(-4)}` : `Edit Items for Order #${String(editingOrderForItems.id).slice(-4)}`}
+                                </h3>
+                                <p className="text-[11px] text-amber-50">
+                                    {language === 'th' ? 'เพิ่ม ลด ลบ รายการ หรือเพิ่มเมนูใหม่ในบิลนี้' : 'Modify items, adjust quantities, or add new dishes to this active bill'}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => { setShowOrderItemsEditor(false); setEditingOrderForItems(null); }} 
+                                className="text-white bg-amber-700/50 hover:bg-amber-700 w-8 h-8 flex items-center justify-center rounded-xl text-xl font-bold leading-none transition"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        {/* Split layout in Modal Body */}
+                        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-gray-50">
+                            
+                            {/* LEFT SIDE: Current Items & Details */}
+                            <div className="flex-1 flex flex-col border-r border-gray-200 p-4 lg:p-6 overflow-y-auto">
+                                <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
+                                    🛒 {language === 'th' ? 'รายการอาหารในออเดอร์ปัจจุบัน' : 'Current Order Items'} 
+                                    <span className="bg-brand-100 text-brand-800 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold font-mono">
+                                        {editedItemsList.reduce((acc, i) => acc + i.quantity, 0)} {language === 'th' ? 'ชิ้น' : 'pcs'}
+                                    </span>
+                                </h4>
+
+                                {/* Order metadata fields */}
+                                <div className="grid grid-cols-2 gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200">
+                                    <div>
+                                        <label className="text-[10px] uppercase font-extrabold text-gray-400 block mb-0.5">{language === 'th' ? 'ชื่อลูกค้า' : 'Cust Name'}</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-xs font-bold bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-amber-500 text-gray-800"
+                                            value={editedOrderCustomerName}
+                                            onChange={e => setEditedOrderCustomerName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] uppercase font-extrabold text-gray-400 block mb-0.5">{language === 'th' ? 'เลขโต๊ะ / เบอร์โทร' : 'Table / Tel'}</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-xs font-bold bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-amber-500 text-gray-800"
+                                            value={editedOrderTableNumber}
+                                            onChange={e => setEditedOrderTableNumber(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-[10px] uppercase font-extrabold text-gray-400 block mb-0.5">{language === 'th' ? 'หมายเหตุ / พิเศษ' : 'Remarks / Note'}</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full text-xs font-bold bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-amber-500 text-gray-800"
+                                            value={editedOrderNote}
+                                            onChange={e => setEditedOrderNote(e.target.value)}
+                                            placeholder={language === 'th' ? 'เช่น เผ็ดน้อย, แยกน้ำซอส' : 'e.g. less spicy, sauce on side'}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-[10px] uppercase font-extrabold text-gray-400 block mb-0.5">{language === 'th' ? 'ช่องทางจำหน่าย' : 'Order Source'}</label>
+                                        <select 
+                                            className="w-full text-xs font-bold bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 outline-none focus:border-amber-500 text-gray-800"
+                                            value={editedOrderSource}
+                                            onChange={e => setEditedOrderSource(e.target.value as OrderSource)}
+                                        >
+                                            <option value="store">Store (ทานที่ร้าน / กลับบ้าน)</option>
+                                            <option value="grab">Grab Food</option>
+                                            <option value="lineman">LineMan</option>
+                                            <option value="foodpanda">FoodPanda</option>
+                                            <option value="robinhood">Robinhood</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Items list view */}
+                                <div className="flex-1 space-y-2 mb-4 scrollbar-thin">
+                                    {editedItemsList.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center py-12 text-center text-gray-400">
+                                            <p className="text-3xl mb-2">🍽️</p>
+                                            <p className="text-xs font-bold">{language === 'th' ? 'ไม่มีรายการอาหารในออเดอร์นี้' : 'No items left in this order.'}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1">{language === 'th' ? 'โปรดคลิกเลือกรายการจากทางขวามือ เพื่อเพิ่มอาหาร' : 'Please select dishes from the right side library'}</p>
+                                        </div>
+                                    ) : (
+                                        editedItemsList.map(item => (
+                                            <div key={item.id} className="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm hover:shadow transition flex justify-between items-center gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-extrabold text-[13.5px] text-gray-800 leading-tight truncate">
+                                                        {language === 'th' ? (item.nameTh || item.name) : item.name}
+                                                    </p>
+                                                    <p className="text-xs font-black text-brand-605 mt-0.5 font-mono text-brand-600">
+                                                        ฿{item.totalPrice.toLocaleString()} 
+                                                        <span className="text-[10.5px] text-gray-400 font-normal"> (฿{Math.round(item.totalPrice / item.quantity).toLocaleString()} / ชิ้น)</span>
+                                                    </p>
+                                                    {item.selectedToppings && item.selectedToppings.length > 0 && (
+                                                        <p className="text-[10px] text-gray-500 mt-1 max-w-sm truncate">
+                                                            ➕ {item.selectedToppings.map(t => language === 'th' ? (t.nameTh || t.name) : t.name).join(', ')}
+                                                        </p>
+                                                    )}
+                                                    {item.subItems && item.subItems.length > 0 && (
+                                                        <p className="text-[10px] text-gray-500 mt-1 max-w-sm truncate italic">
+                                                            🧩 {item.subItems.map(s => s.name).join(', ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Control Qty */}
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => decrementEditedItemQty(item.id)}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-600 transition font-bold"
+                                                    >
+                                                        <Minus size={13}/>
+                                                    </button>
+                                                    <span className="w-8 text-center text-xs font-black font-mono text-gray-800">
+                                                        {item.quantity}
+                                                    </span>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => incrementEditedItemQty(item.id)}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-600 transition font-bold"
+                                                    >
+                                                        <Plus size={13}/>
+                                                    </button>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => deleteEditedItem(item.id)}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-650 transition ml-1 text-red-650"
+                                                    >
+                                                        <Trash2 size={13}/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Sum Section */}
+                                <div className="bg-gray-150 p-3.5 rounded-xl border border-gray-200 flex justify-between items-center mt-auto">
+                                    <span className="text-xs font-bold text-gray-500 uppercase">{language === 'th' ? 'ยอดขายรวมทั้งสิ้น:' : 'Total Adjusted Sum:'}</span>
+                                    <span className="text-xl font-black font-mono text-brand-600">
+                                        ฿{editedItemsList.reduce((sum, item) => sum + item.totalPrice, 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* RIGHT SIDE: Add New Menu Items Library */}
+                            <div className="w-full lg:w-[420px] bg-white p-4 lg:p-6 flex flex-col overflow-hidden">
+                                <h4 className="font-extrabold text-gray-700 mb-3 flex items-center gap-1.5 shrink-0 text-sm">
+                                    ✨ {language === 'th' ? 'เพิ่มเมนูอาหารในบิล' : 'Add New Dishes'}
+                                </h4>
+
+                                {/* Filter & Search bar */}
+                                <div className="space-y-2 mb-4 shrink-0">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-2 text-gray-400" size={15}/>
+                                        <input 
+                                            type="text" 
+                                            placeholder={language === 'th' ? 'ค้นหาอาหาร...' : 'Search foods...'}
+                                            className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-amber-500 font-bold bg-white text-gray-850"
+                                            value={addSearchQuery}
+                                            onChange={e => setAddSearchQuery(e.target.value)}
+                                        />
+                                    </div>
+                                    
+                                    {/* Categories filter badging list */}
+                                    <div className="flex gap-1 overflow-x-auto pb-1 select-none scrollbar-none">
+                                        <button 
+                                            onClick={() => setAddCategoryFilter('all')}
+                                            className={`px-2.5 py-1 text-[10.5px] rounded-lg font-bold whitespace-nowrap transition-all shrink-0 ${addCategoryFilter === 'all' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                        >
+                                            {language === 'th' ? 'ทั้งหมด' : 'All'}
+                                        </button>
+                                        {(CATEGORIES || []).map(cat => (
+                                            <button 
+                                                key={cat.id}
+                                                onClick={() => setAddCategoryFilter(cat.id as ProductCategory)}
+                                                className={`px-2.5 py-1 text-[10.5px] rounded-lg font-bold whitespace-nowrap transition-all shrink-0 ${addCategoryFilter === cat.id ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                            >
+                                                {language === 'th' ? (cat.nameTh || cat.name) : cat.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Menu Items List scrollable wrapper */}
+                                <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px] scrollbar-thin">
+                                    {filteredAddMenuMatches.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 py-12">
+                                            <p className="text-xl">🔍</p>
+                                            <p className="text-[11px] mt-1 font-bold">{language === 'th' ? 'ไม่พบเมนูที่ค้นหา' : 'No foods match your search'}</p>
+                                        </div>
+                                    ) : (
+                                        filteredAddMenuMatches.map(pizza => (
+                                            <div 
+                                                key={pizza.id}
+                                                onClick={() => {
+                                                    playClickSound();
+                                                    addMenuItemToEditedList(pizza);
+                                                }}
+                                                className="p-2.5 bg-gray-55 hover:bg-amber-50 border border-gray-150 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] select-none group"
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    {pizza.image && (
+                                                        <img 
+                                                            src={convertGoogleDriveUrl(pizza.image)} 
+                                                            alt={pizza.name}
+                                                            className="w-10 h-10 rounded-lg object-cover bg-gray-200 shrink-0 border border-gray-200"
+                                                            referrerPolicy="no-referrer"
+                                                        />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-extrabold text-gray-800 leading-tight group-hover:text-amber-805 transition truncate">
+                                                            {language === 'th' ? (pizza.nameTh || pizza.name) : pizza.name}
+                                                        </p>
+                                                        <p className="text-[10.5px] font-bold text-gray-400 group-hover:text-amber-600 font-mono mt-0.5">
+                                                            ฿{pizza.basePrice.toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    type="button"
+                                                    className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white transition shadow-sm shrink-0"
+                                                >
+                                                    <Plus size={12}/>
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="bg-gray-100 p-4 border-t border-gray-200 flex justify-end gap-3 shrink-0">
+                            <button 
+                                onClick={() => { setShowOrderItemsEditor(false); setEditingOrderForItems(null); }} 
+                                className="px-5 py-2.5 rounded-xl font-bold border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 hover:shadow-sm active:scale-95 transition text-xs"
+                            >
+                                {language === 'th' ? 'ยกเลิกแก้ไข' : 'Discard Changes'}
+                            </button>
+                            <button 
+                                onClick={handleSaveEditedOrderItems} 
+                                className="px-6 py-2.5 rounded-xl font-black bg-brand-600 hover:bg-brand-700 text-white shadow-md active:scale-95 transition text-xs"
+                            >
+                                {language === 'th' ? '💾 บันทึกและอัปเดตออเดอร์' : '💾 Save & Update Queue'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
