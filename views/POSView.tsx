@@ -79,7 +79,7 @@ export const POSView: React.FC = () => {
         autoPrintNewOrders, setAutoPrintNewOrders,
         vatEnabled, setVatEnabled,
         btDevice, btCharacteristic, btStatus,
-        connectBluetoothPrinter, disconnectBluetoothPrinter,
+        connectBluetoothPrinter, disconnectBluetoothPrinter, resetBluetoothConnection,
         triggerReceiptPrint, generateEscPosData, writeBtInChunks,
         thaiCodePage, setThaiCodePage
     } = useStore();
@@ -1503,35 +1503,35 @@ export const POSView: React.FC = () => {
                         {shopLogo ? <img src={shopLogo} alt="Logo" className="w-14 h-14 rounded-full object-cover border-2 border-brand-500" /> : <div className="bg-brand-600 p-3 rounded-xl text-white shadow-lg shadow-brand-500/50"><DollarSign size={28} /></div>}
                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleLogoUpload}/>
                     </div>
-                    <button onClick={() => { playClickSound(); setActiveTab('order'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="New Order"><ShoppingBag size={28} /></button>
-                    <button onClick={() => { playClickSound(); setActiveTab('tables'); }} className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Active Orders"><Layers size={28} />{activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</button>
-                    <button onClick={() => { playClickSound(); setActiveTab('sales'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Reports"><PieChart size={28} /></button>
-                    <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="QR Generator"><QrCode size={28} /></button>
-                    <button onClick={() => { playClickSound(); setActiveTab('partners'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'partners' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Partner Referral Shares"><Store size={28} /></button>
-                     <button onClick={() => { playClickSound(); setActiveTab('manage'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title="Store Settings"><Settings size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('order'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'order' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'สั่งอาหารใหม่' : 'New Order'}><ShoppingBag size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('tables'); }} className={`p-4 rounded-2xl transition relative w-16 h-16 flex items-center justify-center ${activeTab === 'tables' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'ออเดอร์ทั้งหมด' : 'Active Orders'}><Layers size={28} />{activeTables.length > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>}</button>
+                    <button onClick={() => { playClickSound(); setActiveTab('sales'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'รายงานขาย' : 'Reports'}><PieChart size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'สร้างคิวอาร์' : 'QR Generator'}><QrCode size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('partners'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'partners' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'พาร์ทเนอร์แนะนำ' : 'Partner Referral Shares'}><Store size={28} /></button>
+                     <button onClick={() => { playClickSound(); setActiveTab('manage'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'ตั้งค่าร้านค้า' : 'Store Settings'}><Settings size={28} /></button>
                 </div>
                 <div className="flex flex-col items-center gap-4 w-full">
                     {/* SYSTEM SOUND TOGGLE CONTROLLER */}
                     <button 
                         onClick={toggleSound} 
                         className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 border cursor-pointer ${soundEnabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-500 border-gray-700/50'}`} 
-                        title={soundEnabled ? 'Mute Sound Alerts' : 'Unmute Sound Alerts'}
+                        title={soundEnabled ? (language === 'th' ? 'ปิดเสียงแจ้งเตือน' : 'Mute Sound Alerts') : (language === 'th' ? 'เปิดเสียงแจ้งเตือน' : 'Unmute Sound Alerts')}
                     >
                         {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
                     </button>
                     <button onClick={() => { playClickSound(); toggleLanguage(); }} className="text-xs font-bold bg-gray-800 text-gray-300 w-12 h-12 rounded-full flex items-center justify-center hover:bg-gray-700 active:scale-95 transition">{language.toUpperCase()}</button>
-                    <button onClick={() => { playAlertSound(); adminLogout(); }} className="p-4 text-red-400 hover:bg-gray-800 rounded-xl transition cursor-pointer" title="Logout"><LogOut size={28} /></button>
+                    <button onClick={() => { playAlertSound(); adminLogout(); }} className="p-4 text-red-400 hover:bg-gray-800 rounded-xl transition cursor-pointer" title={language === 'th' ? 'ออกจากระบบ' : 'Logout'}><LogOut size={28} /></button>
                 </div>
             </aside>
             
             {/* --- MOBILE BOTTOM NAV --- */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden font-sans">
-                <button onClick={() => { playClickSound(); setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">Order</span></button>
-                 <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">Active</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'สั่งอาหาร' : 'Order'}</span></button>
+                 <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">{language === 'th' ? 'กำลังทำ' : 'Active'}</span></button>
                 <div className="relative -top-5"><button onClick={() => { playClickSound(); setShowMobileCart(!showMobileCart); }} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
                 <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
-                <button onClick={() => { playClickSound(); setActiveTab('partners'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-brand-500' : 'text-gray-400'}`}><Store size={20}/><span className="text-[10px] font-bold">Partners</span></button>
-                <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">Settings</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('partners'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-brand-500' : 'text-gray-400'}`}><Store size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'พาร์ทเนอร์' : 'Partners'}</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'ตั้งค่าร้าน' : 'Settings'}</span></button>
             </div>
 
             {/* --- MAIN CONTENT --- */}
@@ -1540,9 +1540,9 @@ export const POSView: React.FC = () => {
                     <>
                         <div className={`flex-1 flex flex-col h-full bg-gray-100 relative ${showMobileCart ? 'hidden lg:flex' : 'flex'}`}>
                             <div className="bg-white px-4 py-3 shadow-sm border-b shrink-0 overflow-x-auto no-scrollbar flex items-center gap-2">
-                                <button onClick={() => setIsEditMode(!isEditMode)} className={`hidden lg:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}><Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? 'Editing' : 'Order'}</span></button>
+                                <button onClick={() => setIsEditMode(!isEditMode)} className={`hidden lg:flex p-3 rounded-xl items-center gap-2 mr-2 transition ${isEditMode ? 'bg-red-500 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}><Edit2 size={20}/> <span className="text-sm font-bold">{isEditMode ? (language === 'th' ? 'กำลังแก้ไข' : 'Editing') : (language === 'th' ? 'สั่งอาหาร' : 'Order')}</span></button>
                                 {CATEGORIES.map(cat => (<button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`whitespace-nowrap px-6 py-3 rounded-xl text-base font-bold transition ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-md scale-105' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>{language === 'th' ? cat.labelTh : cat.label}</button>))}
-                                {isEditMode && <button onClick={handleOpenAddModal} className="whitespace-nowrap px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto"><Plus size={18}/> New Item</button>}
+                                {isEditMode && <button onClick={handleOpenAddModal} className="whitespace-nowrap px-4 py-3 rounded-xl text-sm font-bold bg-green-500 text-white flex items-center gap-1 shadow hover:bg-green-600 ml-auto"><Plus size={18}/> {language === 'th' ? 'เพิ่มเมนูใหม่' : 'New Item'}</button>}
                                 
                                 {/* Visible desktop language choice right at main POS header */}
                                 <button 
@@ -1615,14 +1615,86 @@ export const POSView: React.FC = () => {
                             </div>
                         </div>
                         <div className={`w-full lg:w-96 bg-white border-l shadow-xl flex flex-col fixed lg:relative inset-0 lg:inset-auto transition-transform duration-300 ${showMobileCart ? 'translate-y-0 z-[60] lg:z-40' : 'translate-y-full lg:translate-y-0 z-40'}`}>
-                            <div className="lg:hidden p-4 bg-gray-900 text-white flex justify-between items-center"><h2 className="font-bold text-lg flex items-center gap-2"><ShoppingBag/> Current Order</h2><button onClick={() => setShowMobileCart(false)} className="bg-white/20 p-2 rounded-full"><X size={20}/></button></div>
+                            <div className="lg:hidden p-4 bg-gray-900 text-white flex justify-between items-center">
+                                <h2 className="font-bold text-lg flex items-center gap-2">
+                                    <ShoppingBag/> {language === 'th' ? 'รายการออเดอร์ปัจจุบัน' : 'Current Order'}
+                                </h2>
+                                <button onClick={() => setShowMobileCart(false)} className="bg-white/20 p-2 rounded-full"><X size={20}/></button>
+                            </div>
                             <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                                {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50"><ShoppingBag size={64} className="mb-4"/><p className="font-bold text-xl">No items yet</p></div> : <div className="space-y-3">{cart.map(item => (<div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50"><div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}><div className="pr-6"><h4 className="font-bold text-gray-800 text-base">{item.name}</h4>{item.specialInstructions && <div className="text-xs text-red-500 font-bold mt-1 bg-red-50 inline-block px-1 rounded">Note: {item.specialInstructions}</div>}<p className="text-xs text-gray-500 leading-tight mt-1">{(item.selectedToppings || []).map(t => t.name).join(', ')}{(item.subItems || []).filter(Boolean).map(s => `+ ${s.name}`).join(', ')}</p></div><div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div></div><div className="flex items-center justify-between mt-3"><div className="flex items-center bg-gray-100 rounded-lg p-1"><button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button><span className="w-10 text-center font-bold text-base">{item.quantity}</span><button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button></div><button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button></div></div>))}</div>}
+                                {cart.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-50">
+                                        <ShoppingBag size={64} className="mb-4"/>
+                                        <p className="font-bold text-xl">{language === 'th' ? 'ยังไม่มีรายการอาหาร' : 'No items yet'}</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {cart.map(item => {
+                                            const localizedName = language === 'th' && item.nameTh ? item.nameTh : item.name;
+                                            return (
+                                                <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group active:bg-gray-50">
+                                                    <div className="flex justify-between items-start mb-2 cursor-pointer" onClick={() => handleEditCartItem(item)}>
+                                                        <div className="pr-6">
+                                                            <h4 className="font-bold text-gray-800 text-base">{localizedName}</h4>
+                                                            {item.specialInstructions && (
+                                                                <div className="text-xs text-red-500 font-bold mt-1 bg-red-55 px-1 rounded inline-block">
+                                                                    {language === 'th' ? 'หมายเหตุ: ' : 'Note: '}{item.specialInstructions}
+                                                                </div>
+                                                            )}
+                                                            <p className="text-xs text-gray-500 leading-tight mt-1">
+                                                                {(item.selectedToppings || []).map(t => language === 'th' && t.nameTh ? t.nameTh : t.name).join(', ')}
+                                                                {(item.subItems || []).filter(Boolean).map(s => `+ ${language === 'th' && s.nameTh ? s.nameTh : s.name}`).join(', ')}
+                                                            </p>
+                                                        </div>
+                                                        <div className="font-bold text-gray-900 text-base">฿{item.totalPrice}</div>
+                                                    </div>
+                                                    <div className="flex items-center justify-between mt-3">
+                                                        <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                                                            <button onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button>
+                                                            <span className="w-10 text-center font-bold text-base">{item.quantity}</span>
+                                                            <button onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button>
+                                                        </div>
+                                                        <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                             <div className="p-4 bg-white border-t space-y-3 pb-24 lg:pb-4">
-                                <div className="grid grid-cols-2 gap-2"><input type="text" placeholder="Table No. / Name" className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={tableNumber} onChange={e => setTableNumber(e.target.value)}/><select className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" value={orderSource} onChange={e => setOrderSource(e.target.value as OrderSource)}><option value="store">In-Store</option><option value="grab">Grab</option><option value="lineman">Lineman</option><option value="robinhood">Robinhood</option><option value="foodpanda">Foodpanda</option><option value="shopeefood">ShopeeFood</option><option value="other">Other / อื่นๆ</option></select></div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder={language === 'th' ? 'เลขโต๊ะ / ชื่อลูกค้า' : 'Table No. / Name'} 
+                                        className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" 
+                                        value={tableNumber} 
+                                        onChange={e => setTableNumber(e.target.value)}
+                                    />
+                                    <select 
+                                        className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" 
+                                        value={orderSource} 
+                                        onChange={e => setOrderSource(e.target.value as OrderSource)}
+                                    >
+                                        <option value="store">{language === 'th' ? 'ทานในร้าน (In-Store)' : 'In-Store'}</option>
+                                        <option value="grab">Grab</option>
+                                        <option value="lineman">Lineman</option>
+                                        <option value="robinhood">Robinhood</option>
+                                        <option value="foodpanda">Foodpanda</option>
+                                        <option value="shopeefood">ShopeeFood</option>
+                                        <option value="other">{language === 'th' ? 'อื่นๆ (Other)' : 'Other / อื่นๆ'}</option>
+                                    </select>
+                                </div>
                                 {orderSource !== 'store' && (
-                                    <div className="w-full"><input type="text" placeholder={`${orderSource.toUpperCase()} Order No.`} className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" value={deliveryPlatformRef} onChange={e => setDeliveryPlatformRef(e.target.value)}/></div>
+                                    <div className="w-full">
+                                        <input 
+                                            type="text" 
+                                            placeholder={language === 'th' ? `หมายเลขออเดอร์ ${orderSource.toUpperCase()}` : `${orderSource.toUpperCase()} Order No.`} 
+                                            className="border-2 border-brand-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full bg-brand-50" 
+                                            value={deliveryPlatformRef} 
+                                            onChange={e => setDeliveryPlatformRef(e.target.value)}
+                                        />
+                                    </div>
                                 )}
                                 <div className="space-y-1.5 pt-1.5 border-t border-gray-100">
                                     <div className="flex justify-between items-center text-xs font-bold text-gray-500">
@@ -1647,11 +1719,26 @@ export const POSView: React.FC = () => {
                                         </>
                                     )}
                                     <div className="flex justify-between items-center text-2xl font-black text-gray-950 pt-1">
-                                        <span>Total</span>
+                                        <span>{language === 'th' ? 'รวมยอดทั้งหมด' : 'Total'}</span>
                                         <span>฿{cartTotal}</span>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3"><button onClick={handleSendToKitchen} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Kitchen</button><button onClick={handleCheckBill} disabled={cart.length === 0} className="py-4 rounded-xl font-bold text-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow">Pay Now</button></div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={handleSendToKitchen} 
+                                        disabled={cart.length === 0} 
+                                        className="py-4 rounded-xl font-bold text-lg bg-yellow-400 text-yellow-900 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow cursor-pointer text-center"
+                                    >
+                                        {language === 'th' ? 'ส่งเข้าครัว' : 'Kitchen'}
+                                    </button>
+                                    <button 
+                                        onClick={handleCheckBill} 
+                                        disabled={cart.length === 0} 
+                                        className="py-4 rounded-xl font-bold text-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow cursor-pointer text-center"
+                                    >
+                                        {language === 'th' ? 'เช็คบิลสด' : 'Pay Now'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </>
@@ -1852,35 +1939,68 @@ export const POSView: React.FC = () => {
                     return (
                         <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                             <div className="max-w-7xl mx-auto space-y-6">
-                                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><PieChart className="text-brand-600"/> Reports & History</h2>
+                                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
+                                    <PieChart className="text-brand-600"/> 
+                                    {language === 'th' ? 'รายงานขาย & ประวัติออเดอร์' : 'Reports & History'}
+                                </h2>
                                 
                                 {/* Filters */}
                                 <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                                     <div className="flex gap-2">
                                         {(['day', 'month', 'year', 'all'] as const).map(f => (
-                                            <button key={f} onClick={() => setSalesFilter(f)} className={`px-4 py-2 rounded-lg font-bold transition capitalize ${salesFilter === f ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                                {f === 'day' ? 'Today' : f}
+                                            <button 
+                                                key={f} 
+                                                onClick={() => setSalesFilter(f)} 
+                                                className={`px-4 py-2 rounded-lg font-bold transition capitalize ${salesFilter === f ? 'bg-brand-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                            >
+                                                {f === 'day' ? (language === 'th' ? 'วันนี้' : 'Today') : 
+                                                 f === 'month' ? (language === 'th' ? 'เดือนนี้' : 'Month') : 
+                                                 f === 'year' ? (language === 'th' ? 'ปีนี้' : 'Year') : (language === 'th' ? 'ทั้งหมด' : 'All')}
                                             </button>
                                         ))}
                                     </div>
-                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: (o.items || []).length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2"><Download size={18}/> Export CSV</button>
+                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: (o.items || []).length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2">
+                                        <Download size={18}/> {language === 'th' ? 'ส่งออกไฟล์ CSV' : 'Export CSV'}
+                                    </button>
                                 </div>
 
                                 {/* KPIs */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Sales</p><p className="text-3xl font-bold text-gray-900">฿{totalSales.toLocaleString()}</p></div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Orders</p><p className="text-3xl font-bold text-gray-900">{filteredOrders.length}</p></div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Net Sales (After GP)</p><p className="text-3xl font-bold text-brand-600">฿{netSales.toLocaleString()}</p></div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200"><p className="text-sm font-bold text-gray-500 uppercase mb-2">Total Expenses</p><p className="text-3xl font-bold text-orange-500">฿{totalExpensesValue.toLocaleString()}</p></div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'ยอดขายรวม' : 'Total Sales'}</p>
+                                        <p className="text-3xl font-bold text-gray-900">฿{totalSales.toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'จำนวนออเดอร์ทั้งหมด' : 'Total Orders'}</p>
+                                        <p className="text-3xl font-bold text-gray-900">{filteredOrders.length}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'รายรับสุทธิ (หลังหัก GP)' : 'Net Sales (After GP)'}</p>
+                                        <p className="text-3xl font-bold text-brand-600">฿{netSales.toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'ค่าใช้จ่ายทั้งหมด' : 'Total Expenses'}</p>
+                                        <p className="text-3xl font-bold text-orange-500">฿{totalExpensesValue.toLocaleString()}</p>
+                                    </div>
                                 </div>
 
                                 {/* Order History Table */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-800 text-lg">Order History</h3></div>
+                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                        <h3 className="font-bold text-gray-800 text-lg">{language === 'th' ? 'ประวัติรายการสั่งซื้อ' : 'Order History'}</h3>
+                                    </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs border-b border-gray-100">
-                                                <tr><th className="p-4">Date & Time (เวลาไทย)</th><th className="p-4">Order ID</th><th className="p-4">Source</th><th className="p-4">Status</th><th className="p-4">Amount(Total)</th><th className="p-4 text-orange-500">Net(After GP)</th><th className="p-4 text-right">Actions</th></tr>
+                                                <tr>
+                                                    <th className="p-4">{language === 'th' ? 'วันเวลา' : 'Date & Time'}</th>
+                                                    <th className="p-4">{language === 'th' ? 'หมายเลขออเดอร์' : 'Order ID'}</th>
+                                                    <th className="p-4">{language === 'th' ? 'ที่มา' : 'Source'}</th>
+                                                    <th className="p-4">{language === 'th' ? 'สถานะ' : 'Status'}</th>
+                                                    <th className="p-4">{language === 'th' ? 'ยอดเต็ม' : 'Amount(Total)'}</th>
+                                                    <th className="p-4 text-orange-500">{language === 'th' ? 'หลังหัก GP' : 'Net(After GP)'}</th>
+                                                    <th className="p-4 text-right">{language === 'th' ? 'จัดการ' : 'Actions'}</th>
+                                                </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {[...filteredOrders].reverse().map(order => (
@@ -1901,14 +2021,14 @@ export const POSView: React.FC = () => {
                                                             <button onClick={() => handleStartEditOrder(order)} className="text-blue-700 hover:underline font-bold text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition">แก้ไข (Edit)</button>
                                                             <button onClick={() => handleDeleteOrderPrompt(order)} className="text-red-700 hover:underline font-bold text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition">ลบ (Delete)</button>
                                                             {order.source !== 'store' && (
-                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition">Edit GP</button>
+                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition">{language === 'th' ? 'แก้ไข GP' : 'Edit GP'}</button>
                                                             )}
-                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded flex items-center gap-1 transition"><Printer size={12}/> Print</button>
-                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded transition">Receipt</button>
+                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded flex items-center gap-1 transition"><Printer size={12}/> {language === 'th' ? 'พิมพ์ใบเสร็จ' : 'Print'}</button>
+                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded transition">{language === 'th' ? 'ดูใบเสร็จ' : 'Receipt'}</button>
                                                         </td>
                                                     </tr>
                                                 ))}
-                                                {filteredOrders.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400 font-bold">No orders found for this period.</td></tr>}
+                                                {filteredOrders.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-gray-400 font-bold">{language === 'th' ? 'ไม่พบข้อมูลออเดอร์ในช่วงเวลานี้' : 'No orders found for this period.'}</td></tr>}
                                             </tbody>
                                         </table>
                                     </div>
@@ -2509,17 +2629,28 @@ export const POSView: React.FC = () => {
                                                     </p>
                                                 </div>
 
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-col gap-2 w-full">
                                                     {btStatus !== 'connected' ? (
-                                                        <button 
-                                                            type="button"
-                                                            onClick={connectBluetoothPrinter}
-                                                            className="flex-1 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-sm transition-all"
-                                                        >
-                                                            🔗 {btStatus === 'connecting' ? 'กำลังเชื่อมต่อ...' : 'ค้นหา & เชื่อมต่อเครื่องพิมพ์'}
-                                                        </button>
+                                                        <div className="flex gap-2 w-full">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={connectBluetoothPrinter}
+                                                                className="flex-1 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-sm transition-all"
+                                                            >
+                                                                🔗 {btStatus === 'connecting' ? (language === 'th' ? 'กำลังเชื่อมต่อ...' : 'Connecting...') : (language === 'th' ? 'ค้นหา & เชื่อมต่อเครื่องพิมพ์' : 'Search & Connect')}
+                                                            </button>
+                                                            {btStatus === 'connecting' && (
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={disconnectBluetoothPrinter}
+                                                                    className="px-3 bg-red-100 hover:bg-red-200 text-red-700 font-extrabold py-2.5 rounded-xl text-xs transition-all"
+                                                                >
+                                                                    ❌ {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     ) : (
-                                                        <>
+                                                        <div className="grid grid-cols-3 gap-2 w-full">
                                                             <button 
                                                                 type="button"
                                                                 onClick={async () => {
@@ -2546,19 +2677,45 @@ export const POSView: React.FC = () => {
                                                                         alert("❌ ไม่สามารถพิมพ์ได้: " + err.message);
                                                                     }
                                                                 }}
-                                                                className="flex-1 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs hover:shadow transition-all"
+                                                                className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-[11px] hover:shadow transition-all text-center"
                                                             >
-                                                                📝 ทดสอบพิมพ์ใบเสร็จ
+                                                                📝 {language === 'th' ? 'ทดสอบพิมพ์' : 'Test Print'}
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={async () => {
+                                                                    playClickSound();
+                                                                    await resetBluetoothConnection();
+                                                                }}
+                                                                className="bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-[11px] hover:shadow transition-all text-center"
+                                                                title={language === 'th' ? 'เชื่อมต่อใหม่และล้างบัฟเฟอร์ค้าง' : 'Reset connection & reconnect'}
+                                                            >
+                                                                🔄 {language === 'th' ? 'รีเฟรชเชื่อมต่อ' : 'Refresh BT'}
                                                             </button>
                                                             <button 
                                                                 type="button"
                                                                 onClick={disconnectBluetoothPrinter}
-                                                                className="flex-1 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs hover:shadow transition-all"
+                                                                className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-[11px] hover:shadow transition-all text-center"
                                                             >
-                                                                ❌ ตัดการเชื่อมต่อบลูทูธ
+                                                                ❌ {language === 'th' ? 'ตัดเชื่อมต่อ' : 'Disconnect'}
                                                             </button>
-                                                        </>
+                                                        </div>
                                                     )}
+
+                                                    {/* Quick Reset troubleshooting helper box */}
+                                                    <div className="flex justify-between items-center text-[10.5px] text-gray-500 bg-gray-50 p-2 rounded-xl border border-dashed border-gray-200 mt-1">
+                                                        <span>{language === 'th' ? 'หากเครื่องพิมพ์ค้างไม่ตอบสนองเลย:' : 'If printer is frozen/lagging:'}</span>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={async () => {
+                                                                playClickSound();
+                                                                await resetBluetoothConnection();
+                                                            }}
+                                                            className="text-brand-600 hover:text-brand-800 font-bold underline transition"
+                                                        >
+                                                            {language === 'th' ? '🔄 รีเซ็ตการเชื่อมต่อทันที' : '🔄 Force Reset Connection'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -2679,19 +2836,30 @@ export const POSView: React.FC = () => {
                 {/* Combo Selector */}
                 {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 ? (
                     <div className="mb-6">
-                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Utensils size={18}/> Select Your Items</h3>
+                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <Utensils size={18}/> 
+                            {language === 'th' ? 'เลือกของทานในเซ็ต' : 'Select Your Items'}
+                        </h3>
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             {Array.from({ length: selectedPizza.comboCount }).map((_, idx) => (
                                 <button key={idx} onClick={() => handleComboSlotClick(idx)} className={`p-4 border-2 rounded-xl text-left transition ${activeComboSlot === idx ? 'border-brand-500 bg-brand-50' : comboSelections[idx] ? 'border-green-500 bg-green-50' : 'border-dashed border-gray-300 hover:border-gray-400'}`}>
-                                    <div className="text-sm font-bold text-gray-500 mb-1">Item {idx + 1}</div>
-                                    <div className="font-bold text-gray-900">{comboSelections[idx]?.name || 'Tap to select'}</div>
+                                    <div className="text-sm font-bold text-gray-500 mb-1">
+                                        {language === 'th' ? `จานที่ ${idx + 1}` : `Item ${idx + 1}`}
+                                    </div>
+                                    <div className="font-bold text-gray-900">
+                                        {comboSelections[idx] 
+                                            ? (language === 'th' && comboSelections[idx].nameTh ? comboSelections[idx].nameTh : comboSelections[idx].name) 
+                                            : (language === 'th' ? 'แตะระบุเมนู' : 'Tap to select')}
+                                    </div>
                                 </button>
                             ))}
                         </div>
                         
                         {activeComboSlot !== null && (
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in">
-                                <div className="text-sm font-bold text-gray-800 mb-2">Options for Item {activeComboSlot + 1}:</div>
+                                <div className="text-sm font-bold text-gray-800 mb-2">
+                                    {language === 'th' ? `ตัวเลือกสำหรับจานที่ ${activeComboSlot + 1}:` : `Options for Item ${activeComboSlot + 1}:`}
+                                </div>
                                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                                     {menu.filter(m => !m.comboCount).map(m => { // Exclude combos from combo
                                         const promoBadge = language === 'th' ? (m.badgeTh || m.badge) : (m.badge || m.badgeTh);
@@ -2716,16 +2884,16 @@ export const POSView: React.FC = () => {
                 {/* Half-Half Selector (POS) */}
                 {selectedPizza.id === 'p_half_half' && (
                     <div className="mb-6 bg-amber-50 p-4 rounded-xl border border-amber-200 text-left">
-                        <h3 className="font-bold text-amber-950 mb-3 flex items-center gap-2">🌓 Select Two Halves</h3>
+                        <h3 className="font-bold text-amber-950 mb-3 flex items-center gap-2">🌓 {language === 'th' ? 'เลือกสองหน้าลูกครึ่ง (Half-Half)' : 'Select Two Halves'}</h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">Side A (First Half)</label>
+                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกแรก (Side A)' : 'Side A (First Half)'}</label>
                                 <select 
                                     className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
                                     value={halfA?.id || ''}
                                     onChange={(e) => setHalfA(menu.find(p => p.id === e.target.value) || null)}
                                 >
-                                    <option value="">-- Select Side A --</option>
+                                    <option value="">{language === 'th' ? '-- เลือกซีกแรก A --' : '-- Select Side A --'}</option>
                                     {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
                                         <option key={pItem.id} value={pItem.id}>
                                             {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
@@ -2734,13 +2902,13 @@ export const POSView: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">Side B (Second Half)</label>
+                                <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ซีกสอง (Side B)' : 'Side B (Second Half)'}</label>
                                 <select 
                                     className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-800"
                                     value={halfB?.id || ''}
                                     onChange={(e) => setHalfB(menu.find(p => p.id === e.target.value) || null)}
                                 >
-                                    <option value="">-- Select Side B --</option>
+                                    <option value="">{language === 'th' ? '-- เลือกซีกสอง B --' : '-- Select Side B --'}</option>
                                     {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
                                         <option key={pItem.id} value={pItem.id}>
                                             {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
@@ -2755,7 +2923,10 @@ export const POSView: React.FC = () => {
                 {/* Toppings (Only for non-combo items, though you can adapt logic as needed) */}
                 {!(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) && (
                     <div className="mb-6">
-                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Layers size={18}/> Extra Options</h3>
+                        <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <Layers size={18}/> 
+                            {language === 'th' ? 'เลือกส่วนประกอบเพิ่มเติม' : 'Extra Options'}
+                        </h3>
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                             {toppings.filter(t => t.available).map(t => {
                                 const isSelected = selectedToppings.some(st => st.id === t.id);
@@ -2777,8 +2948,14 @@ export const POSView: React.FC = () => {
                 
                 {/* Note */}
                 <div className="mb-6">
-                    <h3 className="font-bold text-gray-800 mb-2">Special Instructions</h3>
-                    <input type="text" placeholder="e.g., No onions, extra spicy" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 outline-none" value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)} />
+                    <h3 className="font-bold text-gray-800 mb-2">{language === 'th' ? 'หมายเหตุพิเศษ' : 'Special Instructions'}</h3>
+                    <input 
+                        type="text" 
+                        placeholder={language === 'th' ? 'เช่น ไม่ใส่หอมใหญ่, เผ็ดพิเศษ' : 'e.g., No onions, extra spicy'} 
+                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-brand-500 outline-none" 
+                        value={specialInstructions} 
+                        onChange={(e) => setSpecialInstructions(e.target.value)} 
+                    />
                 </div>
             </div>
             
@@ -2792,7 +2969,9 @@ export const POSView: React.FC = () => {
                     onClick={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? confirmAddComboToCart : confirmAddToCart} 
                     disabled={(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) ? comboSelections.filter(Boolean).length < selectedPizza.comboCount : false}
                     className="flex-1 bg-brand-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-700 shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    {editingCartItem ? 'Update Order' : 'Add to Order'} • ฿{
+                    {editingCartItem 
+                        ? (language === 'th' ? 'อัปเดตรายการ' : 'Update Order') 
+                        : (language === 'th' ? 'เพิ่มลงออเดอร์' : 'Add to Order')} • ฿{
                         ((selectedPizza.id === 'p_half_half' 
                             ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
                             : selectedPizza.basePrice) 

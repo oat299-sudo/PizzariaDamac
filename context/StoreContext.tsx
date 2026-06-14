@@ -135,6 +135,7 @@ interface StoreContextType {
   setBtStatus: (status: 'disconnected' | 'connecting' | 'connected') => void;
   connectBluetoothPrinter: () => Promise<void>;
   disconnectBluetoothPrinter: () => void;
+  resetBluetoothConnection: () => Promise<void>;
   triggerReceiptPrint: (payload: any) => Promise<void>;
   triggerKitchenPrint: (order: Order) => Promise<void>;
   generateEscPosData: (data: any, lang: Language) => Uint8Array;
@@ -992,12 +993,41 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const disconnectBluetoothPrinter = () => {
-      if (btDevice && btDevice.gatt.connected) {
-          btDevice.gatt.disconnect();
+      try {
+          if (btDevice && btDevice.gatt && btDevice.gatt.connected) {
+              btDevice.gatt.disconnect();
+          }
+      } catch (e) {
+          console.warn("Disconnection failed during manual disconnect:", e);
       }
       setBtStatus('disconnected');
       setBtCharacteristic(null);
       setBtDevice(null);
+  };
+
+  const resetBluetoothConnection = async () => {
+      setBtStatus('connecting');
+      try {
+          if (btDevice && btDevice.gatt && btDevice.gatt.connected) {
+              try {
+                  btDevice.gatt.disconnect();
+              } catch (e) {
+                  console.warn("Disconnection warning during reset connection:", e);
+              }
+          }
+      } catch (err) {
+          console.error("GATT disconnect error during connection reset:", err);
+      }
+      
+      setBtCharacteristic(null);
+      setBtDevice(null);
+      setBtStatus('disconnected');
+
+      // A short timeout to ensure the device lists can refresh and clear internal buffers
+      await new Promise(r => setTimeout(r, 600));
+      
+      // Attempt fresh connection re-scan
+      await connectBluetoothPrinter();
   };
 
   const t = (key: keyof typeof TRANSLATIONS.en, params?: Record<string, string | number>) => {
@@ -2444,7 +2474,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       btDevice, setBtDevice,
       btCharacteristic, setBtCharacteristic,
       btStatus, setBtStatus,
-      connectBluetoothPrinter, disconnectBluetoothPrinter,
+      connectBluetoothPrinter, disconnectBluetoothPrinter, resetBluetoothConnection,
       triggerReceiptPrint, triggerKitchenPrint,
       generateEscPosData, generateKitchenEscPosData,
       writeBtInChunks,

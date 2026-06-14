@@ -24,7 +24,7 @@ export const KitchenView: React.FC = () => {
     orders, updateOrderStatus, adminLogout, t, language, toggleLanguage, 
     paperSize, setPaperSize, receiptFontSize, receiptPadding, 
     autoPrintNewOrders, setAutoPrintNewOrders, printerType, setPrinterType, btCharacteristic, triggerKitchenPrint,
-    btDevice, btStatus, connectBluetoothPrinter, disconnectBluetoothPrinter, writeBtInChunks
+    btDevice, btStatus, connectBluetoothPrinter, disconnectBluetoothPrinter, resetBluetoothConnection, writeBtInChunks
   } = useStore();
   const [filterType, setFilterType] = useState<'active' | 'today' | 'yesterday' | 'cancelled'>('active');
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -480,18 +480,32 @@ export const KitchenView: React.FC = () => {
 
                                     <div className="flex flex-col gap-1.5 pt-1">
                                         {btStatus !== 'connected' ? (
-                                            <button
-                                                type="button"
-                                                onClick={async () => {
-                                                    playClickSound();
-                                                    await connectBluetoothPrinter();
-                                                }}
-                                                className="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
-                                            >
-                                                🔗 {btStatus === 'connecting' ? (language === 'th' ? 'กำลังเชื่อมต่อ...' : 'Connecting...') : (language === 'th' ? 'ค้นหา & เชื่อมต่อเครื่องพิมพ์' : 'Search & Connect Bluetooth')}
-                                            </button>
+                                            <div className="flex flex-col gap-1 w-full">
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        playClickSound();
+                                                        await connectBluetoothPrinter();
+                                                    }}
+                                                    className="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
+                                                >
+                                                    🔗 {btStatus === 'connecting' ? (language === 'th' ? 'กำลังเชื่อมต่อ...' : 'Connecting...') : (language === 'th' ? 'ค้นหา & เชื่อมต่อเครื่องพิมพ์' : 'Search & Connect Bluetooth')}
+                                                </button>
+                                                {btStatus === 'connecting' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            playClickSound();
+                                                            disconnectBluetoothPrinter();
+                                                        }}
+                                                        className="w-full bg-red-900/40 text-red-400 border border-red-800/40 hover:bg-red-900 hover:text-white py-1.5 rounded-lg text-[11px] transition-all cursor-pointer text-center"
+                                                    >
+                                                        ❌ {language === 'th' ? 'ยกเลิกการเชื่อมต่อ' : 'Cancel Connection'}
+                                                    </button>
+                                                )}
+                                            </div>
                                         ) : (
-                                            <>
+                                            <div className="grid grid-cols-1 gap-1.5 w-full">
                                                 <button
                                                     type="button"
                                                     onClick={async () => {
@@ -520,6 +534,17 @@ export const KitchenView: React.FC = () => {
                                                 </button>
                                                 <button
                                                     type="button"
+                                                    onClick={async () => {
+                                                        playClickSound();
+                                                        await resetBluetoothConnection();
+                                                    }}
+                                                    className="w-full bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-extrabold py-2 rounded-lg text-[11px] shadow transition-all cursor-pointer text-center"
+                                                    title={language === 'th' ? 'ตัดการเชื่อมเดิมและหาพิมพ์เชื่อมต่อใหม่ทันที' : 'Force disconnect and refresh BT stream'}
+                                                >
+                                                    🔄 {language === 'th' ? 'รีเฟรชการเชื่อมต่อ' : 'Refresh Connection'}
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => {
                                                         playClickSound();
                                                         disconnectBluetoothPrinter();
@@ -528,7 +553,7 @@ export const KitchenView: React.FC = () => {
                                                 >
                                                     ❌ {language === 'th' ? 'ยกเลิกการเชื่อมต่อบลูทูธ' : 'Disconnect Bluetooth'}
                                                 </button>
-                                            </>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
