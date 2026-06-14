@@ -1553,6 +1553,34 @@ export const POSView: React.FC = () => {
                                     <span>{language === 'th' ? '🇺🇸 ENG' : '🇹🇭 ภาษาไทย'}</span>
                                 </button>
                             </div>
+                            
+                            {printerType === 'bluetooth' && btStatus !== 'connected' && (
+                                <div 
+                                    onClick={async () => {
+                                        playClickSound();
+                                        await resetBluetoothConnection();
+                                    }}
+                                    className="mx-4 mt-4 bg-amber-500 hover:bg-amber-600 border border-amber-600/30 p-3.5 rounded-2xl flex items-center justify-between text-white font-sans text-xs font-black cursor-pointer shadow-md active:scale-[0.99] transition duration-200 select-none group shrink-0"
+                                    title={language === 'th' ? 'คลิกที่นี่เพื่อเชื่อมต่อเครื่องปริ้นเตอร์ Bluetooth ใหม่ทันที' : 'Click to connect / reconnect Bluetooth printer'}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-white/20 p-1.5 rounded-lg text-white">🖨️</span>
+                                        <div>
+                                            <p className="font-extrabold text-[12.5px] leading-tight flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-red-400 animate-ping"></span>
+                                                {language === 'th' ? 'เครื่องพิมพ์บูทูธ ไม่ได้เชื่อมต่ออยู่ หรือค้างไม่ตอบสนอง' : 'Bluetooth printer is disconnected or inactive!'}
+                                            </p>
+                                            <p className="text-[10.5px] text-amber-50 font-medium">
+                                                {language === 'th' ? '👉 แตะที่นี่เพื่อเชื่อมต่อใหม่และล้างบัฟเฟอร์ เพื่อใช้งานพิมพ์ใบเสร็จอัติโนมัติ' : '👉 Tap here to reconnect & reset stream buffers instantly'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span className="bg-white text-amber-700 hover:bg-amber-50 px-2.5 py-1 rounded-lg text-xs font-black shadow border border-amber-400 group-hover:scale-105 transition shrink-0 uppercase">
+                                        {language === 'th' ? '🔄 รีเฟรชเชื่อมต่อ' : '🔄 Refresh BT'}
+                                    </span>
+                                </div>
+                            )}
+
                             <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                                     {filteredMenu.map(item => {

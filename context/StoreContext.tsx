@@ -885,6 +885,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const triggerReceiptPrint = async (payload: any) => {
       if (printerType === 'bluetooth') {
+          // Try background auto-reconnect if device exists but connection dropped / went to sleep
+          if (!btCharacteristic && btDevice) {
+              console.log("Bluetooth device was paired but GATT is disconnected. Trying to auto-reconnect...");
+              try {
+                  setBtStatus('connecting');
+                  const server = await btDevice.gatt.connect();
+                  const services = await server.getPrimaryServices();
+                  let autoChar = null;
+                  for (const service of services) {
+                      try {
+                          const characteristics = await service.getCharacteristics();
+                          for (const char of characteristics) {
+                              if (char.properties.write || char.properties.writeWithoutResponse) {
+                                  autoChar = char;
+                                  break;
+                              }
+                          }
+                      } catch (cErr) {}
+                      if (autoChar) break;
+                  }
+                  if (autoChar) {
+                      setBtCharacteristic(autoChar);
+                      setBtStatus('connected');
+                      
+                      let escPosBytes: Uint8Array;
+                      if (thaiCodePage.startsWith('graphic-')) {
+                          const width = thaiCodePage === 'graphic-80' ? 576 : 384;
+                          escPosBytes = await generateEscPosGraphicData(payload, false, language, width);
+                      } else {
+                          escPosBytes = generateEscPosData(payload, language);
+                      }
+                      await writeBtInChunks(autoChar, escPosBytes);
+                      return; // Successfully printed after auto-reconnect!
+                  }
+              } catch (reconnectErr) {
+                  console.warn("Bluetooth background reconnection failed:", reconnectErr);
+                  setBtStatus('disconnected');
+                  setBtCharacteristic(null);
+              }
+          }
+
           if (btCharacteristic) {
               try {
                   let escPosBytes: Uint8Array;
@@ -897,10 +938,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   await writeBtInChunks(btCharacteristic, escPosBytes);
                   return; // Successfully printed directly via Bluetooth!
               } catch (err: any) {
-                  console.error("Bluetooth write failed, falling back to system print", err);
+                  console.error("Bluetooth write failed under active channel, trying fallback", err);
+                  // Connection might be stale - reset characteristic to trigger reconnect next time
+                  setBtCharacteristic(null);
+                  setBtStatus('disconnected');
               }
           } else {
-              alert(language === 'th' ? "⚠️ ยังไม่ได้เชื่อมต่อเครื่องพิมพ์ Bluetooth (Printer001)! ระบบจะเปิดหน้าต่างปกติพิมพ์แทนให้ชั่วคราว" : "⚠️ Bluetooth printer is active but not connected! Using browser print fallback.");
+              console.log("Bluetooth printer active but not connected. Falling back to system print smoothly without blocking alert.");
           }
       }
       
@@ -910,6 +954,47 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const triggerKitchenPrint = async (order: Order) => {
       if (printerType === 'bluetooth') {
+          // Try background auto-reconnect if device exists but connection dropped / went to sleep
+          if (!btCharacteristic && btDevice) {
+              console.log("Bluetooth kitchen device was paired but GATT is disconnected. Trying to auto-reconnect...");
+              try {
+                  setBtStatus('connecting');
+                  const server = await btDevice.gatt.connect();
+                  const services = await server.getPrimaryServices();
+                  let autoChar = null;
+                  for (const service of services) {
+                      try {
+                          const characteristics = await service.getCharacteristics();
+                          for (const char of characteristics) {
+                              if (char.properties.write || char.properties.writeWithoutResponse) {
+                                  autoChar = char;
+                                  break;
+                              }
+                          }
+                      } catch (cErr) {}
+                      if (autoChar) break;
+                  }
+                  if (autoChar) {
+                      setBtCharacteristic(autoChar);
+                      setBtStatus('connected');
+                      
+                      let escPosBytes: Uint8Array;
+                      if (thaiCodePage.startsWith('graphic-')) {
+                          const width = thaiCodePage === 'graphic-80' ? 576 : 384;
+                          escPosBytes = await generateEscPosGraphicData(order, true, language, width);
+                      } else {
+                          escPosBytes = generateKitchenEscPosData(order, language);
+                      }
+                      await writeBtInChunks(autoChar, escPosBytes);
+                      return; // Successfully printed after auto-reconnect!
+                  }
+              } catch (reconnectErr) {
+                  console.warn("Bluetooth kitchen background reconnection failed:", reconnectErr);
+                  setBtStatus('disconnected');
+                  setBtCharacteristic(null);
+              }
+          }
+
           if (btCharacteristic) {
               try {
                   let escPosBytes: Uint8Array;
@@ -923,6 +1008,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   return; // Successfully printed kitchen ticket directly via Bluetooth!
               } catch (err: any) {
                   console.error("Bluetooth kitchen write failed", err);
+                  setBtCharacteristic(null);
+                  setBtStatus('disconnected');
               }
           }
       }

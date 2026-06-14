@@ -350,6 +350,35 @@ export const KitchenView: React.FC = () => {
         </div>
       )}
 
+      {printerType === 'bluetooth' && btStatus !== 'connected' && (
+        <div 
+          onClick={async () => {
+            playClickSound();
+            await resetBluetoothConnection();
+          }}
+          className="mb-6 bg-amber-500 hover:bg-amber-600 border border-amber-650 p-4 rounded-xl flex items-center justify-between text-white font-sans text-xs font-black cursor-pointer shadow-lg active:scale-[0.99] transition-all duration-200 select-none group"
+          title={language === 'th' ? 'คลิกที่นี่เพื่อเชื่อมต่อเครื่องปริ้นเตอร์ Bluetooth และล้างบัฟเฟอร์ค้าง' : 'Click to connect / reconnect Bluetooth printer'}
+        >
+          <div className="flex items-center gap-3">
+            <span className="bg-white/20 p-2 rounded-lg animate-pulse text-xl text-white">
+              🖨️
+            </span>
+            <div>
+              <p className="font-bold text-base md:text-lg flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping"></span>
+                {language === 'th' ? 'เครื่องพิมพ์ครัวบลูทูธ ไม่ได้เชื่อมต่ออยู่ หรือค้างทำงาน' : 'Bluetooth kitchen printer is disconnected or inactive!'}
+              </p>
+              <p className="text-xs text-amber-50 font-medium font-sans">
+                {language === 'th' ? '👉 แตะที่นี่เพื่อเชื่อมต่อใหม่และล้างบัฟเฟอร์ค้าง เพื่อใช้งานส่งออเดอร์เข้าห้องครัวอัติโนมัติ' : '👉 Tap here to reconnect & reset stream buffers instantly for kitchen auto print'}
+              </p>
+            </div>
+          </div>
+          <button className="bg-white text-amber-700 hover:bg-amber-50 px-4 py-2 rounded-lg font-bold text-xs select-none shadow uppercase shrink-0">
+            {language === 'th' ? '🔄 รีเฟรชด่วน' : '🔄 Refresh BT'}
+          </button>
+        </div>
+      )}
+
       <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b border-gray-700 pb-4 gap-4">
         <div className="flex-1">
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
