@@ -88,6 +88,9 @@ export const POSView: React.FC = () => {
     const [customCP, setCustomCP] = useState<string>("18");
     const [activeTab, setActiveTab] = useState<string>('order');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
+    const [registeredCustomers, setRegisteredCustomers] = useState<any[]>([]);
+    const [loadingCustomers, setLoadingCustomers] = useState<boolean>(false);
+    const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
     
     // Half-Half customizer states for POS
     const [halfA, setHalfA] = useState<Pizza | null>(null);
@@ -103,6 +106,23 @@ export const POSView: React.FC = () => {
             setHalfB(null);
         }
     }, [selectedPizza]);
+
+    useEffect(() => {
+        if (activeTab === 'manage') {
+            const fetchCustomersList = async () => {
+                setLoadingCustomers(true);
+                try {
+                    const data = await getAllCustomers();
+                    setRegisteredCustomers(data || []);
+                } catch (e) {
+                    console.error("Error fetching customers list:", e);
+                } finally {
+                    setLoadingCustomers(false);
+                }
+            };
+            fetchCustomersList();
+        }
+    }, [activeTab, getAllCustomers]);
 
     const handleUpdateGPDeduction = async (order: Order) => {
         const suggestion = (order.totalAmount - (order.netAmount || order.totalAmount)).toFixed(2);
@@ -2436,6 +2456,157 @@ export const POSView: React.FC = () => {
                     <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
                         <div className="max-w-4xl mx-auto space-y-6">
                             <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><Settings className="text-brand-600"/> Store Settings & Management</h2>
+                            
+                            {/* Registered Customers List (รายชื่อสมาชิกที่ลงทะเบียน) */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 mb-4 gap-4">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                            <User size={20} className="text-brand-500" />
+                                            {language === 'th' ? 'รายชื่อลูกค้าที่สมัครสมาชิก' : 'Registered Customers'}
+                                            <span className="bg-brand-100 text-brand-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full">
+                                                {registeredCustomers.length}
+                                            </span>
+                                        </h3>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            {language === 'th' ? 'แสดงข้อมูลลูกค้าทั้งหมดที่ลงทะเบียนสมัครใช้งานบนเว็บไซต์' : 'Displays all customer accounts registered on the website'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <button 
+                                            onClick={async () => {
+                                                setLoadingCustomers(true);
+                                                try {
+                                                    const data = await getAllCustomers();
+                                                    setRegisteredCustomers(data || []);
+                                                } catch(e) {
+                                                    console.error(e);
+                                                } finally {
+                                                    setLoadingCustomers(false);
+                                                }
+                                            }}
+                                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                                            title={language === 'th' ? 'รีเฟรชข้อมูล' : 'Refresh List'}
+                                        >
+                                            <RefreshCw size={14} className={loadingCustomers ? "animate-spin" : ""} />
+                                        </button>
+                                        <button
+                                            onClick={handleExportCustomers}
+                                            className="bg-brand-50 hover:bg-brand-100 text-brand-600 px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                                        >
+                                            <FileSpreadsheet size={14} />
+                                            {language === 'th' ? 'ส่งออกข้อมูล (Export)' : 'Export CSV'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Customer Search Filter */}
+                                <div className="mb-4 relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                        <Search size={16} />
+                                    </div>
+                                    <input 
+                                        type="text"
+                                        placeholder={language === 'th' ? 'ค้นหาจาก ชื่อ หรือ เบอร์โทรศัพท์...' : 'Search by Name or Phone number...'}
+                                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-100 rounded-xl font-bold text-gray-800 outline-none focus:border-brand-500 transition text-sm"
+                                        value={customerSearchTerm}
+                                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Customer List Container */}
+                                {loadingCustomers ? (
+                                    <div className="flex flex-col items-center justify-center p-8 text-gray-400 font-sans">
+                                        <RefreshCw size={32} className="animate-spin text-brand-500 mb-2" />
+                                        <p className="text-sm font-bold">{language === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading customers...'}</p>
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        const trimmedTerm = customerSearchTerm.trim().toLowerCase();
+                                        const filtered = registeredCustomers.filter(c => 
+                                            !trimmedTerm ||
+                                            (c.name && c.name.toLowerCase().includes(trimmedTerm)) ||
+                                            (c.phone && c.phone.toLowerCase().includes(trimmedTerm)) ||
+                                            (c.address && c.address.toLowerCase().includes(trimmedTerm))
+                                        );
+
+                                        if (filtered.length === 0) {
+                                            return (
+                                                <div className="flex flex-col items-center justify-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                                    <User size={40} className="text-gray-300 mb-2" />
+                                                    <p className="text-sm font-bold text-gray-500">
+                                                        {customerSearchTerm ? (language === 'th' ? 'ไม่พบข้อมูลที่ค้นหา' : 'No customers match search') : (language === 'th' ? 'ยังไม่มีข้อมูลลูกค้าลงทะเบียน' : 'No registered customers found')}
+                                                    </p>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="overflow-x-auto rounded-xl border border-gray-105">
+                                                <table className="w-full text-left border-collapse font-sans text-xs">
+                                                    <thead>
+                                                        <tr className="bg-gray-50 text-gray-500 border-b border-gray-150 font-bold uppercase">
+                                                            <th className="p-3">{language === 'th' ? 'ชื่อลูกค้า / ระดับ' : 'Customer Name / Tier'}</th>
+                                                            <th className="p-3">{language === 'th' ? 'เบอร์โทรศัพท์' : 'Phone Number'}</th>
+                                                            <th className="p-3">{language === 'th' ? 'แต้มสะสม' : 'Loyalty Points'}</th>
+                                                            <th className="p-3">{language === 'th' ? 'ที่อยู่จัดส่งเริ่มต้น' : 'Default Address'}</th>
+                                                            <th className="p-3">{language === 'th' ? 'วันเกิด' : 'Birthday'}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 text-gray-700">
+                                                        {filtered.map((cust, idx) => (
+                                                            <tr key={cust.phone || idx} className="hover:bg-gray-50/50 transition">
+                                                                <td className="p-3 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-700 flex items-center justify-center font-bold">
+                                                                            {cust.name ? cust.name.charAt(0).toUpperCase() : 'C'}
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="font-extrabold text-sm text-gray-900 block">{cust.name || 'Anonymous'}</span>
+                                                                            {cust.tier && (
+                                                                                <span className={`inline-flex items-center gap-0.5 text-[9px] font-extrabold px-1.5 py-0.25 rounded ${
+                                                                                    cust.tier === 'Gold' ? 'bg-amber-100 text-amber-800' :
+                                                                                    cust.tier === 'Silver' ? 'bg-slate-100 text-slate-800' :
+                                                                                    'bg-orange-50 text-orange-700'
+                                                                                }`}>
+                                                                                    <Star size={8} fill="currentColor" /> {cust.tier}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3 font-extrabold text-gray-800 whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Phone size={11} className="text-gray-400 shrink-0" />
+                                                                        <span>{cust.phone}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-3 font-extrabold text-brand-600 whitespace-nowrap text-left text-sm">
+                                                                    {cust.loyaltyPoints || 0} {language === 'th' ? 'แต้ม' : 'pts'}
+                                                                </td>
+                                                                <td className="p-3 max-w-[220px]">
+                                                                    <p className="line-clamp-2 text-[11px] font-medium text-gray-500 leading-tight" title={cust.address}>
+                                                                        {cust.address || '-'}
+                                                                    </p>
+                                                                </td>
+                                                                <td className="p-3 whitespace-nowrap text-gray-500 font-medium">
+                                                                    {cust.birthday ? (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Calendar size={11} className="text-gray-400 shrink-0" />
+                                                                            <span>{cust.birthday}</span>
+                                                                        </div>
+                                                                    ) : '-'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        );
+                                    })()
+                                )}
+                            </div>
+
                             {/* Contact Info Settings */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                 <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Phone size={20} className="text-brand-500"/> Connect & Links (Footer)</h3>
