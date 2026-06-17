@@ -620,17 +620,25 @@ export const CustomerView: React.FC = () => {
       const extraToppingsPrice = comboSelections.reduce((sum, item) => {
           return sum + (item?.toppings.reduce((tSum, t) => tSum + t.price, 0) || 0);
       }, 0);
+      const extraPremiumPrice = comboSelections.reduce((sum, item) => {
+          if (!item) return sum;
+          const p = menu.find(m => m.id === item.pizzaId);
+          if (p && p.basePrice > 380) {
+              return sum + (p.basePrice - 380);
+          }
+          return sum;
+      }, 0);
       const localized = getLocalizedItem(selectedPizza);
       const item: CartItem = {
           id: Date.now().toString() + Math.random(),
           pizzaId: selectedPizza.id,
           name: localized.name,
           nameTh: selectedPizza.nameTh,
-          basePrice: selectedPizza.basePrice,
+          basePrice: selectedPizza.basePrice + extraPremiumPrice,
           selectedToppings: [],
           subItems: comboSelections, 
           quantity: 1,
-          totalPrice: selectedPizza.basePrice + extraToppingsPrice,
+          totalPrice: selectedPizza.basePrice + extraToppingsPrice + extraPremiumPrice,
           specialInstructions: specialInstructions
       };
       addToCart(item);
@@ -1565,7 +1573,15 @@ export const CustomerView: React.FC = () => {
                                              >
                                                  <img src={pizza.image} className="w-12 h-12 rounded-lg object-cover"/>
                                                  <div>
-                                                     <div className="font-bold text-sm text-gray-800 flex items-center gap-1.5">{(() => { const subB = language === 'th' ? (pizza.badgeTh || pizza.badge) : (pizza.badge || pizza.badgeTh); return subB ? <span className="bg-gradient-to-r from-red-600 to-amber-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm shrink-0 animate-pulse">{subB}</span> : null; })()}{getLocalizedItem(pizza).name}</div>
+                                                    <div className="font-bold text-sm text-gray-800 flex items-center gap-1.5">{(() => { const subB = language === 'th' ? (pizza.badgeTh || pizza.badge) : (pizza.badge || pizza.badgeTh); return subB ? <span className="bg-gradient-to-r from-red-600 to-amber-500 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm shrink-0 animate-pulse">{subB}</span> : null; })()}{getLocalizedItem(pizza).name}</div>
+                                                    <div className="text-xs text-gray-400 font-bold mt-0.5">฿{pizza.basePrice}</div>
+                                                    {pizza.basePrice > 380 && (
+                                                        <div className="mt-1">
+                                                            <span className="bg-orange-50 text-orange-700 text-[10px] font-black px-2 py-0.5 rounded-lg border border-orange-200">
+                                                                +{pizza.basePrice - 380} ฿
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                  </div>
                                              </button>
                                          ))}
@@ -1574,7 +1590,19 @@ export const CustomerView: React.FC = () => {
                              )}
                          </div>
                          <div className="p-4 border-t bg-white flex justify-between items-center">
-                             <div className="font-bold text-xl text-gray-900">฿{selectedPizza.basePrice}</div>
+                             <div>
+                                 <div className="text-[10px] font-extrabold text-gray-400 uppercase leading-none mb-1">{language === 'th' ? 'ยอดรวมเซ็ตนี้' : 'Bundle Price'}</div>
+                                 <div className="font-black text-2xl text-brand-600">
+                                     ฿{selectedPizza.basePrice + comboSelections.reduce((sum, item) => {
+                                         if (!item) return sum;
+                                         const p = menu.find(m => m.id === item.pizzaId);
+                                         if (p && p.basePrice > 380) {
+                                             return sum + (p.basePrice - 380);
+                                         }
+                                         return sum;
+                                     }, 0)}
+                                 </div>
+                             </div>
                              {!currentComboSlot && currentComboSlot !== 0 && (
                                  <button 
                                      disabled={comboSelections.filter(Boolean).length < (selectedPizza.comboCount || 0)}

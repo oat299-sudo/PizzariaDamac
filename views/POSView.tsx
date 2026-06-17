@@ -920,11 +920,19 @@ export const POSView: React.FC = () => {
         if (!selectedPizza) return;
         playSuccessFeedback();
         const localized = getLocalizedItem(selectedPizza);
+        const extraPremiumPrice = comboSelections.reduce((sum, item) => {
+            if (!item) return sum;
+            const p = menu.find(m => m.id === item.pizzaId);
+            if (p && p.basePrice > 380) {
+                return sum + (p.basePrice - 380);
+            }
+            return sum;
+        }, 0);
         const item: CartItem = {
             id: Date.now().toString() + Math.random().toString(),
             pizzaId: selectedPizza.id, name: localized.name, nameTh: selectedPizza.nameTh,
-            basePrice: selectedPizza.basePrice, selectedToppings: [], subItems: comboSelections,
-            quantity: quantity, totalPrice: selectedPizza.basePrice * quantity, specialInstructions: specialInstructions
+            basePrice: selectedPizza.basePrice + extraPremiumPrice, selectedToppings: [], subItems: comboSelections,
+            quantity: quantity, totalPrice: (selectedPizza.basePrice + extraPremiumPrice) * quantity, specialInstructions: specialInstructions
         };
         addToCart(item); setSelectedPizza(null); setComboSelections([]);
     }
@@ -3149,6 +3157,90 @@ export const POSView: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Promo Combo Builder (POS) */}
+                            {selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0 && (
+                                <div className="mb-6 bg-brand-50/50 p-5 rounded-2xl border border-brand-100 text-left">
+                                    <h3 className="font-extrabold text-brand-900 mb-3 flex items-center gap-2">
+                                        🎁 {language === 'th' ? 'เลือกรายการในเซ็ตโปรโมชั่น' : 'Select Combo Items'}
+                                    </h3>
+                                    
+                                    {activeComboSlot === null ? (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-gray-500 font-bold mb-2">
+                                                {language === 'th' ? `เลือกพิซซ่าทั้งหมด ${selectedPizza.comboCount} ถาดสำหรับชุดประหยัดนี้` : `Choose ${selectedPizza.comboCount} pizzas for this bundle`}
+                                            </p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {Array.from({ length: selectedPizza.comboCount }).map((_, idx) => {
+                                                    const sel = comboSelections[idx];
+                                                    return (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => handleComboSlotClick(idx)}
+                                                            className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center justify-between text-left transition duration-155 ${sel ? 'border-brand-500 bg-brand-50/80 hover:bg-brand-50' : 'border-gray-300 hover:border-brand-400 bg-white hover:bg-gray-55'}`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm text-white bg-brand-600`}>
+                                                                    {idx + 1}
+                                                                </div>
+                                                                <div>
+                                                                    <span className={`font-extrabold text-sm block ${sel ? 'text-gray-901' : 'text-gray-400'}`}>
+                                                                        {sel ? (language === 'th' ? sel.nameTh || sel.name : sel.name) : (language === 'th' ? 'คลิกเลือกพิซซ่า...' : 'Click to select...')}
+                                                                    </span>
+                                                                    {sel && (() => {
+                                                                        const p = menu.find(m => m.id === sel.pizzaId);
+                                                                        if (p && p.basePrice > 380) {
+                                                                            return <span className="inline-block mt-0.5 text-[10px] bg-red-100 text-red-800 font-black px-1.5 py-0.25 rounded">+{p.basePrice - 380} ฿</span>;
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                </div>
+                                                            </div>
+                                                            <ChevronRight size={18} className="text-gray-450" />
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveComboSlot(null)}
+                                                    className="text-xs font-extrabold text-gray-500 hover:text-gray-900 flex items-center gap-1 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm"
+                                                >
+                                                    <ArrowLeft size={14} /> Back
+                                                </button>
+                                                <h4 className="font-extrabold text-sm text-gray-700 font-mono">
+                                                    {language === 'th' ? `เลือกพิซซ่าถาดที่ #${activeComboSlot + 1}` : `Select Pizza for Slot #${activeComboSlot + 1}`}
+                                                </h4>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
+                                                {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                    <button
+                                                        key={pItem.id}
+                                                        type="button"
+                                                        onClick={() => handleComboPizzaSelect(pItem)}
+                                                        className="p-3 bg-white hover:bg-brand-50 border hover:border-brand-550 rounded-xl flex flex-col items-center text-center transition duration-150 relative overflow-hidden text-xs"
+                                                    >
+                                                        <img src={pItem.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80'} className="w-14 h-14 rounded-lg object-cover mb-2 border border-gray-100" referrerPolicy="no-referrer" />
+                                                        <span className="font-extrabold text-[11px] text-gray-800 block line-clamp-1">{language === 'th' ? pItem.nameTh || pItem.name : pItem.name}</span>
+                                                        <span className="text-[10px] text-gray-450 mt-1">฿{pItem.basePrice}</span>
+                                                        {pItem.basePrice > 380 && (
+                                                            <span className="absolute top-1 right-1 bg-orange-100 text-orange-850 text-[8px] font-black px-1.5 rounded">
+                                                                +{pItem.basePrice - 330 ? pItem.basePrice - 380 : 0} ฿
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Half-Half Selector (POS) */}
                             {selectedPizza.id === 'p_half_half' && (
                                 <div className="mb-6 bg-amber-50 p-4 rounded-xl border border-amber-200 text-left">
@@ -3243,6 +3335,14 @@ export const POSView: React.FC = () => {
                                     (((selectedPizza.id === 'p_half_half' 
                                         ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
                                         : selectedPizza.basePrice) 
+                                    + (selectedPizza.category === 'promotion' ? comboSelections.reduce((sum, item) => {
+                                        if (!item) return sum;
+                                        const p = menu.find(m => m.id === item.pizzaId);
+                                        if (p && p.basePrice > 380) {
+                                            return sum + (p.basePrice - 380);
+                                        }
+                                        return sum;
+                                    }, 0) : 0)
                                     + selectedToppings.reduce((s, t) => s + t.price, 0)) * quantity).toLocaleString()
                                 }
                             </button>
