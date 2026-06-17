@@ -3218,7 +3218,16 @@ export const POSView: React.FC = () => {
                                             </div>
                                             
                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
-                                                {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.available).map(pItem => (
+                                                {menu.filter(p => {
+                                                    if (p.category !== 'pizza') return false;
+                                                    if (p.id === 'custom_base' || p.id === 'p_half_half') return false;
+                                                    if (!p.available) return false;
+                                                    if ((p.comboCount || 0) > 0) return false;
+                                                    if (p.allowedPromotions && p.allowedPromotions.length > 0) {
+                                                        return p.allowedPromotions.includes(selectedPizza.id);
+                                                    }
+                                                    return true;
+                                                }).map(pItem => (
                                                     <button
                                                         key={pItem.id}
                                                         type="button"
@@ -3230,7 +3239,7 @@ export const POSView: React.FC = () => {
                                                         <span className="text-[10px] text-gray-450 mt-1">฿{pItem.basePrice}</span>
                                                         {pItem.basePrice > 380 && (
                                                             <span className="absolute top-1 right-1 bg-orange-100 text-orange-850 text-[8px] font-black px-1.5 rounded">
-                                                                +{pItem.basePrice - 330 ? pItem.basePrice - 380 : 0} ฿
+                                                                +{pItem.basePrice - 380} ฿
                                                             </span>
                                                         )}
                                                     </button>

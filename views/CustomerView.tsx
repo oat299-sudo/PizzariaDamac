@@ -1556,9 +1556,11 @@ export const CustomerView: React.FC = () => {
                                      <button onClick={() => setCurrentComboSlot(null)} className="mb-4 text-sm font-bold text-gray-500 flex items-center gap-1 hover:text-gray-800"><ArrowLeft size={16}/> Back to Bundle</button>
                                      <h3 className="font-bold text-lg mb-4">Choose Pizza #{currentComboSlot + 1}</h3>
                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                         {/* Updated Filter: Exclude Promotions & respect allowedPromotions */}
+                                         {/* Updated Filter: Exclude Promotions, respect allowedPromotions & enforce pizza category */}
                                          {menu.filter(p => {
-                                             if (p.category === 'promotion') return false;
+                                             if (p.category !== 'pizza') return false;
+                                             if (p.id === 'custom_base' || p.id === 'p_half_half') return false;
+                                             if (!p.available) return false;
                                              if ((p.comboCount || 0) > 0) return false;
                                              // Check eligibility
                                              if (p.allowedPromotions && p.allowedPromotions.length > 0) {
