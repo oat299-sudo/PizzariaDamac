@@ -2615,6 +2615,98 @@ export const POSView: React.FC = () => {
                                 )}
                             </div>
 
+                            {/* Catering Gallery & Banner Settings */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-lg text-gray-800 mb-2 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <ImageIcon size={20} className="text-brand-500"/>
+                                    {language === 'th' ? 'แกลเลอรี่ภาพงานกิจกรรม & แบนเนอร์ (Catering & Promo Media)' : 'Catering Events Gallery & Banner'}
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-6">
+                                    {language === 'th' 
+                                        ? 'ตั้งค่ารูปภาพกิจกรรมจัดเลี้ยง (Catering & Private Events) และรูปป้ายโปรโมชั่นต้อนรับของร้าน ภาพทั้งหมดจะถูกบีบอัดรักษาพื้นที่หน่วยความจำอัตโนมัติ' 
+                                        : 'Manage pictures shown in the Catering & Private Events section and the shop welcoming banner.'}
+                                </p>
+
+                                <div className="space-y-6 animate-fade-in">
+                                    {/* Promotional Banner */}
+                                    <div className="bg-gray-55 p-4 rounded-xl border border-gray-100">
+                                        <h4 className="font-bold text-sm text-gray-700 mb-3 block">
+                                            📢 {language === 'th' ? 'รูปแบนเนอร์โปรโมชั่นร้าน (Promo Banner)' : 'Store Welcome Banner'}
+                                        </h4>
+                                        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                            {mediaForm.promoBannerUrl ? (
+                                                <img src={mediaForm.promoBannerUrl} className="w-full md:w-48 h-24 object-cover rounded-lg border border-gray-200 shadow-sm shrink-0" referrerPolicy="no-referrer" />
+                                            ) : (
+                                                <div className="w-full md:w-48 h-24 bg-gray-205 rounded-lg flex items-center justify-center font-bold text-xs text-gray-405 shrink-0">
+                                                    {language === 'th' ? 'ไม่มีแบนเนอร์' : 'No Banner'}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 space-y-2">
+                                                <p className="text-xs text-gray-500 font-medium">
+                                                    {language === 'th' 
+                                                        ? 'แบนเนอร์ขนาดใหญ่สำหรับแสดงเป็นป้ายต้อนรับด้านบนสุดของหน้าฝั่งลูกค้า' 
+                                                        : 'Displayed highlighting your shop on customer mobile browsers.'}
+                                                </p>
+                                                <label className="inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:border-brand-500 text-gray-700 hover:text-brand-600 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition cursor-pointer">
+                                                    <Upload size={14} />
+                                                    {language === 'th' ? 'เปลี่ยนภาพแบนเนอร์' : 'Change Banner'}
+                                                    <input type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Event Gallery */}
+                                    <div>
+                                        <h4 className="font-bold text-sm text-gray-700 mb-3 block">
+                                            📸 {language === 'th' ? 'รูปกิจกรรมต่าง ๆ & งานจัดเลี้ยง (Catering & Events Gallery)' : 'Catering & Event Photos'}
+                                        </h4>
+                                        <p className="text-xs text-gray-400 mb-4 leading-relaxed font-semibold">
+                                            {language === 'th' 
+                                                ? 'รูปภาพที่จะแสดงในส่วน "Catering & Private Events" ด้านล่างหน้าลูกค้าของคุณ แนะนำให้ลงรูปงานจัดเลี้ยง เทศกาล หรือบรรยากาศหน้าร้านสวยๆ' 
+                                                : 'Images displayed under the "Catering & Private Events" section of your customer catalog page.'}
+                                        </p>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                            {/* List current photos */}
+                                            {(mediaForm.eventGalleryUrls || []).map((img, idx) => (
+                                                <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-gray-200 group bg-gray-100">
+                                                    <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const filtered = (mediaForm.eventGalleryUrls || []).filter((_, i) => i !== idx);
+                                                            setMediaForm(prev => ({ ...prev, eventGalleryUrls: filtered }));
+                                                        }}
+                                                        className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white p-1.5 rounded-lg shadow transition transform hover:scale-105"
+                                                        title={language === 'th' ? 'ลบรูปภาพนี้' : 'Delete this photo'}
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+
+                                            {/* Dotted Upload trigger */}
+                                            <label className="border-2 border-dashed border-gray-300 hover:border-brand-500 text-gray-400 hover:text-brand-600 hover:bg-brand-50/20 rounded-xl transition cursor-pointer flex flex-col items-center justify-center p-4 aspect-video group">
+                                                <Upload size={20} className="mb-1 text-gray-400 group-hover:scale-110 transition" />
+                                                <span className="text-[10px] font-extrabold">{language === 'th' ? 'อัปโหลดภาพกิจกรรม' : 'Add Event Photo'}</span>
+                                                <input type="file" accept="image/*" onChange={handleEventImageUpload} className="hidden" />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+                                    <button 
+                                        type="button"
+                                        onClick={handleSaveMediaSettings} 
+                                        className="w-full lg:w-auto bg-brand-600 hover:bg-brand-700 text-white font-extrabold py-2.5 px-6 rounded-xl shadow transition"
+                                    >
+                                        💾 {language === 'th' ? 'บันทึกแกลเลอรี่และแบนเนอร์' : 'Save Gallery & Banner'}
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Contact Info Settings */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                 <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Phone size={20} className="text-brand-500"/> Connect & Links (Footer)</h3>

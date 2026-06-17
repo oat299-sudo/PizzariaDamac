@@ -283,11 +283,11 @@ export const CustomerView: React.FC = () => {
               const d = calculateDistanceKm(storeLat, storeLng, deliveryLat, deliveryLng);
               setDeliveryDistanceKm(d);
               
-              const freeKm = storeSettings.freeDeliveryRadiusKm ?? 5;
+              const freeKm = 0; // Temporarily removed free delivery radius (set to 0)
               const rateKm = storeSettings.deliveryFeePerKm ?? 10;
               const base = storeSettings.baseDeliveryFee ?? 0;
               
-              const calculatedFee = d <= freeKm ? base : base + Math.ceil(d - freeKm) * rateKm;
+              const calculatedFee = base + Math.ceil(d) * rateKm;
               setDeliveryFee(calculatedFee);
           }
           
@@ -2023,8 +2023,8 @@ export const CustomerView: React.FC = () => {
                                                                      </div>
                                                                      <div className="text-[10px] font-normal leading-tight mt-1 text-emerald-600/90 text-center">
                                                                          {deliveryDistanceKm <= (storeSettings.freeDeliveryRadiusKm || 5) 
-                                                                             ? (language === 'th' ? '✨ อยู่ในระยะจัดส่งฟรี!' : '✨ Within free delivery zone!')
-                                                                             : (language === 'th' ? 'เกินระยะส่งฟรี (คาดว่ามีค่าจัดส่ง)' : 'Outside free delivery zone')}
+                                                                             ? (language === 'th' ? '🛵 จัดส่งโดยไรเดอร์ตามระยะทางจริง' : '🛵 Standard distance-based delivery')
+                                                                             : (language === 'th' ? '🛵 จัดส่งโดยไรเดอร์ตามระยะทางจริง' : '🛵 Standard distance-based delivery')}
                                                                          <div className="text-emerald-800 font-medium mt-1.5 leading-tight flex items-start gap-1 text-left bg-emerald-100/50 p-2 rounded">
                                                                              <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500"/>
                                                                              <span>{language === 'th' ? 'ระยะทางที่แสดงผลนี้อาจจะไม่ถูกต้อง 100% ทางร้านจะตรวจเช็คระยะทางจริงจาก Google Map และแจ้งค่าจัดส่งที่แน่ชัดอีกครั้ง' : 'Distance shown is estimated. The store will verify the exact distance via Google Maps and confirm the final fee.'}</span>
