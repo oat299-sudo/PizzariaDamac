@@ -1303,20 +1303,21 @@ export const POSView: React.FC = () => {
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount || 0), 0) - totalExpenses;
     const filteredMenu = useMemo(() => {
-        const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory; });
+        const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory && item.id !== 'p_half_half'; });
         if (activeCategory === 'pizza') {
+            const savedHalfHalf = menu.find(p => p.id === 'p_half_half');
             const virtualHalfHalfPizza: Pizza = {
                 id: 'p_half_half',
-                name: 'Half-Half Pizza (Create Your Own)',
-                nameTh: 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
-                basePrice: 0, 
-                description: 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
-                descriptionTh: 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
-                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
-                available: true,
+                name: savedHalfHalf?.name || 'Half-Half Pizza (Create Your Own)',
+                nameTh: savedHalfHalf?.nameTh || 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
+                basePrice: savedHalfHalf?.basePrice || 0, 
+                description: savedHalfHalf?.description || 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
+                descriptionTh: savedHalfHalf?.descriptionTh || 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
+                image: savedHalfHalf?.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+                available: savedHalfHalf !== undefined ? savedHalfHalf.available : true,
                 category: 'pizza',
-                badge: 'Mix 2-in-1',
-                badgeTh: 'แบ่งครึ่งผสมผสาน'
+                badge: savedHalfHalf?.badge || 'Mix 2-in-1',
+                badgeTh: savedHalfHalf?.badgeTh || 'แบ่งครึ่งผสมผสาน'
             };
             return [virtualHalfHalfPizza, ...raw];
         }
@@ -3591,6 +3592,16 @@ export const POSView: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
+                                        {/* Image URL text input */}
+                                        <div className="mt-2 text-left">
+                                            <input 
+                                                type="text" 
+                                                placeholder={language === 'th' ? 'หรือ วางลิงก์รูปภาพตรงนี้ (เช่น Google Drive, Web Link)' : 'Or paste direct image URL (e.g. Google Drive, Web Link)'}
+                                                value={itemForm.image || ''} 
+                                                onChange={e => setItemForm({ ...itemForm, image: e.target.value })} 
+                                                className="w-full text-xs font-bold border border-gray-250 rounded-lg px-2.5 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800 font-mono shadow-sm"
+                                            />
+                                        </div>
                                     </div>
                                     
                                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-150 space-y-3 text-left">
@@ -3817,6 +3828,16 @@ export const POSView: React.FC = () => {
                                             </label>
                                         </div>
                                     )}
+                                </div>
+                                {/* Topping image URL text field */}
+                                <div className="mt-2 text-left">
+                                    <input 
+                                        type="text" 
+                                        placeholder={language === 'th' ? 'หรือ วางลิงก์รูปภาพท็อปปิ้งตรงนี้ (เช่น Google Drive, Web Link)' : 'Or paste direct topping image URL (e.g. Google Drive, Web Link)'}
+                                        value={toppingForm.image || ''} 
+                                        onChange={e => setToppingForm({ ...toppingForm, image: e.target.value })} 
+                                        className="w-full text-xs font-bold border border-gray-250 rounded-lg px-2.5 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800 font-mono shadow-sm"
+                                    />
                                 </div>
                             </div>
 

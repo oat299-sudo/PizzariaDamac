@@ -1213,20 +1213,21 @@ export const CustomerView: React.FC = () => {
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
                     {(() => {
-                        const rawItems = menu.filter(p => p.category === activeCategory);
+                        const rawItems = menu.filter(p => p.category === activeCategory && p.id !== 'p_half_half');
                         if (activeCategory === 'pizza') {
+                            const savedHalfHalf = menu.find(p => p.id === 'p_half_half');
                             const virtualHalfHalfPizza: Pizza = {
                                 id: 'p_half_half',
-                                name: 'Half-Half Pizza (Create Your Own)',
-                                nameTh: 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
-                                basePrice: 0, 
-                                description: 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
-                                descriptionTh: 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
-                                image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
-                                available: true,
+                                name: savedHalfHalf?.name || 'Half-Half Pizza (Create Your Own)',
+                                nameTh: savedHalfHalf?.nameTh || 'พิซซ่าครึ่ง-ครึ่ง (รวม 2 หน้าในถาดเดียว)',
+                                basePrice: savedHalfHalf?.basePrice || 0, 
+                                description: savedHalfHalf?.description || 'Choose 2 flavors in 1 pizza tray! Price is (Average base price + 20 THB).',
+                                descriptionTh: savedHalfHalf?.descriptionTh || 'เลือกผสม 2 หน้าที่คุณชอบในถาดเดียว! ราคาคิดเฉลี่ยสองหน้า + 20 บาท',
+                                image: savedHalfHalf?.image || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+                                available: savedHalfHalf !== undefined ? savedHalfHalf.available : true,
                                 category: 'pizza',
-                                badge: 'Mix 2-in-1',
-                                badgeTh: 'แบ่งครึ่งผสมผสาน'
+                                badge: savedHalfHalf?.badge || 'Mix 2-in-1',
+                                badgeTh: savedHalfHalf?.badgeTh || 'แบ่งครึ่งผสมผสาน'
                             };
                             return [virtualHalfHalfPizza, ...rawItems];
                         }

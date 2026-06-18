@@ -1663,16 +1663,24 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const updatePizza = async (pizza: Pizza) => {
       if (isSupabaseConfigured) {
           try {
-            await supabase.from('menu_items').update({
+            await supabase.from('menu_items').upsert({
+                id: pizza.id,
                 name: pizza.name, name_th: pizza.nameTh, 
                 description: pizza.description, description_th: pizza.descriptionTh,
                 base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
                 combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false
-            }).eq('id', pizza.id);
+            });
           } catch(e) { console.error(e); }
       }
       // Always update local
-      setMenu(prev => prev.map(p => p.id === pizza.id ? pizza : p));
+      setMenu(prev => {
+          const exists = prev.some(p => p.id === pizza.id);
+          if (exists) {
+              return prev.map(p => p.id === pizza.id ? pizza : p);
+          } else {
+              return [...prev, pizza];
+          }
+      });
   };
   const deletePizza = async (id: string) => {
       if (isSupabaseConfigured) {
