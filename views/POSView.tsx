@@ -2781,6 +2781,87 @@ export const POSView: React.FC = () => {
                                 }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
                             </div>
 
+                            {/* Manage Toppings Card (จัดการส่วนผสมและท็อปปิ้ง) */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 mb-4 gap-4">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2 font-sans">
+                                            <Sparkles size={20} className="text-brand-500" />
+                                            {language === 'th' ? 'จัดการท็อปปิ้งและส่วนผสมเพิ่มเติม' : 'Manage Toppings & Ingredients'}
+                                            <span className="bg-brand-100 text-brand-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full font-mono">
+                                                {toppings.length}
+                                            </span>
+                                        </h3>
+                                        <p className="text-xs text-gray-400 mt-1 font-sans">
+                                            {language === 'th' ? 'เพิ่ม แก้ไข ลบ หรือตั้งค่าการเปิด/ปิดท็อปปิ้งในระบบ' : 'Add, edit, remove or toggle topping availability'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenToppingModal()}
+                                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm font-sans"
+                                    >
+                                        <Plus size={14} />
+                                        {language === 'th' ? 'เพิ่มท็อปปิ้งใหม่' : 'Add New Topping'}
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1 scrollbar-thin">
+                                    {toppings.map(t => {
+                                        const localizedName = language === 'th' && t.nameTh ? t.nameTh : t.name;
+                                        return (
+                                            <div key={t.id} className={`p-3 rounded-xl border flex items-center justify-between gap-3 bg-gray-50/50 hover:bg-gray-100 transition font-sans ${!t.available ? 'opacity-60 border-red-200 bg-red-50/10' : 'border-gray-200'}`}>
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    {t.image ? (
+                                                        <img src={convertGoogleDriveUrl(t.image)} alt={t.name} className="w-10 h-10 rounded-lg object-cover bg-gray-200 border border-gray-150" referrerPolicy="no-referrer" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold font-mono">🍕</div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="font-extrabold text-xs text-gray-801 leading-tight truncate">{localizedName}</p>
+                                                        <div className="flex items-center gap-1.5 mt-1 font-mono text-[10px] text-gray-500 font-bold">
+                                                            <span>฿{t.price}</span>
+                                                            <span className="text-gray-300">•</span>
+                                                            <span className="uppercase text-[9px] bg-gray-200 px-1 rounded text-gray-650 shrink-0">{t.category || 'other'}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {/* Toggle Stock */}
+                                                    <button 
+                                                        onClick={() => updateTopping({ ...t, available: !t.available })}
+                                                        className={`p-1.5 rounded-lg shadow-sm border transition cursor-pointer ${t.available ? 'bg-green-50 hover:bg-green-100 text-green-700 border-green-200' : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'}`}
+                                                        title={t.available ? (language === 'th' ? 'มีของอยู่ (คลิกเพื่อปิด)' : 'In Stock') : (language === 'th' ? 'หมด (คลิกเพื่อเปิด)' : 'Out of Stock')}
+                                                    >
+                                                        <Power size={11} />
+                                                    </button>
+                                                    {/* Edit */}
+                                                    <button 
+                                                        onClick={() => handleOpenToppingModal(t)}
+                                                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded-lg border border-blue-200 transition cursor-pointer"
+                                                        title="Edit"
+                                                    >
+                                                        <Edit2 size={11} />
+                                                    </button>
+                                                    {/* Delete */}
+                                                    <button 
+                                                        onClick={async () => {
+                                                            if (confirm(language === 'th' ? `คุณแน่ใจหรือไม่ที่จะลบท็อปปิ้ง "${localizedName}" จากระบบ?` : `Are you sure you want to delete topping "${localizedName}"?`)) {
+                                                                await deleteTopping(t.id);
+                                                            }
+                                                        }}
+                                                        className="bg-red-50 hover:bg-red-100 text-red-750 p-1.5 rounded-lg border border-red-200 transition text-red-700 cursor-pointer"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={11} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Printer Settings */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
                                 <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2"><Printer size={20} className="text-brand-500"/> {language === 'th' ? 'ตั้งค่าความกว้างกระดาษเครื่องพิมพ์' : 'Printer & Paper Width Settings'}</h3>
@@ -3446,6 +3527,380 @@ export const POSView: React.FC = () => {
                                     }, 0) : 0)
                                     + selectedToppings.reduce((s, t) => s + t.price, 0)) * quantity).toLocaleString()
                                 }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MENU ITEM EDIT/ADD MODAL (showItemModal) --- */}
+            {showItemModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden text-gray-800 animate-fade-in text-left">
+                        <div className="bg-brand-600 px-6 py-4 flex items-center justify-between text-white sticky top-0 z-10 font-sans">
+                            <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                🍔 {itemForm.id ? (language === 'th' ? 'แก้ไขรายละเอียดสินค้า' : 'Edit Menu Item') : (language === 'th' ? 'เพิ่มเมนูอาหารใหม่' : 'Add New Menu Item')}
+                            </h3>
+                            <button 
+                                onClick={() => setShowItemModal(false)} 
+                                className="text-white/80 hover:text-white font-bold text-2xl leading-none cursor-pointer"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-6 flex-1 font-sans">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                
+                                {/* Left Side: Image and Status */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">{language === 'th' ? 'รูปภาพสินค้า' : 'Product Image'}</label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50/50 hover:bg-gray-100 transition relative group h-48 overflow-hidden">
+                                            {itemForm.image ? (
+                                                <>
+                                                    <img 
+                                                        src={convertGoogleDriveUrl(itemForm.image)} 
+                                                        alt="preview" 
+                                                        className="absolute inset-0 w-full h-full object-cover" 
+                                                        referrerPolicy="no-referrer"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                                                        <label className="bg-white text-gray-800 px-3 py-1.5 rounded-lg text-xs font-bold shadow cursor-pointer hover:bg-gray-100 flex items-center gap-1">
+                                                            <Upload size={12}/> {language === 'th' ? 'เปลี่ยนรูป' : 'Change'}
+                                                            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                                        </label>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setItemForm({ ...itemForm, image: '' })}
+                                                            className="bg-red-650 bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:bg-red-700 flex items-center gap-1 cursor-pointer"
+                                                        >
+                                                            <Trash2 size={12}/> {language === 'th' ? 'ลบรูป' : 'Delete'}
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-center">
+                                                    <Plus className="text-gray-400 mb-2" size={40} />
+                                                    <p className="text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'ลากไฟล์รูปภาพ หรือคลิกเพื่ออัปโหลด' : 'Drag or click to upload'}</p>
+                                                    <p className="text-[10px] text-gray-400">{language === 'th' ? 'แนะนำสัดส่วน 1:1, ขนาดไม่เกิน 5MB' : 'Recommended 1:1 aspect ratio'}</p>
+                                                    <label className="mt-3 bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200 px-4 py-2 rounded-xl text-xs font-black shadow-sm cursor-pointer transition">
+                                                        {language === 'th' ? 'เลือกไฟล์รูปภาพ' : 'Select Image File'}
+                                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                                    </label>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-150 space-y-3 text-left">
+                                        <h4 className="font-extrabold text-xs text-gray-500 uppercase tracking-wider">{language === 'th' ? 'การตั้งค่าแท็กและสถานะ' : 'Badge & Status Settings'}</h4>
+                                        
+                                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                                            <span className="text-xs font-bold text-gray-700">{language === 'th' ? 'พร้อมขาย (มีของ)' : 'Available in Stock'}</span>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setItemForm({ ...itemForm, available: !itemForm.available })}
+                                                className="p-1 rounded-full transition cursor-pointer"
+                                            >
+                                                {itemForm.available ? <ToggleRight size={38} className="text-green-500" /> : <ToggleLeft size={38} className="text-gray-400" />}
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                                            <span className="text-xs font-bold text-gray-700">{language === 'th' ? 'เมนูแนะนำขายดี (Bestseller)' : 'Mark as Bestseller'}</span>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setItemForm({ ...itemForm, isBestSeller: !itemForm.isBestSeller })}
+                                                className="p-1 rounded-full transition cursor-pointer"
+                                            >
+                                                {itemForm.isBestSeller ? <ToggleRight size={38} className="text-amber-500" /> : <ToggleLeft size={38} className="text-gray-400" />}
+                                            </button>
+                                        </div>
+
+                                        {/* Promo Badges */}
+                                        <div className="grid grid-cols-2 gap-3 mt-2">
+                                            <div>
+                                                <label className="text-[10px] font-extrabold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ป้ายกำกับ (EN)' : 'Badge Label (EN)'}</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="e.g. Hot, Promo"
+                                                    value={itemForm.badge || ''} 
+                                                    onChange={e => setItemForm({ ...itemForm, badge: e.target.value })} 
+                                                    className="w-full text-xs font-bold border border-gray-205 rounded-lg px-2.5 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-extrabold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ป้ายกำกับ (TH)' : 'Badge Label (TH)'}</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="เช่น ยอดฮิต, ใหม่"
+                                                    value={itemForm.badgeTh || ''} 
+                                                    onChange={e => setItemForm({ ...itemForm, badgeTh: e.target.value })} 
+                                                    className="w-full text-xs font-bold border border-gray-205 rounded-lg px-2.5 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Right Side: Text Fields */}
+                                <div className="space-y-4 text-left font-sans">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ชื่อเมนูอาหาร (EN)' : 'Food Name (EN)'}</label>
+                                            <input 
+                                                type="text" 
+                                                required
+                                                value={itemForm.name || ''} 
+                                                onChange={e => setItemForm({ ...itemForm, name: e.target.value })} 
+                                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none"
+                                                placeholder="e.g. Carbonara Pasta"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ชื่อเมนูอาหาร (TH)' : 'Food Name (TH)'}</label>
+                                            <input 
+                                                type="text" 
+                                                required
+                                                value={itemForm.nameTh || ''} 
+                                                onChange={e => setItemForm({ ...itemForm, nameTh: e.target.value })} 
+                                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none"
+                                                placeholder="เช่น พาสต้าคาโบนาร่า"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'หมวดหมู่สินค้า' : 'Category'}</label>
+                                            <select 
+                                                value={itemForm.category || 'pizza'} 
+                                                onChange={e => setItemForm({ ...itemForm, category: e.target.value as ProductCategory })} 
+                                                className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 focus:border-brand-500 outline-none bg-white font-sans"
+                                            >
+                                                {(CATEGORIES || []).map(cat => (
+                                                    <option key={cat.id} value={cat.id}>{language === 'th' ? (cat.labelTh || cat.label) : cat.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ราคาเริ่มต้น (บาท)' : 'Base Price (฿)'}</label>
+                                            <input 
+                                                type="number" 
+                                                required
+                                                min="0"
+                                                value={itemForm.basePrice !== undefined ? itemForm.basePrice : ''} 
+                                                onChange={e => setItemForm({ ...itemForm, basePrice: parseInt(e.target.value) || 0 })} 
+                                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none font-mono"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'รายละเอียดสินค้า (EN)' : 'Description (EN)'}</label>
+                                        <textarea 
+                                            rows={2}
+                                            value={itemForm.description || ''} 
+                                            onChange={e => setItemForm({ ...itemForm, description: e.target.value })} 
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-medium text-gray-850 focus:border-brand-500 outline-none"
+                                            placeholder="e.g. Rich cream, egg yolk, bacon and cheese with fresh pasta."
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'รายละเอียดสินค้า (TH)' : 'Description (TH)'}</label>
+                                        <textarea 
+                                            rows={2}
+                                            value={itemForm.descriptionTh || ''} 
+                                            onChange={e => setItemForm({ ...itemForm, descriptionTh: e.target.value })} 
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-medium text-gray-850 focus:border-brand-500 outline-none"
+                                            placeholder="เช่น ครีมเข้มข้น ไข่แดง เบคอน และชีสขูด เสิร์ฟพร้อมพาสต้าเส้นสด"
+                                        />
+                                    </div>
+
+                                    {/* Promotion Bundle Fields if category is promotion */}
+                                    {itemForm.category === 'promotion' && (
+                                        <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 mt-2">
+                                            <h5 className="font-extrabold text-xs text-amber-900 mb-2 uppercase tracking-wide">📦 {language === 'th' ? 'ตั้งค่าการจัดสมนาคุณ (คอมโบ)' : 'Combo Choices Setup'}</h5>
+                                            <div>
+                                                <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'จำนวนตัวเลือกพิซซ่า/เมนูในชุดนี้' : 'Pizzas/Dishes Choices Count Limit'}</label>
+                                                <input 
+                                                    type="number"
+                                                    min="0"
+                                                    value={itemForm.comboCount || 0}
+                                                    onChange={e => setItemForm({ ...itemForm, comboCount: parseInt(e.target.value) || 0 })}
+                                                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-1.5 font-bold font-mono text-gray-800 outline-none focus:border-brand-500"
+                                                />
+                                                <p className="text-[9px] text-amber-800 font-medium mt-1 leading-relaxed">
+                                                    * {language === 'th' ? 'ระบุตัวเลข เช่น 2 หากต้องให้ลูกค้าเลือกรายการพิซซ่าได้ 2 ถาด (ใส่ 0 หากเป็นเซตปกติไม่มีเมนูให้เลือกย่อย)' : 'Specify choices user can select inside this promo, e.g. 2. (Set to 0 if simple static banner promo)'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gray-100 p-4 border-t border-gray-150 flex justify-end gap-3 sticky bottom-0 z-10 shrink-0 font-sans">
+                            <button 
+                                type="button"
+                                onClick={() => setShowItemModal(false)}
+                                className="px-5 py-2.5 rounded-xl font-bold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 active:scale-95 transition text-xs cursor-pointer"
+                            >
+                                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={handleSaveItem}
+                                disabled={!itemForm.name || itemForm.basePrice === undefined}
+                                className="px-6 py-2.5 rounded-xl font-black bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-md active:scale-95 transition text-xs cursor-pointer"
+                            >
+                                {language === 'th' ? '💾 บันทึกสินค้า' : '💾 Save Item'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- TOPPING EDIT/ADD MODAL (showToppingsModal) --- */}
+            {showToppingsModal && (
+                <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto print:hidden">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-gray-800 animate-fade-in text-left">
+                        <div className="bg-brand-600 px-6 py-4 flex items-center justify-between text-white sticky top-0 z-10 font-sans">
+                            <h3 className="font-extrabold text-lg flex items-center gap-2">
+                                🍕 {toppingForm.id ? (language === 'th' ? 'แก้ไขวัตถุดิบท็อปปิ้ง' : 'Edit Topping / Ingredient') : (language === 'th' ? 'เพิ่มวัตถุดิบท็อปปิ้งใหม่' : 'Add New Topping')}
+                            </h3>
+                            <button 
+                                onClick={() => setShowToppingsModal(false)} 
+                                className="text-white/80 hover:text-white font-bold text-2xl leading-none cursor-pointer"
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-4 flex-1 text-left font-sans">
+                            {/* Topping Image Upload */}
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">{language === 'th' ? 'รูปภาพท็อปปิ้ง (ย่อข้อมูลอัตโนมัติ)' : 'Topping Thumbnail Image'}</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-xl p-3 flex flex-col items-center justify-center bg-gray-50/50 hover:bg-gray-100 transition relative group h-32 overflow-hidden">
+                                    {toppingForm.image ? (
+                                        <>
+                                            <img 
+                                                src={convertGoogleDriveUrl(toppingForm.image)} 
+                                                alt="topping-preview" 
+                                                className="absolute inset-0 w-full h-full object-cover" 
+                                                referrerPolicy="no-referrer"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                                                <label className="bg-white text-gray-800 px-2.5 py-1 rounded-md text-xs font-bold shadow cursor-pointer hover:bg-gray-50 flex items-center gap-1">
+                                                    <Upload size={10}/> {language === 'th' ? 'เปลี่ยนรูป' : 'Change'}
+                                                    <input type="file" accept="image/*" className="hidden" onChange={handleToppingImageUpload} />
+                                                </label>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setToppingForm({ ...toppingForm, image: '' })}
+                                                    className="bg-red-600 text-white px-2.5 py-1 rounded-md text-xs font-bold shadow hover:bg-red-700 flex items-center gap-1 cursor-pointer"
+                                                >
+                                                    <Trash2 size={10}/> {language === 'th' ? 'ลบรูป' : 'Delete'}
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center text-center">
+                                            <Plus className="text-gray-400 mb-1" size={24} />
+                                            <p className="text-[10px] font-bold text-gray-500">{language === 'th' ? 'คลิกอัปโหลดภาพท็อปปิ้งสัดส่วน 1:1' : 'Upload 1:1 topping thumbnail'}</p>
+                                            <label className="mt-2 bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200 px-3 py-1 rounded-lg text-[10px] font-black shadow-sm cursor-pointer transition">
+                                                {language === 'th' ? 'เลือกไฟล์' : 'Select'}
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleToppingImageUpload} />
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ชื่อท็อปปิ้ง (EN)' : 'Topping Name (EN)'}</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={toppingForm.name || ''} 
+                                    onChange={e => setToppingForm({ ...toppingForm, name: e.target.value })} 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none"
+                                    placeholder="e.g. Extra Mozzarella Cheese"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ชื่อท็อปปิ้ง (TH)' : 'Topping Name (TH)'}</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={toppingForm.nameTh || ''} 
+                                    onChange={e => setToppingForm({ ...toppingForm, nameTh: e.target.value })} 
+                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none"
+                                    placeholder="เช่น เพิ่มมอสซาเรลล่าชีส"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'ราคาบวกเพิ่ม (฿)' : 'Extra Price (฿)'}</label>
+                                    <input 
+                                        type="number" 
+                                        required
+                                        min="0"
+                                        value={toppingForm.price !== undefined ? toppingForm.price : ''} 
+                                        onChange={e => setToppingForm({ ...toppingForm, price: parseInt(e.target.value) || 0 })} 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none font-mono"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase block mb-1">{language === 'th' ? 'หมวดหมู่ท็อปปิ้ง' : 'Category'}</label>
+                                    <select 
+                                        value={toppingForm.category || 'other'} 
+                                        onChange={e => setToppingForm({ ...toppingForm, category: e.target.value as any })} 
+                                        className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 focus:border-brand-500 outline-none bg-white font-sans"
+                                    >
+                                        <option value="sauce">{language === 'th' ? 'ซอสราด (Sauce)' : 'Sauce'}</option>
+                                        <option value="cheese">{language === 'th' ? 'ชีสแผ่น/ขูด (Cheese)' : 'Cheese'}</option>
+                                        <option value="meat">{language === 'th' ? 'เนื้อสัตว์ / ไส้ (Meat)' : 'Meat'}</option>
+                                        <option value="vegetable">{language === 'th' ? 'ผัก / ผลไม้ (Vegetable)' : 'Vegetable'}</option>
+                                        <option value="seasoning">{language === 'th' ? 'เครื่องปรุง (Seasoning)' : 'Seasoning'}</option>
+                                        <option value="other">{language === 'th' ? 'อื่นๆ (Other)' : 'Other'}</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-150 mt-2">
+                                <span className="text-xs font-bold text-gray-700">{language === 'th' ? 'สถานะท็อปปิ้ง (มีวัตถุดิบ)' : 'In Stock & Available'}</span>
+                                <button 
+                                    type="button"
+                                    onClick={() => setToppingForm({ ...toppingForm, available: !toppingForm.available })}
+                                    className="p-1 rounded-full transition cursor-pointer"
+                                >
+                                    {toppingForm.available ? <ToggleRight size={36} className="text-green-500" /> : <ToggleLeft size={36} className="text-gray-400" />}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-gray-100 p-4 border-t border-gray-150 flex justify-end gap-3 sticky bottom-0 z-10 shrink-0 font-sans">
+                            <button 
+                                type="button"
+                                onClick={() => setShowToppingsModal(false)}
+                                className="px-5 py-2 rounded-xl font-bold border border-gray-300 text-gray-750 bg-white hover:bg-gray-50 active:scale-95 transition text-xs cursor-pointer"
+                            >
+                                {language === 'th' ? 'ยกเลิก' : 'Cancel'}
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={handleSaveTopping}
+                                disabled={!toppingForm.name || toppingForm.price === undefined}
+                                className="px-6 py-2 rounded-xl font-black bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-md active:scale-95 transition text-xs cursor-pointer"
+                            >
+                                {language === 'th' ? '💾 บันทึกท็อปปิ้ง' : '💾 Save Topping'}
                             </button>
                         </div>
                     </div>
