@@ -1653,7 +1653,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 id: pizza.id, name: pizza.name, name_th: pizza.nameTh, 
                 description: pizza.description, description_th: pizza.descriptionTh,
                 base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-                combo_count: pizza.comboCount
+                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false
             }]);
           } catch (e) { console.error(e); }
       } 
@@ -1667,7 +1667,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 name: pizza.name, name_th: pizza.nameTh, 
                 description: pizza.description, description_th: pizza.descriptionTh,
                 base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-                combo_count: pizza.comboCount
+                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false
             }).eq('id', pizza.id);
           } catch(e) { console.error(e); }
       }

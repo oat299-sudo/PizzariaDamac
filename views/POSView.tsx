@@ -1738,8 +1738,8 @@ export const POSView: React.FC = () => {
                                     {filteredMenu.map(item => {
                                         const localized = getLocalizedItem(item);
                                         return (
-                                            <div key={item.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col transition h-full group ${!item.available ? 'opacity-60 grayscale' : ''} ${isEditMode ? 'hover:border-blue-400' : 'hover:border-brand-400 cursor-pointer active:scale-95'}`}>
-                                                <div className="relative aspect-square overflow-hidden" onClick={() => !isEditMode && handleCustomize(item)}>
+                                            <div key={item.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col transition h-full group ${!item.available ? 'opacity-60 grayscale' : ''} ${isEditMode ? 'border-dashed border-blue-400 hover:border-solid hover:border-blue-500 cursor-pointer shadow-sm hover:shadow-md' : 'hover:border-brand-400 cursor-pointer active:scale-95'}`}>
+                                                <div className="relative aspect-square overflow-hidden cursor-pointer" onClick={() => isEditMode ? handleEditMenuItem(item) : handleCustomize(item)}>
                                                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                                     
                                                     {/* Promo Badge Tag */}
@@ -1771,7 +1771,7 @@ export const POSView: React.FC = () => {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="p-4 flex flex-col flex-1" onClick={() => !isEditMode && handleCustomize(item)}>
+                                                <div className="p-4 flex flex-col flex-1 cursor-pointer" onClick={() => isEditMode ? handleEditMenuItem(item) : handleCustomize(item)}>
                                                     <h3 className="font-bold text-gray-800 text-base md:text-lg leading-tight mb-1">{localized.name}</h3>
                                                     <div className="mt-auto flex justify-between items-center pt-2">
                                                         <span className="font-bold text-brand-600 text-base md:text-lg">
