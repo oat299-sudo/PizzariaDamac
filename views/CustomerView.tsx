@@ -2282,7 +2282,7 @@ export const CustomerView: React.FC = () => {
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
-                                            placeholder={language === 'th' ? 'ใส่รหัส เช่น BOI3' : 'Enter code, e.g., BOI3'}
+                                            placeholder={language === 'th' ? 'ใส่รหัสส่วนลด' : 'Enter promo code'}
                                             value={promoCodeInput}
                                             onChange={(e) => setPromoCodeInput(e.target.value)}
                                             className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-brand-500 font-mono uppercase font-bold"
