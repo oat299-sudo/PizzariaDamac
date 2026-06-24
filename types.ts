@@ -114,6 +114,24 @@ export interface Order {
   // Partner Cafe QR parameters
   partnerId?: string;
   partnerCommissionAmount?: number;
+
+  // Discount & Promo code
+  promoCode?: string;
+  discountAmount?: number;
+}
+
+export type PromoDiscountType = 'percentage' | 'fixed_order' | 'fixed_delivery';
+
+export interface PromoCode {
+  id: string;
+  code: string; // e.g. "BOI3", "FREE50"
+  discountType: PromoDiscountType;
+  discountValue: number; // percentage value or baht value
+  minOrderAmount: number; // 0 if no minimum
+  isActive: boolean;
+  description?: string;
+  descriptionTh?: string;
+  createdAt: string;
 }
 
 export interface Partner {

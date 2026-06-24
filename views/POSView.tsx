@@ -5,7 +5,7 @@ import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -81,7 +81,8 @@ export const POSView: React.FC = () => {
         btDevice, btCharacteristic, btStatus,
         connectBluetoothPrinter, disconnectBluetoothPrinter, resetBluetoothConnection,
         triggerReceiptPrint, generateEscPosData, writeBtInChunks,
-        thaiCodePage, setThaiCodePage
+        thaiCodePage, setThaiCodePage,
+        promoCodes, addPromoCode, updatePromoCode, deletePromoCode
     } = useStore();
     
     // Unified Tab State
@@ -99,6 +100,14 @@ export const POSView: React.FC = () => {
     // Partners form states
     const [newPartnerName, setNewPartnerName] = useState('');
     const [newPartnerComm, setNewPartnerComm] = useState<number>(10);
+
+    // Promo form states
+    const [newPromoCode, setNewPromoCode] = useState('');
+    const [newPromoDescEn, setNewPromoDescEn] = useState('');
+    const [newPromoDescTh, setNewPromoDescTh] = useState('');
+    const [newPromoType, setNewPromoType] = useState<'percentage' | 'fixed_order' | 'fixed_delivery'>('percentage');
+    const [newPromoValue, setNewPromoValue] = useState<number>(3);
+    const [newPromoMinOrder, setNewPromoMinOrder] = useState<number>(500);
 
     useEffect(() => {
         if (selectedPizza?.id === 'p_half_half') {
@@ -123,6 +132,36 @@ export const POSView: React.FC = () => {
             fetchCustomersList();
         }
     }, [activeTab, getAllCustomers]);
+
+    const handleAddPromoCodeSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newPromoCode.trim()) {
+            alert(language === 'th' ? 'กรุณาใส่รหัสส่วนลด' : 'Please enter a promo code');
+            return;
+        }
+        
+        const promo: any = {
+            id: Date.now().toString(),
+            code: newPromoCode.trim().toUpperCase(),
+            description: newPromoDescEn.trim() || `${newPromoValue}% off on orders above ฿${newPromoMinOrder}`,
+            descriptionTh: newPromoDescTh.trim() || `ส่วนลด ${newPromoValue}${newPromoType === 'percentage' ? '%' : ' บาท'} เมื่อสั่งขั้นต่ำ ฿${newPromoMinOrder}`,
+            discountType: newPromoType,
+            discountValue: Number(newPromoValue) || 0,
+            minOrderAmount: Number(newPromoMinOrder) || 0,
+            isActive: true,
+            createdAt: new Date().toISOString()
+        };
+        
+        await addPromoCode(promo);
+        
+        // Reset form
+        setNewPromoCode('');
+        setNewPromoDescEn('');
+        setNewPromoDescTh('');
+        setNewPromoType('percentage');
+        setNewPromoValue(3);
+        setNewPromoMinOrder(500);
+    };
 
     const handleUpdateGPDeduction = async (order: Order) => {
         const suggestion = (order.totalAmount - (order.netAmount || order.totalAmount)).toFixed(2);
@@ -1661,6 +1700,7 @@ export const POSView: React.FC = () => {
                     <button onClick={() => { playClickSound(); setActiveTab('sales'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'sales' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'รายงานขาย' : 'Reports'}><PieChart size={28} /></button>
                     <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'qr_gen' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'สร้างคิวอาร์' : 'QR Generator'}><QrCode size={28} /></button>
                     <button onClick={() => { playClickSound(); setActiveTab('partners'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'partners' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'พาร์ทเนอร์แนะนำ' : 'Partner Referral Shares'}><Store size={28} /></button>
+                    <button onClick={() => { playClickSound(); setActiveTab('promos'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'promos' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'โปรโมชั่น & ส่วนลด' : 'Promotions & Discounts'}><Tag size={28} /></button>
                      <button onClick={() => { playClickSound(); setActiveTab('manage'); }} className={`p-4 rounded-2xl transition w-16 h-16 flex items-center justify-center ${activeTab === 'manage' ? 'bg-brand-600 text-white shadow-lg' : 'hover:bg-gray-800'}`} title={language === 'th' ? 'ตั้งค่าร้านค้า' : 'Store Settings'}><Settings size={28} /></button>
                 </div>
                 <div className="flex flex-col items-center gap-4 w-full">
@@ -1684,6 +1724,7 @@ export const POSView: React.FC = () => {
                 <div className="relative -top-5"><button onClick={() => { playClickSound(); setShowMobileCart(!showMobileCart); }} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
                 <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
                 <button onClick={() => { playClickSound(); setActiveTab('partners'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-brand-500' : 'text-gray-400'}`}><Store size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'พาร์ทเนอร์' : 'Partners'}</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('promos'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'promos' ? 'text-brand-500' : 'text-gray-400'}`}><Tag size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'ส่วนลด' : 'Promos'}</span></button>
                 <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'ตั้งค่าร้าน' : 'Settings'}</span></button>
             </div>
 
@@ -2449,6 +2490,222 @@ export const POSView: React.FC = () => {
                                                             >
                                                                 {language === 'th' ? 'ลบบัญชีพันธมิตร' : 'Delete Partner'}
                                                             </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'promos' && (
+                    <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6 font-sans">
+                        <div className="max-w-6xl mx-auto space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-200 pb-4 mb-4 gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
+                                        <Ticket className="text-brand-600 animate-pulse" size={28}/>
+                                        {language === 'th' ? 'จัดการคูปอง & รหัสส่วนลด' : 'Promo & Coupon Management'}
+                                    </h2>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {language === 'th' ? 'สร้างและกำหนดเงื่อนไขส่วนลดสำหรับลูกค้า สั่งออนไลน์' : 'Create and configure custom discount codes for online customer orders.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Create New Promo Code Form */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-fit lg:col-span-1">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                        <Plus size={20} className="text-green-500"/>
+                                        {language === 'th' ? 'เพิ่มรหัสส่วนลดใหม่' : 'Create New Promo'}
+                                    </h3>
+                                    <form onSubmit={handleAddPromoCodeSubmit} className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'รหัสส่วนลด (พิมพ์ใหญ่เท่านั้น)' : 'Promo Code (Uppercase)'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. BOI3, BOI50"
+                                                value={newPromoCode}
+                                                onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())}
+                                                className="w-full text-sm font-mono font-bold border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500 uppercase"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'ประเภทส่วนลด' : 'Discount Type'}
+                                            </label>
+                                            <select
+                                                value={newPromoType}
+                                                onChange={(e: any) => setNewPromoType(e.target.value)}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            >
+                                                <option value="percentage">{language === 'th' ? 'ลดเป็นเปอร์เซ็นต์ (%)' : 'Percentage (%)'}</option>
+                                                <option value="fixed_order">{language === 'th' ? 'ลดราคาอาหารตรงๆ (บาท)' : 'Fixed Order discount (THB)'}</option>
+                                                <option value="fixed_delivery">{language === 'th' ? 'ส่วนลดค่าจัดส่ง (บาท)' : 'Fixed Delivery discount (THB)'}</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'มูลค่าส่วนลด' : 'Discount Value'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="1"
+                                                placeholder={newPromoType === 'percentage' ? 'e.g., 3' : 'e.g., 50'}
+                                                value={newPromoValue || ''}
+                                                onChange={(e) => setNewPromoValue(Number(e.target.value))}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            />
+                                            <p className="text-[10px] text-gray-400 mt-1">
+                                                {newPromoType === 'percentage' 
+                                                    ? (language === 'th' ? 'เช่น ใส่ 3 เพื่อลด 3%' : 'E.g., enter 3 for 3% discount')
+                                                    : (language === 'th' ? 'เช่น ใส่ 50 เพื่อลด 50 บาท' : 'E.g., enter 50 for 50 THB discount')
+                                                }
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'ยอดสั่งซื้อขั้นต่ำ (บาท)' : 'Min Order Amount (THB)'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="0"
+                                                placeholder="e.g., 500"
+                                                value={newPromoMinOrder || 0}
+                                                onChange={(e) => setNewPromoMinOrder(Number(e.target.value))}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'คำอธิบาย (ภาษาไทย - ไม่บังคับ)' : 'Description (Thai - Optional)'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g., ส่วนลด 3% เมื่อยอดสั่งเกิน 500 บาท"
+                                                value={newPromoDescTh}
+                                                onChange={(e) => setNewPromoDescTh(e.target.value)}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'คำอธิบาย (English - ไม่บังคับ)' : 'Description (English - Optional)'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g., 3% discount on orders above 500 THB"
+                                                value={newPromoDescEn}
+                                                onChange={(e) => setNewPromoDescEn(e.target.value)}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-brand-500/10 transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={18}/>
+                                            {language === 'th' ? 'เพิ่มคูปองส่วนลด' : 'Add Promo Code'}
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {/* List of Existing Promo Codes */}
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 lg:col-span-2">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">
+                                        {language === 'th' ? 'รหัสส่วนลดปัจจุบัน' : 'Active Promo Codes'}
+                                    </h3>
+                                    {(!promoCodes || promoCodes.length === 0) ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                                            <Ticket size={48} className="mb-2 opacity-30 animate-bounce"/>
+                                            <p>{language === 'th' ? 'ยังไม่มีคูปองส่วนลด' : 'No promo codes configured yet.'}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {promoCodes.map((promo) => {
+                                                const discountFormatted = promo.discountType === 'percentage' 
+                                                    ? `${promo.discountValue}%` 
+                                                    : `${promo.discountValue} THB`;
+                                                    
+                                                const typeFormatted = promo.discountType === 'percentage'
+                                                    ? (language === 'th' ? 'ลดเป็นเปอร์เซ็นต์ (%)' : 'Percentage (%)')
+                                                    : promo.discountType === 'fixed_order'
+                                                    ? (language === 'th' ? 'ลดราคาอาหาร (บาท)' : 'Fixed Order (THB)')
+                                                    : (language === 'th' ? 'ลดค่าส่ง (บาท)' : 'Delivery (THB)');
+                                                    
+                                                return (
+                                                    <div key={promo.id} className={`p-4 rounded-xl border transition ${promo.isActive ? 'bg-white border-gray-200 hover:shadow-md' : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-base font-mono font-black tracking-wider bg-gray-900 text-white px-2.5 py-1 rounded-lg">
+                                                                    {promo.code}
+                                                                </span>
+                                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${promo.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                    {promo.isActive ? (language === 'th' ? 'เปิดใช้งาน' : 'Active') : (language === 'th' ? 'ปิดอยู่' : 'Inactive')}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const updated = { ...promo, isActive: !promo.isActive };
+                                                                        await updatePromoCode(updated);
+                                                                    }}
+                                                                    className={`p-1.5 rounded-lg border transition ${promo.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'}`}
+                                                                    title={promo.isActive ? (language === 'th' ? 'ปิดการใช้งาน' : 'Deactivate') : (language === 'th' ? 'เปิดการใช้งาน' : 'Activate')}
+                                                                >
+                                                                    {promo.isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (confirm(language === 'th' ? `ลบรหัสส่วนลด "${promo.code}" หรือไม่?` : `Delete promo code "${promo.code}"?`)) {
+                                                                            deletePromoCode(promo.id);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-red-500 border border-red-100 bg-red-50 rounded-lg hover:bg-red-100 transition cursor-pointer"
+                                                                >
+                                                                    <Trash2 size={16}/>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-1 mt-3">
+                                                            <p className="text-xs font-bold text-gray-800">
+                                                                {language === 'th' ? promo.descriptionTh : promo.description}
+                                                            </p>
+                                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 text-[10px] text-gray-500">
+                                                                <div>
+                                                                    <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'ประเภท' : 'Type'}</span>
+                                                                    <span className="font-bold">{typeFormatted}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'ส่วนลด' : 'Discount'}</span>
+                                                                    <span className="font-bold text-brand-600">{discountFormatted}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'ขั้นต่ำ' : 'Min Order'}</span>
+                                                                    <span className="font-bold">฿{promo.minOrderAmount}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'สร้างเมื่อ' : 'Created At'}</span>
+                                                                    <span className="font-semibold font-mono">{new Date(promo.createdAt).toLocaleDateString()}</span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );

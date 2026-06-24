@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { 
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
   PaymentMethod, CustomerProfile, Expense, StoreSettings, NewsItem, 
-  SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory, Partner
+  SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory, Partner,
+  PromoCode
 } from '../types';
 import { 
   INITIAL_MENU, INITIAL_TOPPINGS, DEFAULT_STORE_SETTINGS, 
@@ -143,6 +144,11 @@ interface StoreContextType {
   writeBtInChunks: (characteristic: any, data: Uint8Array) => Promise<void>;
   thaiCodePage: string;
   setThaiCodePage: (cp: string) => void;
+
+  promoCodes: PromoCode[];
+  addPromoCode: (pc: PromoCode) => Promise<void>;
+  updatePromoCode: (pc: PromoCode) => Promise<void>;
+  deletePromoCode: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -1339,6 +1345,102 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   };
 
+  // --- Promo Codes State ---
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_promo_codes');
+          if (saved) {
+              try { return JSON.parse(saved); } catch(e) {}
+          }
+      }
+      return [
+        {
+          id: 'pc_boi3',
+          code: 'BOI3',
+          discountType: 'percentage',
+          discountValue: 3,
+          minOrderAmount: 0,
+          isActive: true,
+          description: '3% Discount for BOI workers',
+          descriptionTh: 'ส่วนลด 3% สำหรับพนักงาน BOI',
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'pc_free50',
+          code: 'BOI50',
+          discountType: 'fixed_delivery',
+          discountValue: 50,
+          minOrderAmount: 500,
+          isActive: true,
+          description: '50 THB off delivery fee on orders over 500 THB',
+          descriptionTh: 'ส่วนลดค่าส่ง 50 บาท เมื่อยอดสั่งครบ 500 บาทขึ้นไป',
+          createdAt: new Date().toISOString()
+        }
+      ];
+  });
+
+  const addPromoCode = async (pc: PromoCode) => {
+      const updated = [pc, ...promoCodes];
+      setPromoCodes(updated);
+      try {
+          localStorage.setItem('damac_promo_codes', JSON.stringify(updated));
+      } catch(e) {}
+
+      if (isSupabaseConfigured) {
+          try {
+              await supabase.from('promo_codes').insert([{
+                  id: pc.id,
+                  code: pc.code,
+                  discount_type: pc.discountType,
+                  discount_value: pc.discountValue,
+                  min_order_amount: pc.minOrderAmount,
+                  is_active: pc.isActive,
+                  description: pc.description,
+                  description_th: pc.descriptionTh,
+                  created_at: pc.createdAt
+              }]);
+          } catch(e) { console.error("Supabase insert promo code failed", e); }
+      }
+  };
+
+  const updatePromoCode = async (pc: PromoCode) => {
+      const updated = promoCodes.map(p => p.id === pc.id ? pc : p);
+      setPromoCodes(updated);
+      try {
+          localStorage.setItem('damac_promo_codes', JSON.stringify(updated));
+      } catch(e) {}
+
+      if (isSupabaseConfigured) {
+          try {
+              await supabase.from('promo_codes').upsert({
+                  id: pc.id,
+                  code: pc.code,
+                  discount_type: pc.discountType,
+                  discount_value: pc.discountValue,
+                  min_order_amount: pc.minOrderAmount,
+                  is_active: pc.isActive,
+                  description: pc.description,
+                  description_th: pc.descriptionTh,
+                  created_at: pc.createdAt
+              });
+          } catch(e) { console.error("Supabase update promo code failed", e); }
+      }
+  };
+
+  const deletePromoCode = async (id: string) => {
+      const updated = promoCodes.filter(p => p.id !== id);
+      setPromoCodes(updated);
+      try {
+          localStorage.setItem('damac_promo_codes', JSON.stringify(updated));
+      } catch(e) {}
+
+      if (isSupabaseConfigured) {
+          try {
+              await supabase.from('promo_codes').delete().eq('id', id);
+          } catch(e) { console.error("Supabase delete promo code failed", e); }
+      }
+  };
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustState] = useState<CustomerProfile | null>(() => {
     const saved = localStorage.getItem('damac_customer');
@@ -1489,6 +1591,34 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch (err) { console.error("Toppings fetch failed", err); }
   };
 
+  const fetchPromoCodes = async () => {
+      if (!isSupabaseConfigured) return;
+      try {
+          const { data, error } = await supabase.from('promo_codes').select('*');
+          if (error) {
+              if (error.code === '42P01') {
+                  console.warn("Table 'promo_codes' missing. Relying on local storage promo codes.");
+                  return;
+              }
+              throw error;
+          }
+          if (data) {
+              const mapped = data.map((d: any) => ({
+                  id: d.id,
+                  code: d.code,
+                  discountType: d.discount_type,
+                  discountValue: Number(d.discount_value),
+                  minOrderAmount: Number(d.min_order_amount || 0),
+                  isActive: d.is_active !== false,
+                  description: d.description,
+                  descriptionTh: d.description_th,
+                  createdAt: d.created_at
+              }));
+              setPromoCodes(mapped);
+          }
+      } catch (err) { console.error("Promo codes fetch failed", err); }
+  };
+
   const fetchOrders = async () => {
       if (!isSupabaseConfigured) return;
       try {
@@ -1596,6 +1726,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         fetchToppings();
         fetchOrders();
         fetchSettings();
+        fetchPromoCodes();
         
         const subscription = supabase.channel('realtime_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -1604,6 +1735,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, fetchMenu)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'toppings' }, fetchToppings) // Subscribe to toppings
         .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, fetchSettings)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_codes' }, fetchPromoCodes)
         .subscribe();
         
         // Polling fallback every 5 seconds to ensure status updates even if realtime is flaky
@@ -2015,6 +2147,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       status?: OrderStatus;
       deliveryPlatformRef?: string;
       partnerId?: string;
+      promoCode?: string;
+      discountAmount?: number;
     }
   ) => {
       // Check for an existing active order (same table for dine-in, or same customer phone)
@@ -2163,12 +2297,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Calculate Total
       const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
       const deliveryFee = details?.delivery?.fee === 'pending' ? 0 : (details?.delivery?.fee || 0);
-      const totalAmount = subtotal + deliveryFee;
+      const discount = details?.discountAmount || 0;
+      const totalAmount = Math.max(0, subtotal + deliveryFee - discount);
       
       // Calculate Net (GP Deduction)
       const source = details?.source || 'store';
       const gpRate = GP_RATES[source] || 0;
-      const netAmount = totalAmount * (1 - gpRate);
+      const netAmount = Math.max(0, totalAmount * (1 - gpRate));
 
       // Partner Commission calculation
       let partnerCommissionAmount = 0;
@@ -2182,6 +2317,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       let computedNote = details?.note || '';
       if (details?.deliveryPlatformRef) {
           computedNote = `Ref: ${details.deliveryPlatformRef}${computedNote ? ' | ' + computedNote : ''}`;
+      }
+      if (details?.promoCode && details?.discountAmount) {
+          const promoStr = `[Promo: ${details.promoCode} (-${details.discountAmount} THB)]`;
+          computedNote = computedNote ? `${computedNote} | ${promoStr}` : promoStr;
       }
 
       const newOrder: Order = {
@@ -2204,7 +2343,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           tableNumber: details?.tableNumber,
           deliveryPlatformRef: details?.deliveryPlatformRef,
           partnerId: details?.partnerId,
-          partnerCommissionAmount: partnerCommissionAmount
+          partnerCommissionAmount: partnerCommissionAmount,
+          promoCode: details?.promoCode,
+          discountAmount: details?.discountAmount
       };
 
       if (isSupabaseConfigured) {
@@ -2566,6 +2707,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       autoPrintNewOrders, setAutoPrintNewOrders,
       vatEnabled, setVatEnabled,
       partners, addPartner, updatePartner, deletePartner,
+      promoCodes, addPromoCode, updatePromoCode, deletePromoCode,
       btDevice, setBtDevice,
       btCharacteristic, setBtCharacteristic,
       btStatus, setBtStatus,
