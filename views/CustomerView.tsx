@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite, parseAnyMapLink } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
-import { ShoppingCart, Plus, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw, Download } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { generatePromptPayPayload } from '../utils/promptpay';
@@ -96,7 +96,7 @@ const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
 
 export const CustomerView: React.FC = () => {
   const { 
-    menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, navigateTo, 
+    menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, updateCartItemQuantity, navigateTo, 
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback, updateOrderTypeToPickup,
     language, toggleLanguage, t, getLocalizedItem,
     isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
@@ -1957,7 +1957,7 @@ export const CustomerView: React.FC = () => {
                                     {cart.map(item => (
                                         <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group">
                                             <div className="flex justify-between items-start mb-2">
-                                                <div>
+                                                <div className="pr-6">
                                                     <h4 className="font-bold text-gray-800">{item.name}</h4>
                                                     {item.specialInstructions && <div className="text-xs text-red-500 italic mt-0.5">"{item.specialInstructions}"</div>}
                                                     <p className="text-xs text-gray-500">
@@ -1967,7 +1967,14 @@ export const CustomerView: React.FC = () => {
                                                 </div>
                                                 <div className="font-bold text-gray-900">฿{item.totalPrice}</div>
                                             </div>
-                                            <button onClick={() => removeFromCart(item.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><X size={16}/></button>
+                                            <div className="flex items-center justify-between mt-3">
+                                                <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-100">
+                                                    <button type="button" onClick={() => item.quantity > 1 ? updateCartItemQuantity(item.id, -1) : removeFromCart(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Minus size={16}/></button>
+                                                    <span className="w-10 text-center font-bold text-sm">{item.quantity}</span>
+                                                    <button type="button" onClick={() => updateCartItemQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white rounded-md shadow-sm transition"><Plus size={16}/></button>
+                                                </div>
+                                                <button type="button" onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 p-2"><Trash2 size={20}/></button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
