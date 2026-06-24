@@ -108,6 +108,7 @@ export const POSView: React.FC = () => {
     const [newPromoType, setNewPromoType] = useState<'percentage' | 'fixed_order' | 'fixed_delivery'>('percentage');
     const [newPromoValue, setNewPromoValue] = useState<number>(3);
     const [newPromoMinOrder, setNewPromoMinOrder] = useState<number>(500);
+    const [newPromoMaxUses, setNewPromoMaxUses] = useState<number>(0);
 
     useEffect(() => {
         if (selectedPizza?.id === 'p_half_half') {
@@ -148,6 +149,7 @@ export const POSView: React.FC = () => {
             discountType: newPromoType,
             discountValue: Number(newPromoValue) || 0,
             minOrderAmount: Number(newPromoMinOrder) || 0,
+            maxUsesPerDay: Number(newPromoMaxUses) || 0,
             isActive: true,
             createdAt: new Date().toISOString()
         };
@@ -161,6 +163,7 @@ export const POSView: React.FC = () => {
         setNewPromoType('percentage');
         setNewPromoValue(3);
         setNewPromoMinOrder(500);
+        setNewPromoMaxUses(0);
     };
 
     const handleUpdateGPDeduction = async (order: Order) => {
@@ -2584,8 +2587,22 @@ export const POSView: React.FC = () => {
                                                 required
                                                 min="0"
                                                 placeholder="e.g., 500"
-                                                value={newPromoMinOrder || 0}
+                                                value={newPromoMinOrder === 0 ? '' : newPromoMinOrder}
                                                 onChange={(e) => setNewPromoMinOrder(Number(e.target.value))}
+                                                className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                {language === 'th' ? 'จำกัดสิทธิ์ต่อวัน (0 = ไม่จำกัด)' : 'Max Uses Per Day (0 = Unlimited)'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="e.g., 10"
+                                                value={newPromoMaxUses === 0 ? '' : newPromoMaxUses}
+                                                onChange={(e) => setNewPromoMaxUses(Number(e.target.value))}
                                                 className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-brand-500"
                                             />
                                         </div>
@@ -2702,6 +2719,12 @@ export const POSView: React.FC = () => {
                                                                     <span className="font-bold">฿{promo.minOrderAmount}</span>
                                                                 </div>
                                                                 <div>
+                                                                    <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'จำกัด/วัน' : 'Daily Limit'}</span>
+                                                                    <span className="font-bold text-blue-600">
+                                                                        {(promo.maxUsesPerDay && promo.maxUsesPerDay > 0) ? `${promo.lastUseDate === new Date().toISOString().split('T')[0] ? promo.currentUses || 0 : 0}/${promo.maxUsesPerDay}` : (language === 'th' ? 'ไม่จำกัด' : 'Unlimited')}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="col-span-2">
                                                                     <span className="block text-[8px] uppercase font-bold text-gray-400">{language === 'th' ? 'สร้างเมื่อ' : 'Created At'}</span>
                                                                     <span className="font-semibold font-mono">{new Date(promo.createdAt).toLocaleDateString()}</span>
                                                                 </div>

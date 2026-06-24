@@ -129,6 +129,16 @@ export const CustomerView: React.FC = () => {
           return;
       }
       
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (found.maxUsesPerDay && found.maxUsesPerDay > 0) {
+          const usesToday = found.lastUseDate === todayStr ? (found.currentUses || 0) : 0;
+          if (usesToday >= found.maxUsesPerDay) {
+              setPromoError(language === 'th' ? 'รหัสส่วนลดนี้ใช้ครบสิทธิ์ของวันนี้แล้ว' : 'This promo code has reached its daily limit');
+              setAppliedPromoCode(null);
+              return;
+          }
+      }
+      
       if (cartTotal < found.minOrderAmount) {
           setPromoError(
               language === 'th' 

@@ -2375,6 +2375,28 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       setOrders(prev => [newOrder, ...prev]);
       
+      // Update promo code usage count
+      if (details?.promoCode) {
+          const promoToUpdate = promoCodes.find(p => p.code.toUpperCase() === details.promoCode?.toUpperCase());
+          if (promoToUpdate) {
+              const todayStr = new Date().toISOString().split('T')[0];
+              const isToday = promoToUpdate.lastUseDate === todayStr;
+              const newCurrentUses = isToday ? (promoToUpdate.currentUses || 0) + 1 : 1;
+              const maxUses = promoToUpdate.maxUsesPerDay;
+              
+              // Automatically disable if max uses reached
+              const shouldDisable = (maxUses && maxUses > 0 && newCurrentUses >= maxUses);
+              
+              const updatedPromo = {
+                  ...promoToUpdate,
+                  currentUses: newCurrentUses,
+                  lastUseDate: todayStr,
+                  isActive: shouldDisable ? false : promoToUpdate.isActive
+              };
+              updatePromoCode(updatedPromo);
+          }
+      }
+      
       // Save ID for Guest Tracking
       try {
         localStorage.setItem('damac_last_order', newOrder.id);

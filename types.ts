@@ -131,6 +131,9 @@ export interface PromoCode {
   isActive: boolean;
   description?: string;
   descriptionTh?: string;
+  maxUsesPerDay?: number;
+  currentUses?: number;
+  lastUseDate?: string;
   createdAt: string;
 }
 
