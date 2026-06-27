@@ -88,6 +88,7 @@ export const POSView: React.FC = () => {
     // Unified Tab State
     const [customCP, setCustomCP] = useState<string>("18");
     const [activeTab, setActiveTab] = useState<string>('order');
+    const [salesSubTab, setSalesSubTab] = useState<'orders' | 'daily'>('orders');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     const [registeredCustomers, setRegisteredCustomers] = useState<any[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState<boolean>(false);
@@ -96,6 +97,12 @@ export const POSView: React.FC = () => {
     // Half-Half customizer states for POS
     const [halfA, setHalfA] = useState<Pizza | null>(null);
     const [halfB, setHalfB] = useState<Pizza | null>(null);
+
+    // Pizza Boat customizer states for POS
+    const [boatA, setBoatA] = useState<Pizza | null>(null);
+    const [boatB, setBoatB] = useState<Pizza | null>(null);
+    const [boatPriceA, setBoatPriceA] = useState<number>(0);
+    const [boatPriceB, setBoatPriceB] = useState<number>(0);
 
     // Partners form states
     const [newPartnerName, setNewPartnerName] = useState('');
@@ -114,6 +121,12 @@ export const POSView: React.FC = () => {
         if (selectedPizza?.id === 'p_half_half') {
             setHalfA(null);
             setHalfB(null);
+        }
+        if (selectedPizza?.id === 'p_boat') {
+            setBoatA(null);
+            setBoatB(null);
+            setBoatPriceA(0);
+            setBoatPriceB(0);
         }
     }, [selectedPizza]);
 
@@ -873,6 +886,38 @@ export const POSView: React.FC = () => {
         playSuccessFeedback();
         const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
 
+        if (selectedPizza.id === 'p_boat') {
+            if (!boatA || !boatB) {
+                alert("Please select both parts of the Pizza Boat!");
+                return;
+            }
+            const calculatedBasePrice = Number(boatPriceA) + Number(boatPriceB);
+            const itemTotal = (calculatedBasePrice + toppingsPrice) * quantity;
+            const nameEn = `Pizza Boat (${boatA.name} [฿${boatPriceA}] / ${boatB.name} [฿${boatPriceB}])`;
+            const nameTh = `พิซซ่าโบ๊ท (${boatA.nameTh || boatA.name} [฿${boatPriceA}] / ${boatB.nameTh || boatB.name} [฿${boatPriceB}])`;
+
+            const item: CartItem = {
+                id: editingCartItem ? editingCartItem.id : Date.now().toString() + Math.random().toString(),
+                pizzaId: selectedPizza.id,
+                name: nameEn,
+                nameTh: nameTh,
+                basePrice: calculatedBasePrice,
+                selectedToppings: selectedToppings,
+                quantity: quantity,
+                totalPrice: itemTotal,
+                subItems: [
+                    { pizzaId: boatA.id, name: `Boat Side A: ${boatA.name} (฿${boatPriceA})`, nameTh: `โบ๊ทชิ้นแรก: ${boatA.nameTh || boatA.name} (฿${boatPriceA})`, toppings: [] },
+                    { pizzaId: boatB.id, name: `Boat Side B: ${boatB.name} (฿${boatPriceB})`, nameTh: `โบ๊ทชิ้นหลัง: ${boatB.nameTh || boatB.name} (฿${boatPriceB})`, toppings: [] }
+                ],
+                specialInstructions: specialInstructions
+            };
+            if (editingCartItem) updateCartItem(item); else addToCart(item);
+            setSelectedPizza(null); setSelectedToppings([]); setEditingCartItem(null); setSpecialInstructions(''); setQuantity(1);
+            setBoatA(null); setBoatB(null); setBoatPriceA(0); setBoatPriceB(0);
+            if (editingCartItem && window.innerWidth < 768) setShowMobileCart(true);
+            return;
+        }
+
         if (selectedPizza.id === 'p_half_half') {
             if (!halfA || !halfB) {
                 alert("Please select both halves for the Half-Half pizza!");
@@ -927,7 +972,7 @@ export const POSView: React.FC = () => {
         e.stopPropagation();
         if (!item.available) return;
         
-        if (item.id === 'custom_base' || item.id === 'p_half_half' || (item.category === 'promotion' && (item.comboCount || 0) > 0)) {
+        if (item.id === 'custom_base' || item.id === 'p_half_half' || item.id === 'p_boat' || (item.category === 'promotion' && (item.comboCount || 0) > 0)) {
             handleCustomize(item);
             return;
         }
@@ -1344,8 +1389,62 @@ export const POSView: React.FC = () => {
     const totalGrossSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const netProfit = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount || 0), 0) - totalExpenses;
+
+    const bestSellersOfMonth = useMemo(() => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+
+        // Get all completed/un-cancelled orders in current month
+        const monthlyOrders = (orders || []).filter(o => {
+            if (!o || o.status === 'cancelled') return false;
+            const d = new Date(o.createdAt);
+            return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        });
+
+        const counts: { [id: string]: { name: string; nameTh: string; count: number; totalRev: number; img?: string } } = {};
+        monthlyOrders.forEach(o => {
+            (o.items || []).forEach(item => {
+                const id = item.pizzaId || item.name;
+                if (!counts[id]) {
+                    const menuItem = menu.find(m => m.id === item.pizzaId);
+                    counts[id] = {
+                        name: item.name,
+                        nameTh: item.nameTh || menuItem?.nameTh || item.name,
+                        count: 0,
+                        totalRev: 0,
+                        img: menuItem?.image
+                    };
+                }
+                counts[id].count += item.quantity || 1;
+                counts[id].totalRev += item.totalPrice || 0;
+            });
+        });
+
+        return Object.values(counts)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+    }, [orders, menu]);
+
+    const dailySales = useMemo(() => {
+        const counts: { [date: string]: { totalSales: number; ordersCount: number; netAmount: number } } = {};
+        filteredOrders.forEach(o => {
+            const dateStr = o.createdAt.split('T')[0];
+            if (!counts[dateStr]) {
+                counts[dateStr] = { totalSales: 0, ordersCount: 0, netAmount: 0 };
+            }
+            counts[dateStr].totalSales += o.totalAmount || 0;
+            counts[dateStr].netAmount += o.netAmount || o.totalAmount || 0;
+            counts[dateStr].ordersCount += 1;
+        });
+
+        return Object.entries(counts)
+            .map(([date, data]) => ({ date, ...data }))
+            .sort((a, b) => b.date.localeCompare(a.date));
+    }, [filteredOrders]);
+
     const filteredMenu = useMemo(() => {
-        const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory && item.id !== 'p_half_half'; });
+        const raw = menu.filter(item => { const cat = item.category || 'pizza'; return cat === activeCategory && item.id !== 'p_half_half' && item.id !== 'p_boat'; });
         if (activeCategory === 'pizza') {
             const savedHalfHalf = menu.find(p => p.id === 'p_half_half');
             const virtualHalfHalfPizza: Pizza = {
@@ -1361,7 +1460,23 @@ export const POSView: React.FC = () => {
                 badge: savedHalfHalf?.badge || 'Mix 2-in-1',
                 badgeTh: savedHalfHalf?.badgeTh || 'แบ่งครึ่งผสมผสาน'
             };
-            return [virtualHalfHalfPizza, ...raw];
+
+            const savedPizzaBoat = menu.find(p => p.id === 'p_boat');
+            const virtualPizzaBoat: Pizza = {
+                id: 'p_boat',
+                name: savedPizzaBoat?.name || 'Pizza Boat (2-Piece Custom)',
+                nameTh: savedPizzaBoat?.nameTh || 'พิซซ่าทรงเรือ (เลือกหน้า-ราคากลางแต่ละครึ่ง)',
+                basePrice: savedPizzaBoat?.basePrice || 0, 
+                description: savedPizzaBoat?.description || 'Delicious double boat pizzas! Choose your own custom flavors and custom pricing for each half.',
+                descriptionTh: savedPizzaBoat?.descriptionTh || 'พิซซ่าทรงเรือคู่แสนอร่อย! สามารถเลือกรสชาติและปรับตั้งราคาของแต่ละครึ่งได้อิสระ',
+                image: savedPizzaBoat?.image || 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=800&q=80',
+                available: savedPizzaBoat !== undefined ? savedPizzaBoat.available : true,
+                category: 'pizza',
+                badge: savedPizzaBoat?.badge || 'New Boat',
+                badgeTh: savedPizzaBoat?.badgeTh || 'รูปทรงเรือคู่'
+            };
+
+            return [virtualPizzaBoat, virtualHalfHalfPizza, ...raw];
         }
         return raw;
     }, [menu, activeCategory]);
@@ -2171,104 +2286,341 @@ export const POSView: React.FC = () => {
                     const totalSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
                     const netSales = filteredOrders.reduce((sum, o) => sum + (o.netAmount || o.totalAmount || 0), 0);
                     const totalExpensesValue = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-                    
+
+                    // Download CSV with richer columns
+                    const handleDetailedCSVExport = () => {
+                        const csvRows = filteredOrders.map(o => {
+                            const itemsDescription = (o.items || []).map(i => `${i.name} (x${i.quantity})`).join(' | ');
+                            return {
+                                "Order ID": o.id,
+                                "Date & Time": o.createdAt,
+                                "Customer Name": o.customerName || 'Walk-in / Guest',
+                                "Table": o.tableNumber || '-',
+                                "Source": o.source,
+                                "Status": o.status,
+                                "Items Summary": itemsDescription,
+                                "Gross Amount (฿)": o.totalAmount,
+                                "Net Amount After GP (฿)": o.netAmount || o.totalAmount
+                            };
+                        });
+                        downloadCSV(csvRows, `sales_report_${salesFilter}_${Date.now()}.csv`);
+                    };
+
                     return (
-                        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
+                        <div className="flex-1 bg-gray-50 p-6 overflow-y-auto pb-24 lg:pb-6 text-left">
                             <div className="max-w-7xl mx-auto space-y-6">
-                                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
-                                    <PieChart className="text-brand-600"/> 
-                                    {language === 'th' ? 'รายงานขาย & ประวัติออเดอร์' : 'Reports & History'}
-                                </h2>
                                 
-                                {/* Filters */}
-                                <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                    <div className="flex gap-2">
-                                        {(['day', 'month', 'year', 'all'] as const).map(f => (
+                                {/* Header Title with professional design */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                                            <PieChart size={28} className="text-brand-600"/> 
+                                            {language === 'th' ? 'รายงานวิเคราะห์ยอดขายอัจฉริยะ' : 'Sales Analytics Dashboard'}
+                                        </h2>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            {language === 'th' ? 'ดูข้อมูลเชิงลึก ยอดขายรายวัน รายการยอดนิยม และกลุ่มลูกค้าหลัก' : 'Monitor daily progress, top sellers, and customer insights.'}
+                                        </p>
+                                    </div>
+                                    
+                                    {/* Action Buttons: Filter & Export */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <div className="flex bg-gray-200 p-1 rounded-xl">
+                                            {(['day', 'month', 'year', 'all'] as const).map(f => (
+                                                <button 
+                                                    key={f} 
+                                                    onClick={() => setSalesFilter(f)} 
+                                                    className={`px-4 py-1.5 rounded-lg text-xs font-black transition capitalize ${salesFilter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
+                                                >
+                                                    {f === 'day' ? (language === 'th' ? 'วันนี้' : 'Today') : 
+                                                     f === 'month' ? (language === 'th' ? 'เดือนนี้' : 'Month') : 
+                                                     f === 'year' ? (language === 'th' ? 'ปีนี้' : 'Year') : (language === 'th' ? 'ทั้งหมด' : 'All')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <button 
+                                            onClick={handleDetailedCSVExport} 
+                                            className="px-4 py-2.5 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 shadow-sm flex items-center gap-2 transition"
+                                        >
+                                            <Download size={15}/> {language === 'th' ? 'ส่งออกไฟล์ CSV' : 'Export CSV'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* KPIs Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden">
+                                        <div className="absolute right-0 top-0 w-24 h-24 bg-brand-50 rounded-full translate-x-8 -translate-y-8 opacity-40"></div>
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{language === 'th' ? 'ยอดขายรวม' : 'Gross Sales'}</span>
+                                        <p className="text-3xl font-black text-gray-900 mt-2">฿{totalSales.toLocaleString()}</p>
+                                        <span className="text-[11px] text-gray-400 mt-1">*{language === 'th' ? 'ราคาก่อนหักต้นทุน/GP' : 'Before GP or cost deductions'}</span>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden">
+                                        <div className="absolute right-0 top-0 w-24 h-24 bg-blue-50 rounded-full translate-x-8 -translate-y-8 opacity-40"></div>
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{language === 'th' ? 'จำนวนออเดอร์ทั้งหมด' : 'Total Orders'}</span>
+                                        <p className="text-3xl font-black text-blue-600 mt-2">{filteredOrders.length}</p>
+                                        <span className="text-[11px] text-gray-400 mt-1">*{language === 'th' ? 'คำสั่งซื้อที่เสร็จสมบูรณ์' : 'All completed orders'}</span>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden">
+                                        <div className="absolute right-0 top-0 w-24 h-24 bg-emerald-50 rounded-full translate-x-8 -translate-y-8 opacity-40"></div>
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{language === 'th' ? 'รายรับสุทธิ (หลังหัก GP)' : 'Net Revenue (After GP)'}</span>
+                                        <p className="text-3xl font-black text-emerald-600 mt-2">฿{netSales.toLocaleString()}</p>
+                                        <span className="text-[11px] text-emerald-500 font-bold mt-1">฿{(totalSales - netSales).toLocaleString()} {language === 'th' ? 'ส่วนแบ่ง GP' : 'GP Deducted'}</span>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between relative overflow-hidden">
+                                        <div className="absolute right-0 top-0 w-24 h-24 bg-amber-50 rounded-full translate-x-8 -translate-y-8 opacity-40"></div>
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{language === 'th' ? 'ค่าใช้จ่ายทั้งหมด' : 'Total Expenses'}</span>
+                                        <p className="text-3xl font-black text-amber-600 mt-2">฿{totalExpensesValue.toLocaleString()}</p>
+                                        <span className="text-[11px] font-bold text-gray-500 mt-1">Net Margin: ฿{(netSales - totalExpensesValue).toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                {/* Main Layout Content: Left Area for list/tab, Right Area for Top Sellers of the month */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    
+                                    {/* Left Column: History & Daily Breakdown */}
+                                    <div className="lg:col-span-2 space-y-4">
+                                        
+                                        {/* Sub Tabs Switcher */}
+                                        <div className="flex border-b border-gray-200">
                                             <button 
-                                                key={f} 
-                                                onClick={() => setSalesFilter(f)} 
-                                                className={`px-4 py-2 rounded-lg font-bold transition capitalize ${salesFilter === f ? 'bg-brand-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                                onClick={() => setSalesSubTab('orders')}
+                                                className={`px-5 py-3 font-black text-sm border-b-2 transition ${salesSubTab === 'orders' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                                             >
-                                                {f === 'day' ? (language === 'th' ? 'วันนี้' : 'Today') : 
-                                                 f === 'month' ? (language === 'th' ? 'เดือนนี้' : 'Month') : 
-                                                 f === 'year' ? (language === 'th' ? 'ปีนี้' : 'Year') : (language === 'th' ? 'ทั้งหมด' : 'All')}
+                                                📄 {language === 'th' ? 'ประวัติรายการสั่งซื้อ' : 'Order History'}
                                             </button>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => downloadCSV(filteredOrders.map(o => ({ ID: o.id, Status: o.status, Amount: o.totalAmount, Items: (o.items || []).length })), 'sales_export.csv')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-sm flex items-center gap-2">
-                                        <Download size={18}/> {language === 'th' ? 'ส่งออกไฟล์ CSV' : 'Export CSV'}
-                                    </button>
-                                </div>
+                                            <button 
+                                                onClick={() => setSalesSubTab('daily')}
+                                                className={`px-5 py-3 font-black text-sm border-b-2 transition ${salesSubTab === 'daily' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                📈 {language === 'th' ? 'สรุปยอดขายรายวัน' : 'Daily Sales Breakdown'}
+                                            </button>
+                                        </div>
 
-                                {/* KPIs */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'ยอดขายรวม' : 'Total Sales'}</p>
-                                        <p className="text-3xl font-bold text-gray-900">฿{totalSales.toLocaleString()}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'จำนวนออเดอร์ทั้งหมด' : 'Total Orders'}</p>
-                                        <p className="text-3xl font-bold text-gray-900">{filteredOrders.length}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'รายรับสุทธิ (หลังหัก GP)' : 'Net Sales (After GP)'}</p>
-                                        <p className="text-3xl font-bold text-brand-600">฿{netSales.toLocaleString()}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                                        <p className="text-sm font-bold text-gray-500 uppercase mb-2">{language === 'th' ? 'ค่าใช้จ่ายทั้งหมด' : 'Total Expenses'}</p>
-                                        <p className="text-3xl font-bold text-orange-500">฿{totalExpensesValue.toLocaleString()}</p>
-                                    </div>
-                                </div>
-
-                                {/* Order History Table */}
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                                        <h3 className="font-bold text-gray-800 text-lg">{language === 'th' ? 'ประวัติรายการสั่งซื้อ' : 'Order History'}</h3>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs border-b border-gray-100">
-                                                <tr>
-                                                    <th className="p-4">{language === 'th' ? 'วันเวลา' : 'Date & Time'}</th>
-                                                    <th className="p-4">{language === 'th' ? 'หมายเลขออเดอร์' : 'Order ID'}</th>
-                                                    <th className="p-4">{language === 'th' ? 'ที่มา' : 'Source'}</th>
-                                                    <th className="p-4">{language === 'th' ? 'สถานะ' : 'Status'}</th>
-                                                    <th className="p-4">{language === 'th' ? 'ยอดเต็ม' : 'Amount(Total)'}</th>
-                                                    <th className="p-4 text-orange-500">{language === 'th' ? 'หลังหัก GP' : 'Net(After GP)'}</th>
-                                                    <th className="p-4 text-right">{language === 'th' ? 'จัดการ' : 'Actions'}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {[...filteredOrders].reverse().map(order => (
-                                                    <tr key={order.id} className="hover:bg-gray-50">
-                                                        <td className="p-4 text-gray-600 font-medium">
-                                                            {formatOrderDateTime(order.createdAt, 'medium')}
-                                                        </td>
-                                                        <td className="p-4 font-bold text-gray-800">#{String(order.id).slice(-4)} {order.tableNumber && `(TB: ${order.tableNumber})`}</td>
-                                                        <td className="p-4"><span className="uppercase text-[10px] font-bold bg-gray-200 px-2 py-1 rounded text-gray-700">{order.source}</span></td>
-                                                        <td className="p-4">
-                                                            <span className={`uppercase text-[10px] font-bold px-2 py-1 rounded ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                                {order.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-4 font-bold text-gray-600">฿{order.totalAmount}</td>
-                                                        <td className="p-4 font-bold text-brand-600">฿{order.netAmount || order.totalAmount}</td>
-                                                        <td className="p-4 text-right flex justify-end gap-1.5 flex-wrap">
-                                                            <button onClick={() => handleStartEditOrder(order)} className="text-blue-700 hover:underline font-bold text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition">แก้ไข (Edit)</button>
-                                                            <button onClick={() => handleDeleteOrderPrompt(order)} className="text-red-700 hover:underline font-bold text-xs bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition">ลบ (Delete)</button>
-                                                            {order.source !== 'store' && (
-                                                                <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition">{language === 'th' ? 'แก้ไข GP' : 'Edit GP'}</button>
+                                        {salesSubTab === 'orders' ? (
+                                            /* Order History */
+                                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                                <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                                    <h3 className="font-extrabold text-gray-800 text-base">{language === 'th' ? 'รายการออเดอร์ทั้งหมด' : 'Transaction Records'}</h3>
+                                                    <span className="text-xs font-bold text-gray-500">{filteredOrders.length} {language === 'th' ? 'รายการ' : 'Orders'}</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-sm whitespace-nowrap">
+                                                        <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-xs border-b border-gray-100">
+                                                            <tr>
+                                                                <th className="p-4">{language === 'th' ? 'วันเวลา' : 'Date & Time'}</th>
+                                                                <th className="p-4">{language === 'th' ? 'ลูกค้า / ออเดอร์' : 'Customer & Order'}</th>
+                                                                <th className="p-4">{language === 'th' ? 'ที่มา' : 'Source'}</th>
+                                                                <th className="p-4">{language === 'th' ? 'สถานะ' : 'Status'}</th>
+                                                                <th className="p-4">{language === 'th' ? 'ยอดเต็ม' : 'Amount'}</th>
+                                                                <th className="p-4 text-emerald-600">{language === 'th' ? 'หลังหัก GP' : 'Net'}</th>
+                                                                <th className="p-4 text-right">{language === 'th' ? 'จัดการ' : 'Actions'}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100">
+                                                            {[...filteredOrders].reverse().map(order => (
+                                                                <tr key={order.id} className="hover:bg-gray-50 transition">
+                                                                    <td className="p-4 text-gray-500 text-xs font-bold">
+                                                                        {formatOrderDateTime(order.createdAt, 'medium')}
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-black text-gray-900 text-sm">
+                                                                                #{String(order.id).slice(-4)} 
+                                                                                {order.tableNumber && ` (TB: ${order.tableNumber})`}
+                                                                            </span>
+                                                                            <span className="text-xs text-gray-500 font-bold flex items-center gap-1 mt-0.5">
+                                                                                👤 {order.customerName || (language === 'th' ? 'ลูกค้าทั่วไป (Walk-in)' : 'Walk-in Guest')}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <span className="uppercase text-[10px] font-black bg-gray-100 px-2 py-1 rounded-lg text-gray-600 border border-gray-200">
+                                                                            {order.source}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <span className={`uppercase text-[10px] font-black px-2 py-1 rounded-full ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                            {order.status}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-4 font-extrabold text-gray-700">฿{order.totalAmount}</td>
+                                                                    <td className="p-4 font-black text-emerald-600">฿{order.netAmount || order.totalAmount}</td>
+                                                                    <td className="p-4 text-right flex justify-end gap-1.5 flex-wrap">
+                                                                        <button onClick={() => handleStartEditOrder(order)} className="text-blue-700 hover:underline font-bold text-xs bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition">แก้ไข (Edit)</button>
+                                                                        <button onClick={() => handleDeleteOrderPrompt(order)} className="text-red-700 hover:underline font-bold text-xs bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition">ลบ (Delete)</button>
+                                                                        {order.source !== 'store' && (
+                                                                            <button onClick={() => handleUpdateGPDeduction(order)} className="text-orange-600 hover:underline font-bold text-xs bg-orange-50 hover:bg-orange-100 px-2.5 py-1.5 rounded-lg transition">{language === 'th' ? 'แก้ไข GP' : 'Edit GP'}</button>
+                                                                        )}
+                                                                        <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition"><Printer size={12}/> {language === 'th' ? 'พิมพ์' : 'Print'}</button>
+                                                                        <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 hover:bg-brand-100 px-2.5 py-1.5 rounded-lg transition">{language === 'th' ? 'ใบเสร็จ' : 'Receipt'}</button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            {filteredOrders.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan={7} className="p-8 text-center text-gray-400 font-bold">
+                                                                        {language === 'th' ? 'ไม่พบข้อมูลออเดอร์ในช่วงเวลานี้' : 'No orders found for this period.'}
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                            <button onClick={() => handleReprintOrder(order)} className="text-amber-700 hover:underline font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded flex items-center gap-1 transition"><Printer size={12}/> {language === 'th' ? 'พิมพ์ใบเสร็จ' : 'Print'}</button>
-                                                            <button onClick={() => { setSelectedOrder(order); setShowPaymentModal(true); }} className="text-brand-600 hover:underline font-bold text-xs bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded transition">{language === 'th' ? 'ดูใบเสร็จ' : 'Receipt'}</button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {filteredOrders.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-gray-400 font-bold">{language === 'th' ? 'ไม่พบข้อมูลออเดอร์ในช่วงเวลานี้' : 'No orders found for this period.'}</td></tr>}
-                                            </tbody>
-                                        </table>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Daily Sales breakdown */
+                                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                                <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                                    <h3 className="font-extrabold text-gray-800 text-base">{language === 'th' ? 'ประวัติยอดขายรายวัน' : 'Daily Sales Summary'}</h3>
+                                                    <span className="text-xs font-bold text-gray-500">{dailySales.length} {language === 'th' ? 'วัน' : 'Days'}</span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-sm whitespace-nowrap">
+                                                        <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-xs border-b border-gray-100">
+                                                            <tr>
+                                                                <th className="p-4">{language === 'th' ? 'วันที่' : 'Date'}</th>
+                                                                <th className="p-4">{language === 'th' ? 'จำนวนคำสั่งซื้อ' : 'Orders Count'}</th>
+                                                                <th className="p-4 text-right">{language === 'th' ? 'ยอดขายรวม' : 'Gross Sales'}</th>
+                                                                <th className="p-4 text-emerald-600 text-right">{language === 'th' ? 'รายรับสุทธิ (หลังหัก GP)' : 'Net Sales'}</th>
+                                                                <th className="p-4 text-right">{language === 'th' ? 'ค่าเฉลี่ยต่อบิล' : 'Avg. Ticket Size'}</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100">
+                                                            {dailySales.map(day => (
+                                                                <tr key={day.date} className="hover:bg-gray-50 transition">
+                                                                    <td className="p-4 font-black text-gray-900">{day.date}</td>
+                                                                    <td className="p-4 font-bold text-gray-600">{day.ordersCount} ออเดอร์</td>
+                                                                    <td className="p-4 text-right font-extrabold text-gray-700">฿{day.totalSales.toLocaleString()}</td>
+                                                                    <td className="p-4 text-right font-black text-emerald-600">฿{day.netAmount.toLocaleString()}</td>
+                                                                    <td className="p-4 text-right font-bold text-gray-500">฿{Math.round(day.totalSales / day.ordersCount).toLocaleString()}</td>
+                                                                </tr>
+                                                            ))}
+                                                            {dailySales.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
+                                                                        {language === 'th' ? 'ไม่พบข้อมูลยอดขายรายวันในช่วงเวลานี้' : 'No daily sales records found.'}
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right Column: Dynamic Intelligence Panel (Monthly Best Sellers & Customer Insight) */}
+                                    <div className="space-y-6">
+                                        
+                                        {/* Best Selling Items of the Month */}
+                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm text-left">
+                                            <h3 className="font-extrabold text-gray-900 text-base flex items-center gap-2 mb-4">
+                                                <span>🔥</span> {language === 'th' ? '5 อันดับสินค้าขายดีในเดือนนี้' : 'Top 5 Best Sellers (This Month)'}
+                                            </h3>
+                                            
+                                            <div className="space-y-4">
+                                                {bestSellersOfMonth.map((item, idx) => {
+                                                    const maxCount = bestSellersOfMonth[0]?.count || 1;
+                                                    const percentage = Math.round((item.count / maxCount) * 100);
+                                                    
+                                                    // Let's find customers who ordered this item in this month
+                                                    const buyers = (orders || [])
+                                                        .filter(o => o && o.status !== 'cancelled' && o.customerName)
+                                                        .filter(o => {
+                                                            const d = new Date(o.createdAt);
+                                                            const now = new Date();
+                                                            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+                                                        })
+                                                        .filter(o => (o.items || []).some(itm => (itm.pizzaId === item.pizzaId || itm.name === item.name)))
+                                                        .map(o => o.customerName)
+                                                        .filter((value, index, self) => self.indexOf(value) === index) // Unique buyers
+                                                        .slice(0, 3); // top 3 buyers
+
+                                                    return (
+                                                        <div key={idx} className="flex gap-3 items-start border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                                                            <img 
+                                                                src={item.img || 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=120&q=80'} 
+                                                                className="w-12 h-12 rounded-xl object-cover border border-gray-100 flex-shrink-0"
+                                                                referrerPolicy="no-referrer"
+                                                            />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start gap-2">
+                                                                    <p className="font-black text-gray-900 text-xs truncate">
+                                                                        {idx + 1}. {language === 'th' ? item.nameTh || item.name : item.name}
+                                                                    </p>
+                                                                    <span className="text-xs font-black text-brand-600 bg-brand-50 px-2 py-0.5 rounded-lg whitespace-nowrap">
+                                                                        {item.count} {language === 'th' ? 'ที่' : 'sold'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                {/* Progress Bar */}
+                                                                <div className="w-full bg-gray-100 h-1.5 rounded-full mt-1 overflow-hidden">
+                                                                    <div className="bg-brand-600 h-full rounded-full" style={{ width: `${percentage}%` }}></div>
+                                                                </div>
+
+                                                                {/* Revenue & Customer Names tag */}
+                                                                <div className="flex justify-between items-center mt-1.5 text-[10px]">
+                                                                    <span className="text-gray-400 font-bold">Rev: ฿{item.totalRev.toLocaleString()}</span>
+                                                                    {buyers.length > 0 && (
+                                                                        <span className="text-brand-600 font-extrabold max-w-[120px] truncate" title={buyers.join(', ')}>
+                                                                            👥 {buyers.join(', ')}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {bestSellersOfMonth.length === 0 && (
+                                                    <p className="text-sm text-gray-400 font-bold py-4 text-center">
+                                                        {language === 'th' ? 'ยังไม่มีข้อมูลยอดขายในเดือนนี้' : 'No sales registered yet this month.'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Customer Engagement Spotlight */}
+                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm text-left">
+                                            <h3 className="font-extrabold text-gray-900 text-base flex items-center gap-2 mb-3">
+                                                <span>👥</span> {language === 'th' ? 'กลุ่มลูกค้าที่ใช้บริการช่วงนี้' : 'Recent Customers Profile'}
+                                            </h3>
+                                            <p className="text-xs text-gray-500 mb-4">
+                                                {language === 'th' ? 'รายชื่อลูกค้าที่มียอดสั่งซื้อสูงสุดและออเดอร์ล่าสุด' : 'Identify and connect with active buyers.'}
+                                            </p>
+                                            
+                                            <div className="space-y-3 text-left">
+                                                {(() => {
+                                                    const recentWithNames = filteredOrders
+                                                        .filter(o => o && o.customerName)
+                                                        .slice(-5)
+                                                        .reverse();
+
+                                                    return recentWithNames.map((order, idx) => (
+                                                        <div key={idx} className="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center font-black text-xs text-brand-700 uppercase">
+                                                                    {String(order.customerName).slice(0, 2)}
+                                                                </div>
+                                                                <div className="flex flex-col text-left">
+                                                                    <span className="font-extrabold text-gray-800 text-xs truncate max-w-[130px]">{order.customerName}</span>
+                                                                    <span className="text-[10px] text-gray-400 font-medium font-mono">Order #{String(order.id).slice(-4)}</span>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-xs font-black text-gray-700 font-mono">฿{order.totalAmount.toLocaleString()}</span>
+                                                        </div>
+                                                    ));
+                                                })()}
+                                                {filteredOrders.filter(o => o.customerName).length === 0 && (
+                                                    <p className="text-xs text-gray-400 font-bold text-center py-4">
+                                                        {language === 'th' ? 'ไม่มีรายชื่อลูกค้าส่วนบุคคลในออเดอร์ช่วงนี้' : 'No personal customer names registered.'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
                                     </div>
                                 </div>
+
                             </div>
                         </div>
                     );
@@ -3674,7 +4026,7 @@ export const POSView: React.FC = () => {
                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
                                                 {menu.filter(p => {
                                                     if (p.category !== 'pizza') return false;
-                                                    if (p.id === 'custom_base' || p.id === 'p_half_half') return false;
+                                                    if (p.id === 'custom_base' || p.id === 'p_half_half' || p.id === 'p_boat') return false;
                                                     if (!p.available) return false;
                                                     if ((p.comboCount || 0) > 0) return false;
                                                     if (p.allowedPromotions && p.allowedPromotions.length > 0) {
@@ -3743,6 +4095,80 @@ export const POSView: React.FC = () => {
                                 </div>
                             )}
 
+                            {/* Pizza Boat Selector (POS) */}
+                            {selectedPizza.id === 'p_boat' && (
+                                <div className="mb-6 bg-blue-50 p-4 rounded-xl border border-blue-200 text-left">
+                                    <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">⛵ {language === 'th' ? 'แต่งหน้าพิซซ่าทรงเรือ 2 ชิ้น' : 'Customize Pizza Boat (2 Pieces)'}</h3>
+                                    <div className="space-y-4 font-bold text-gray-850 text-xs text-left">
+                                        
+                                        <div className="bg-white p-3 rounded-lg border border-blue-100">
+                                            <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ชิ้นที่ 1 (Side A)' : 'Side A (Piece 1)'}</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-850 outline-none"
+                                                    value={boatA?.id || ''}
+                                                    onChange={(e) => {
+                                                        const found = menu.find(p => p.id === e.target.value);
+                                                        setBoatA(found || null);
+                                                        setBoatPriceA(found ? Math.round(found.basePrice / 2) : 0);
+                                                    }}
+                                                >
+                                                    <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 1 --' : '-- Choose Side A --'}</option>
+                                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
+                                                        <option key={pItem.id} value={pItem.id}>
+                                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex items-center border border-gray-300 bg-white rounded-lg overflow-hidden">
+                                                    <span className="bg-gray-100 px-2.5 py-2 text-xs font-bold text-gray-500 border-r border-gray-300">฿</span>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder={language === 'th' ? 'ราคาชิ้นแรก' : 'Price A'}
+                                                        value={boatPriceA || ''} 
+                                                        onChange={(e) => setBoatPriceA(Number(e.target.value))}
+                                                        className="w-full px-2 py-2 text-sm font-extrabold outline-none bg-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-3 rounded-lg border border-blue-100">
+                                            <label className="text-xs font-bold text-gray-500 block mb-1 text-left">{language === 'th' ? 'ชิ้นที่ 2 (Side B)' : 'Side B (Piece 2)'}</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded-lg p-2 bg-white text-sm font-bold text-gray-850 outline-none"
+                                                    value={boatB?.id || ''}
+                                                    onChange={(e) => {
+                                                        const found = menu.find(p => p.id === e.target.value);
+                                                        setBoatB(found || null);
+                                                        setBoatPriceB(found ? Math.round(found.basePrice / 2) : 0);
+                                                    }}
+                                                >
+                                                    <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 2 --' : '-- Choose Side B --'}</option>
+                                                    {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
+                                                        <option key={pItem.id} value={pItem.id}>
+                                                            {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex items-center border border-gray-300 bg-white rounded-lg overflow-hidden">
+                                                    <span className="bg-gray-100 px-2.5 py-2 text-xs font-bold text-gray-500 border-r border-gray-300">฿</span>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder={language === 'th' ? 'ราคาชิ้นที่สอง' : 'Price B'}
+                                                        value={boatPriceB || ''} 
+                                                        onChange={(e) => setBoatPriceB(Number(e.target.value))}
+                                                        className="w-full px-2 py-2 text-sm font-extrabold outline-none bg-transparent"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Toppings (Only for non-combo items) */}
                             {!(selectedPizza.category === 'promotion' && (selectedPizza.comboCount || 0) > 0) && (
                                 <div className="mb-6 text-left">
@@ -3797,6 +4223,8 @@ export const POSView: React.FC = () => {
                                     : (language === 'th' ? 'เพิ่มลงออเดอร์' : 'Add to Order')} • ฿{
                                     (((selectedPizza.id === 'p_half_half' 
                                         ? (halfA && halfB ? Math.round((halfA.basePrice/2)+(halfB.basePrice/2)+20) : 20) 
+                                        : selectedPizza.id === 'p_boat'
+                                        ? (Number(boatPriceA || 0) + Number(boatPriceB || 0))
                                         : selectedPizza.basePrice) 
                                     + (selectedPizza.category === 'promotion' ? comboSelections.reduce((sum, item) => {
                                         if (!item) return sum;

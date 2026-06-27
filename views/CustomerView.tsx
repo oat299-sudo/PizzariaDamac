@@ -179,10 +179,22 @@ export const CustomerView: React.FC = () => {
   const [halfA, setHalfA] = useState<Pizza | null>(null);
   const [halfB, setHalfB] = useState<Pizza | null>(null);
 
+  // Boat customizer states
+  const [boatA, setBoatA] = useState<Pizza | null>(null);
+  const [boatB, setBoatB] = useState<Pizza | null>(null);
+  const [boatPriceA, setBoatPriceA] = useState<number>(0);
+  const [boatPriceB, setBoatPriceB] = useState<number>(0);
+
   useEffect(() => {
     if (selectedPizza?.id === 'p_half_half') {
         setHalfA(null);
         setHalfB(null);
+    }
+    if (selectedPizza?.id === 'p_boat') {
+        setBoatA(null);
+        setBoatB(null);
+        setBoatPriceA(0);
+        setBoatPriceB(0);
     }
   }, [selectedPizza]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -591,6 +603,42 @@ export const CustomerView: React.FC = () => {
   const handleAddToCart = () => {
     if (!selectedPizza) return;
     const toppingsPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
+
+    if (selectedPizza.id === 'p_boat') {
+        if (!boatA || !boatB) {
+            alert(language === 'th' ? 'กรุณาเลือกหน้าพิซซ่าให้ครบทั้งสองชิ้นสำหรับพิซซ่าโบ๊ท' : 'Please select both parts of the Pizza Boat.');
+            return;
+        }
+        const calculatedBasePrice = Number(boatPriceA) + Number(boatPriceB);
+        const total = calculatedBasePrice + toppingsPrice;
+        const nameEn = `Pizza Boat (${boatA.name} [฿${boatPriceA}] / ${boatB.name} [฿${boatPriceB}])`;
+        const nameTh = `พิซซ่าโบ๊ท (${boatA.nameTh || boatA.name} [฿${boatPriceA}] / ${boatB.nameTh || boatB.name} [฿${boatPriceB}])`;
+        
+        const item: CartItem = {
+          id: Date.now().toString() + Math.random().toString(),
+          pizzaId: selectedPizza.id,
+          name: nameEn,
+          nameTh: nameTh, 
+          basePrice: calculatedBasePrice,
+          selectedToppings: selectedToppings,
+          quantity: 1,
+          totalPrice: total,
+          subItems: [
+              { pizzaId: boatA.id, name: `Boat Side A: ${boatA.name} (฿${boatPriceA})`, nameTh: `โบ๊ทชิ้นแรก: ${boatA.nameTh || boatA.name} (฿${boatPriceA})`, toppings: [] },
+              { pizzaId: boatB.id, name: `Boat Side B: ${boatB.name} (฿${boatPriceB})`, nameTh: `โบ๊ทชิ้นหลัง: ${boatB.nameTh || boatB.name} (฿${boatPriceB})`, toppings: [] }
+          ],
+          specialInstructions: specialInstructions
+        };
+        addToCart(item);
+        setSelectedPizza(null);
+        setSelectedToppings([]);
+        setSpecialInstructions('');
+        setBoatA(null);
+        setBoatB(null);
+        setBoatPriceA(0);
+        setBoatPriceB(0);
+        return;
+    }
 
     if (selectedPizza.id === 'p_half_half') {
         if (!halfA || !halfB) {
@@ -1293,7 +1341,7 @@ export const CustomerView: React.FC = () => {
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
                     {(() => {
-                        const rawItems = menu.filter(p => p.category === activeCategory && p.id !== 'p_half_half');
+                        const rawItems = menu.filter(p => p.category === activeCategory && p.id !== 'p_half_half' && p.id !== 'p_boat');
                         if (activeCategory === 'pizza') {
                             const savedHalfHalf = menu.find(p => p.id === 'p_half_half');
                             const virtualHalfHalfPizza: Pizza = {
@@ -1309,7 +1357,23 @@ export const CustomerView: React.FC = () => {
                                 badge: savedHalfHalf?.badge || 'Mix 2-in-1',
                                 badgeTh: savedHalfHalf?.badgeTh || 'แบ่งครึ่งผสมผสาน'
                             };
-                            return [virtualHalfHalfPizza, ...rawItems];
+
+                            const savedPizzaBoat = menu.find(p => p.id === 'p_boat');
+                            const virtualPizzaBoat: Pizza = {
+                                id: 'p_boat',
+                                name: savedPizzaBoat?.name || 'Pizza Boat (2-Piece Custom)',
+                                nameTh: savedPizzaBoat?.nameTh || 'พิซซ่าทรงเรือ (เลือกหน้า-ราคากลางแต่ละครึ่ง)',
+                                basePrice: savedPizzaBoat?.basePrice || 0, 
+                                description: savedPizzaBoat?.description || 'Delicious double boat pizzas! Choose your own custom flavors and custom pricing for each half.',
+                                descriptionTh: savedPizzaBoat?.descriptionTh || 'พิซซ่าทรงเรือคู่แสนอร่อย! สามารถเลือกรสชาติและปรับตั้งราคาของแต่ละครึ่งได้อิสระ',
+                                image: savedPizzaBoat?.image || 'https://images.unsplash.com/photo-1628840042765-356cda07504e?auto=format&fit=crop&w=800&q=80',
+                                available: savedPizzaBoat !== undefined ? savedPizzaBoat.available : true,
+                                category: 'pizza',
+                                badge: savedPizzaBoat?.badge || 'New Boat',
+                                badgeTh: savedPizzaBoat?.badgeTh || 'รูปทรงเรือคู่'
+                            };
+
+                            return [virtualPizzaBoat, virtualHalfHalfPizza, ...rawItems];
                         }
                         return rawItems;
                     })().map(item => {
@@ -1802,6 +1866,96 @@ export const CustomerView: React.FC = () => {
                             )}
 
                             {/* Special Instructions */}
+                            {/* Pizza Boat Customizer picker views */}
+                            {selectedPizza.id === 'p_boat' && (
+                                <div className="mb-6 bg-blue-50/50 p-4 rounded-2xl border border-blue-200 text-left shadow-sm animate-fade-in">
+                                     <h3 className="font-bold text-blue-950 flex items-center gap-2 mb-4 text-left">
+                                         <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg text-sm">⛵</span> 
+                                         {language === 'th' ? 'แต่งหน้าพิซซ่าทรงเรือ 2 ชิ้น' : 'Customize Pizza Boat (2 Pieces)'}
+                                     </h3>
+                                     
+                                     <div className="space-y-4">
+                                          {/* Piece A */}
+                                          <div className="text-left bg-white p-3.5 rounded-xl border border-blue-100">
+                                               <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
+                                                   {language === 'th' ? 'ชิ้นที่ 1 (Side A)' : 'Piece 1 (Side A)'}
+                                               </label>
+                                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                   <select 
+                                                       className="w-full border-2 border-gray-250 rounded-xl p-2.5 focus:border-blue-500 outline-none text-sm font-bold bg-white text-gray-850"
+                                                       value={boatA?.id || ''}
+                                                       onChange={(e) => {
+                                                           const found = menu.find(p => p.id === e.target.value);
+                                                           setBoatA(found || null);
+                                                           setBoatPriceA(found ? Math.round(found.basePrice / 2) : 0);
+                                                       }}
+                                                   >
+                                                       <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 1 --' : '-- Choose Flavor A --'}</option>
+                                                       {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
+                                                           <option key={pItem.id} value={pItem.id}>
+                                                               {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                           </option>
+                                                       ))}
+                                                   </select>
+                                                   
+                                                   <div>
+                                                       <div className="flex items-center border-2 border-gray-250 bg-white rounded-xl overflow-hidden focus-within:border-blue-500 transition">
+                                                           <span className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-250">฿</span>
+                                                           <input 
+                                                               type="number" 
+                                                               placeholder={language === 'th' ? 'ราคาชิ้นแรก' : 'Price A'}
+                                                               value={boatPriceA || ''} 
+                                                               onChange={(e) => setBoatPriceA(Number(e.target.value))}
+                                                               className="w-full px-3 py-2 text-sm font-extrabold outline-none bg-transparent"
+                                                           />
+                                                       </div>
+                                                       <span className="text-[10px] text-gray-400 mt-0.5 block">{language === 'th' ? 'ปรับเปลี่ยนราคาของชิ้นนี้เองได้' : 'Can set custom price for this part'}</span>
+                                                   </div>
+                                               </div>
+                                          </div>
+
+                                          {/* Piece B */}
+                                          <div className="text-left bg-white p-3.5 rounded-xl border border-blue-100">
+                                               <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
+                                                   {language === 'th' ? 'ชิ้นที่ 2 (Side B)' : 'Piece 2 (Side B)'}
+                                               </label>
+                                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                   <select 
+                                                       className="w-full border-2 border-gray-250 rounded-xl p-2.5 focus:border-blue-500 outline-none text-sm font-bold bg-white text-gray-850"
+                                                       value={boatB?.id || ''}
+                                                       onChange={(e) => {
+                                                           const found = menu.find(p => p.id === e.target.value);
+                                                           setBoatB(found || null);
+                                                           setBoatPriceB(found ? Math.round(found.basePrice / 2) : 0);
+                                                       }}
+                                                   >
+                                                       <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 2 --' : '-- Choose Flavor B --'}</option>
+                                                       {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
+                                                           <option key={pItem.id} value={pItem.id}>
+                                                               {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                           </option>
+                                                       ))}
+                                                   </select>
+
+                                                   <div>
+                                                       <div className="flex items-center border-2 border-gray-250 bg-white rounded-xl overflow-hidden focus-within:border-blue-500 transition">
+                                                           <span className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-250">฿</span>
+                                                           <input 
+                                                               type="number" 
+                                                               placeholder={language === 'th' ? 'ราคาชิ้นที่สอง' : 'Price B'}
+                                                               value={boatPriceB || ''} 
+                                                               onChange={(e) => setBoatPriceB(Number(e.target.value))}
+                                                               className="w-full px-3 py-2 text-sm font-extrabold outline-none bg-transparent"
+                                                           />
+                                                       </div>
+                                                       <span className="text-[10px] text-gray-400 mt-0.5 block">{language === 'th' ? 'ปรับเปลี่ยนราคาของชิ้นนี้เองได้' : 'Can set custom price for this part'}</span>
+                                                   </div>
+                                               </div>
+                                          </div>
+                                     </div>
+                                </div>
+                            )}
+
                             <div className="mb-6">
                                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><MessageCircle size={14}/> Special Instructions</label>
                                  <textarea 
@@ -1884,6 +2038,8 @@ export const CustomerView: React.FC = () => {
                                         ? (halfA && halfB 
                                             ? Math.round((halfA.basePrice / 2) + (halfB.basePrice / 2) + 20) + selectedToppings.reduce((s,t) => s + t.price, 0)
                                             : 20 + selectedToppings.reduce((s,t) => s + t.price, 0))
+                                        : selectedPizza.id === 'p_boat'
+                                        ? ((Number(boatPriceA || 0) + Number(boatPriceB || 0)) + selectedToppings.reduce((s,t) => s + t.price, 0))
                                         : selectedPizza.basePrice + selectedToppings.reduce((s,t) => s + t.price, 0)}
                                 </span>
                             </div>
