@@ -93,6 +93,11 @@ export const POSView: React.FC = () => {
     const [registeredCustomers, setRegisteredCustomers] = useState<any[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState<boolean>(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+
+    // Sales Report Security states
+    const [salesPasswordInput, setSalesPasswordInput] = useState<string>('');
+    const [isSalesUnlocked, setIsSalesUnlocked] = useState<boolean>(false);
+    const [salesPasswordError, setSalesPasswordError] = useState<boolean>(false);
     
     // Half-Half customizer states for POS
     const [halfA, setHalfA] = useState<Pizza | null>(null);
@@ -129,6 +134,14 @@ export const POSView: React.FC = () => {
             setBoatPriceB(0);
         }
     }, [selectedPizza]);
+
+    useEffect(() => {
+        if (activeTab !== 'sales') {
+            setIsSalesUnlocked(false);
+            setSalesPasswordInput('');
+            setSalesPasswordError(false);
+        }
+    }, [activeTab]);
 
     useEffect(() => {
         if (activeTab === 'manage') {
@@ -2281,6 +2294,140 @@ export const POSView: React.FC = () => {
                 )}
 
                 {activeTab === 'sales' && (() => {
+                    if (!isSalesUnlocked) {
+                        const handlePasswordSubmit = (e?: React.FormEvent) => {
+                            if (e) e.preventDefault();
+                            if (salesPasswordInput === '123456*') {
+                                setIsSalesUnlocked(true);
+                                setSalesPasswordError(false);
+                                setSalesPasswordInput('');
+                                if (typeof playSuccessFeedback === 'function') playSuccessFeedback();
+                            } else {
+                                setSalesPasswordError(true);
+                                setSalesPasswordInput('');
+                                if (typeof playClickSound === 'function') playClickSound();
+                            }
+                        };
+
+                        const handleKeyPress = (num: string) => {
+                            setSalesPasswordError(false);
+                            setSalesPasswordInput(prev => prev + num);
+                        };
+
+                        const handleBackspace = () => {
+                            setSalesPasswordInput(prev => prev.slice(0, -1));
+                        };
+
+                        const handleClear = () => {
+                            setSalesPasswordInput('');
+                            setSalesPasswordError(false);
+                        };
+
+                        return (
+                            <div className="flex-1 bg-gray-50 flex items-center justify-center p-6 pb-24 lg:pb-6">
+                                <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-200 p-8 text-center space-y-6">
+                                    <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
+                                        <Lock size={32} className="animate-pulse" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <h3 className="text-xl font-black text-gray-900">
+                                            {language === 'th' ? '🔐 ล็อกความปลอดภัยผู้จัดการ' : '🔐 Manager Security Lock'}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 font-bold leading-relaxed px-4">
+                                            {language === 'th' 
+                                                ? 'กรุณากรอกรหัสผ่านผู้จัดการเพื่อดูรายงานยอดขาย วิเคราะห์ต้นทุน และรายชื่อลูกค้า' 
+                                                : 'Please enter the manager passcode to access reports, cost analysis, and customer profiles.'}
+                                        </p>
+                                    </div>
+
+                                    <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                                        <div className="relative">
+                                            <input 
+                                                type="password"
+                                                value={salesPasswordInput}
+                                                onChange={(e) => {
+                                                    setSalesPasswordError(false);
+                                                    setSalesPasswordInput(e.target.value);
+                                                }}
+                                                placeholder="••••••"
+                                                className={`w-full px-4 py-3.5 text-center text-2xl tracking-widest font-black bg-gray-50 border-2 rounded-2xl outline-none transition-all duration-200 ${salesPasswordError ? 'border-red-500 bg-red-50 text-red-700 placeholder-red-300' : 'border-gray-200 focus:border-brand-500 focus:bg-white text-gray-950'}`}
+                                                autoFocus
+                                            />
+                                            {salesPasswordError && (
+                                                <p className="text-xs text-red-600 font-extrabold mt-2 animate-bounce">
+                                                    ❌ {language === 'th' ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่' : 'Incorrect passcode. Please try again.'}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* PIN Pad layout for touchscreens/iPads */}
+                                        <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto pt-2">
+                                            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                                                <button
+                                                    key={num}
+                                                    type="button"
+                                                    onClick={() => handleKeyPress(num)}
+                                                    className="h-14 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-2xl font-black text-lg text-gray-800 transition active:scale-95 flex items-center justify-center cursor-pointer"
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleKeyPress('*')}
+                                                className="h-14 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-2xl font-black text-xl text-amber-700 transition active:scale-95 flex items-center justify-center cursor-pointer"
+                                            >
+                                                *
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleKeyPress('0')}
+                                                className="h-14 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-2xl font-black text-lg text-gray-800 transition active:scale-95 flex items-center justify-center cursor-pointer"
+                                            >
+                                                0
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleBackspace}
+                                                className="h-14 bg-red-50 hover:bg-red-100 border border-red-100 rounded-2xl font-bold text-sm text-red-600 transition active:scale-95 flex items-center justify-center cursor-pointer"
+                                                title="Backspace"
+                                            >
+                                                ⌫
+                                            </button>
+                                        </div>
+
+                                        <div className="flex gap-3 pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleClear}
+                                                className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-extrabold text-sm transition active:scale-95 cursor-pointer"
+                                            >
+                                                {language === 'th' ? 'ล้าง' : 'Clear'}
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="flex-1 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl font-black text-sm shadow-md shadow-brand-100 hover:shadow-brand-200 transition active:scale-95 cursor-pointer"
+                                            >
+                                                {language === 'th' ? 'ยืนยันรหัสผ่าน' : 'Confirm'}
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                    <div className="pt-2">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setActiveTab('order')} 
+                                            className="text-xs text-gray-400 hover:text-gray-600 font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                                        >
+                                            ← {language === 'th' ? 'กลับไปหน้าขายสินค้า' : 'Back to POS Cashier'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+
                     const filteredOrders = (orders || []).filter(o => o && filterByDate(o.createdAt, salesFilter));
                     const filteredExpenses = (expenses || []).filter(e => e && filterByDate(e.date, salesFilter));
                     const totalSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
