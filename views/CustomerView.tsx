@@ -2813,7 +2813,7 @@ export const CustomerView: React.FC = () => {
 
         {/* NEW MEMBER COUPONS WELCOME MODAL */}
         {showLoginCouponsModal && customer && (
-            <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
                 <div className="bg-gradient-to-b from-brand-50 to-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-brand-200 animate-slide-up flex flex-col max-h-[90vh]">
                      <div className="p-6 text-center bg-gradient-to-r from-brand-600 to-amber-500 text-white relative shrink-0">
                          <button onClick={() => setShowLoginCouponsModal(false)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 hover:bg-black/40 p-1.5 rounded-full transition"><X size={18}/></button>

@@ -5863,7 +5863,7 @@ export const POSView: React.FC = () => {
 
             {/* Customer Coupon Management Modal */}
             {selectedCouponCustomer && (
-                <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCouponCustomer(null)}>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCouponCustomer(null)}>
                     <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col font-sans" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
                         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">

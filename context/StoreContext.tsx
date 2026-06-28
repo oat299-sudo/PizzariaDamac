@@ -1806,7 +1806,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   savedFavorites: data.saved_favorites || [],
                   orderHistory: data.order_history || [],
                   pdpaAccepted: data.pdpa_accepted,
-                  savedAddresses: data.saved_addresses || []
+                  savedAddresses: data.saved_addresses || [],
+                  coupons: data.coupons || generateInitialCoupons()
               };
               setCustState(updatedProfile);
               try {
