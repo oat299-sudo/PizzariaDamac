@@ -202,6 +202,7 @@ export const CustomerView: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showProfile, setShowProfile] = useState(false);
+  const [showLoginCouponsModal, setShowLoginCouponsModal] = useState(false);
   
   // Order History & Search States
   const [showOrderHistory, setShowOrderHistory] = useState(false);
@@ -974,6 +975,7 @@ export const CustomerView: React.FC = () => {
             alert(language === 'th' ? "สร้างบัญชีผู้ใช้ใหม่สำเร็จ! ยินดีต้อนรับสู่ Pizza Damac!" : "Account created successfully! Welcome to Pizza Damac!");
         }
         setShowAuthModal(false);
+        setShowLoginCouponsModal(true);
     } catch (err: any) {
         console.error("Registration failed:", err);
         alert(language === 'th' ? `การสมัครสมาชิกไม่สำเร็จ: ${err?.message || err}` : `Registration failed: ${err?.message || err}`);
@@ -985,6 +987,7 @@ export const CustomerView: React.FC = () => {
       const success = await customerLogin(loginPhone, loginPassword);
       if (success) {
           setShowAuthModal(false);
+          setShowLoginCouponsModal(true);
       } else {
           alert("Invalid phone or password");
       }
@@ -1271,6 +1274,95 @@ export const CustomerView: React.FC = () => {
                                 <h3 className="font-bold text-sm text-gray-800 truncate">{localized.name}</h3>
                                 <div className="flex justify-between items-center mt-1">
                                     <span className="text-brand-600 font-bold text-xs">฿{item.basePrice}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+        )}
+
+        {/* --- MEMBER COUPONS DASHBOARD SECTION (Logged In) --- */}
+        {customer && customer.coupons && customer.coupons.filter(c => !c.isUsed).length > 0 && activeCategory === 'promotion' && (
+            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent">
+                <div className="flex justify-between items-end mb-4">
+                    <h2 className="text-lg font-black flex items-center gap-2 text-brand-800">
+                         <Gift size={22} className="text-brand-600 shrink-0"/> 
+                         <span>{language === 'th' ? 'คูปองสมาชิกของคุณ (แนะนำให้ใช้เลย!)' : 'Your Member Coupons (Recommended!)'}</span>
+                    </h2>
+                    <span className="text-xs font-bold text-brand-600 bg-brand-100 px-2 py-0.5 rounded-full">
+                        {customer.coupons.filter(c => !c.isUsed).length} {language === 'th' ? 'คูปองพร้อมใช้' : 'Coupons ready'}
+                    </span>
+                </div>
+                
+                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3">
+                    {customer.coupons.filter(c => !c.isUsed).map(c => {
+                        const isSelected = appliedCoupon?.id === c.id;
+                        const isMinSpentOk = cartTotal >= (c.minOrderAmount || 0);
+                        return (
+                            <div 
+                                key={'dashboard-coupon-'+c.id} 
+                                onClick={() => setAppliedCoupon(isSelected ? null : c)}
+                                className={`min-w-[280px] md:min-w-[320px] bg-white rounded-2xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition relative overflow-hidden flex flex-col justify-between ${
+                                    isSelected 
+                                        ? 'border-brand-500 bg-brand-50/10 ring-1 ring-brand-500' 
+                                        : 'border-orange-100 hover:border-brand-300'
+                                }`}
+                            >
+                                {/* Ticket cutout effect left side */}
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-3 h-6 bg-gray-200 rounded-r-full border-y border-r border-orange-100"></div>
+                                {/* Ticket cutout effect right side */}
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-6 bg-gray-200 rounded-l-full border-y border-l border-orange-100"></div>
+
+                                <div>
+                                    <div className="flex justify-between items-start gap-2 mb-2">
+                                        <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                            {c.code}
+                                        </span>
+                                        {c.expiryDate && (
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                                Exp: {c.expiryDate}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h3 className="font-extrabold text-sm md:text-base text-gray-800">
+                                        {language === 'th' ? c.titleTh || c.title : c.title}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-1 font-medium line-clamp-2 leading-relaxed">
+                                        {language === 'th' ? c.descriptionTh || c.description : c.description}
+                                    </p>
+                                </div>
+
+                                <div className="mt-4 flex items-center justify-between border-t border-dashed border-gray-100 pt-3">
+                                    <div className="text-left">
+                                        {c.minOrderAmount && c.minOrderAmount > 0 ? (
+                                            <span className={`text-[10px] font-black block ${isMinSpentOk ? 'text-green-600' : 'text-amber-600'}`}>
+                                                {language === 'th' 
+                                                    ? `ขั้นต่ำ ฿${c.minOrderAmount} (ในรถเข็น: ฿${cartTotal})` 
+                                                    : `Min. spend ฿${c.minOrderAmount} (Cart: ฿${cartTotal})`}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-gray-400 font-medium block">
+                                                {language === 'th' ? 'ไม่มีขั้นต่ำ' : 'No minimum spend'}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAppliedCoupon(isSelected ? null : c);
+                                        }}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                                            isSelected 
+                                                ? 'bg-brand-600 text-white shadow-sm' 
+                                                : 'bg-orange-50 text-brand-700 hover:bg-orange-100 border border-orange-200'
+                                        }`}
+                                    >
+                                        {isSelected 
+                                            ? (language === 'th' ? '✓ เลือกแล้ว' : '✓ Applied') 
+                                            : (language === 'th' ? 'กดใช้คูปอง' : 'Use Coupon')}
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -1950,9 +2042,51 @@ export const CustomerView: React.FC = () => {
                                                            />
                                                        </div>
                                                        <span className="text-[10px] text-gray-400 mt-0.5 block">{language === 'th' ? 'ปรับเปลี่ยนราคาของชิ้นนี้เองได้' : 'Can set custom price for this part'}</span>
-                                                   </div>
-                                               </div>
-                                          </div>
+                                                    </div>
+                                                </div>
+                                           </div>
+
+                                           {/* Piece B */}
+                                           <div className="text-left bg-white p-3.5 rounded-xl border border-blue-100">
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
+                                                    {language === 'th' ? 'ชิ้นที่ 2 (Side B)' : 'Piece 2 (Side B)'}
+                                                </label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <select 
+                                                        className="w-full border-2 border-gray-250 rounded-xl p-2.5 focus:border-blue-500 outline-none text-sm font-bold bg-white text-gray-850"
+                                                        value={boatB?.id || ''}
+                                                        onChange={(e) => {
+                                                            const found = menu.find(p => p.id === e.target.value);
+                                                            setBoatB(found || null);
+                                                            setBoatPriceB(found ? Math.round(found.basePrice / 2) : 0);
+                                                        }}
+                                                    >
+                                                        <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 2 --' : '-- Choose Flavor B --'}</option>
+                                                        {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
+                                                            <option key={pItem.id} value={pItem.id}>
+                                                                {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    
+                                                    <div>
+                                                        <div className="flex items-center border-2 border-gray-250 bg-white rounded-xl overflow-hidden focus-within:border-blue-500 transition">
+                                                            <span className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-250">฿</span>
+                                                            <input 
+                                                                type="number" 
+                                                                placeholder={language === 'th' ? 'ราคาชิ้นหลัง' : 'Price B'}
+                                                                value={boatPriceB || ''} 
+                                                                onChange={(e) => setBoatPriceB(Number(e.target.value))}
+                                                                className="w-full px-3 py-2 text-sm font-extrabold outline-none bg-transparent"
+                                                            />
+                                                        </div>
+                                                        <span className="text-[10px] text-gray-400 mt-0.5 block">{language === 'th' ? 'ปรับเปลี่ยนราคาของชิ้นนี้เองได้' : 'Can set custom price for this part'}</span>
+                                                    </div>
+                                                </div>
+                                           </div>
+                                      </div>
+                                 </div>
+                             )}
 
 
 
@@ -2673,6 +2807,119 @@ export const CustomerView: React.FC = () => {
                             </span>
                         </button>
                     </div>
+                </div>
+            </div>
+        )}
+
+        {/* NEW MEMBER COUPONS WELCOME MODAL */}
+        {showLoginCouponsModal && customer && (
+            <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+                <div className="bg-gradient-to-b from-brand-50 to-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-brand-200 animate-slide-up flex flex-col max-h-[90vh]">
+                     <div className="p-6 text-center bg-gradient-to-r from-brand-600 to-amber-500 text-white relative shrink-0">
+                         <button onClick={() => setShowLoginCouponsModal(false)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-black/20 hover:bg-black/40 p-1.5 rounded-full transition"><X size={18}/></button>
+                         <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 animate-bounce-short">
+                             <Gift size={32} className="text-white" />
+                         </div>
+                         <h2 className="text-xl md:text-2xl font-black tracking-tight">
+                             {language === 'th' ? `ยินดีต้อนรับคุณ ${customer.name}! 🎉` : `Welcome, ${customer.name}! 🎉`}
+                         </h2>
+                         <p className="text-xs md:text-sm text-brand-100 mt-1 font-medium">
+                             {language === 'th' ? 'เราขอมอบคูปองพิเศษสำหรับสมาชิกให้คุณทันที!' : 'We have exclusive member coupons ready for you!'}
+                         </p>
+                     </div>
+                     
+                     <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                         <div className="bg-amber-50/70 border border-amber-200/60 p-3.5 rounded-2xl flex items-start gap-2.5">
+                             <Sparkles className="text-amber-500 shrink-0 mt-0.5" size={16}/>
+                             <div className="text-left">
+                                 <span className="text-xs font-extrabold text-amber-800 uppercase block tracking-wider">
+                                     {language === 'th' ? 'ข้อแนะนำในการใช้งาน' : 'Special Suggestion'}
+                                 </span>
+                                 <p className="text-xs text-amber-700/90 mt-0.5 font-medium leading-relaxed">
+                                     {language === 'th' 
+                                         ? 'คุณสามารถคลิกเลือกเปิดใช้งานคูปองได้ทันทีตั้งแต่ตอนนี้! คูปองจะถูกจองไว้และนำไปคำนวณส่วนลดโดยอัตโนมัติเมื่อสั่งเมนูที่ร่วมรายการ' 
+                                         : 'You can activate a coupon right now! The coupon will be applied automatically when you add matching items.'}
+                                 </p>
+                             </div>
+                         </div>
+
+                         <div className="space-y-3">
+                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">
+                                 {language === 'th' ? 'รายการคูปองของคุณ' : 'Your Available Coupons'}
+                             </h3>
+                             
+                             {!customer.coupons || customer.coupons.filter(c => !c.isUsed).length === 0 ? (
+                                 <div className="text-center py-6 text-gray-400 text-sm font-bold bg-white rounded-2xl border border-dashed border-gray-200">
+                                     🎟️ {language === 'th' ? 'ไม่พบคูปองคงเหลือ' : 'No coupons available'}
+                                 </div>
+                             ) : (
+                                 customer.coupons.filter(c => !c.isUsed).map(c => {
+                                     const isSelected = appliedCoupon?.id === c.id;
+                                     return (
+                                         <div 
+                                             key={c.id}
+                                             className={`border-2 rounded-2xl bg-white overflow-hidden transition flex flex-col md:flex-row md:items-center justify-between p-4 gap-4 relative ${
+                                                 isSelected 
+                                                     ? 'border-brand-500 ring-1 ring-brand-500 bg-brand-50/10' 
+                                                     : 'border-gray-150 hover:border-brand-200 hover:shadow-md'
+                                             }`}
+                                         >
+                                             {/* Left Side: Ticket Style Layout */}
+                                             <div className="flex items-start gap-3 flex-1">
+                                                 <div className={`p-2.5 rounded-xl shrink-0 text-white mt-0.5 ${isSelected ? 'bg-brand-600' : 'bg-gradient-to-br from-amber-400 to-orange-500'}`}>
+                                                     <Gift size={20} />
+                                                 </div>
+                                                 <div className="text-left">
+                                                     <div className="flex items-center gap-1.5 flex-wrap">
+                                                         <span className="font-extrabold text-sm md:text-base text-gray-800">
+                                                             {language === 'th' ? c.titleTh || c.title : c.title}
+                                                         </span>
+                                                         <span className="bg-brand-100 text-brand-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">
+                                                             {c.code}
+                                                         </span>
+                                                     </div>
+                                                     <p className="text-xs text-gray-500 mt-1 font-medium leading-relaxed">
+                                                         {language === 'th' ? c.descriptionTh || c.description : c.description}
+                                                     </p>
+                                                     {c.minOrderAmount && c.minOrderAmount > 0 && (
+                                                         <p className="text-[10px] text-amber-600 font-extrabold mt-1">
+                                                             {language === 'th' ? `*ขั้นต่ำ ฿${c.minOrderAmount}` : `*Min. spend ฿${c.minOrderAmount}`}
+                                                         </p>
+                                                     )}
+                                                 </div>
+                                             </div>
+                                             
+                                             {/* Right Side: Apply Button */}
+                                             <button 
+                                                 onClick={() => {
+                                                     setAppliedCoupon(isSelected ? null : c);
+                                                 }}
+                                                 className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide shrink-0 transition-all ${
+                                                     isSelected 
+                                                         ? 'bg-brand-100 text-brand-700 border border-brand-300' 
+                                                         : 'bg-brand-600 text-white hover:bg-brand-700 shadow-md hover:shadow-lg'
+                                                 }`}
+                                             >
+                                                 {isSelected 
+                                                     ? (language === 'th' ? '✓ เปิดใช้งานอยู่' : '✓ Active Now') 
+                                                     : (language === 'th' ? 'เปิดใช้งานคูปองนี้' : 'Activate Coupon')}
+                                             </button>
+                                         </div>
+                                     );
+                                 })
+                             )}
+                         </div>
+                     </div>
+                     
+                     <div className="p-5 bg-gray-50 border-t border-gray-100 flex flex-col gap-2 shrink-0">
+                         <button 
+                             onClick={() => setShowLoginCouponsModal(false)}
+                             className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3.5 rounded-2xl font-black text-sm tracking-wide shadow-lg hover:shadow-xl transition transform active:scale-95 flex items-center justify-center gap-1.5"
+                         >
+                             <span>{language === 'th' ? 'ตกลง, เริ่มสั่งพิซซ่าเลย! 🍕' : 'Great, Let\'s Order Pizza! 🍕'}</span>
+                             <ArrowRight size={16}/>
+                         </button>
+                     </div>
                 </div>
             </div>
         )}

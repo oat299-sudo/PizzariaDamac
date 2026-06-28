@@ -27,6 +27,9 @@ export interface Pizza {
   allowedPromotions?: string[]; // IDs of promotions this item can be added to. If empty/undefined, allowed in all.
   badge?: string; // Promo badge (e.g., 'New', 'Promo')
   badgeTh?: string; // Thai Promo badge (e.g., 'เมนูใหม่', 'เมนูประจำเดือน')
+  rawCost?: number; // Raw ingredient cost (ต้นทุนวัตถุดิบ)
+  grabPrice?: number; // Price on Grab platform
+  linemanPrice?: number; // Price on LineMan platform
 }
 
 export interface SubItem {
@@ -178,6 +181,11 @@ export interface Expense {
   category: ExpenseCategory;
   date: string;
   note?: string;
+  quantity?: number;     // จำนวน
+  unit?: string;         // หน่วย (เช่น กิโลกรัม, แพ็ค, กล่อง, ชิ้น)
+  unitPrice?: number;    // ราคาต่อหน่วย
+  vendor?: string;       // ร้านค้า/ซัพพลายเออร์
+  billNumber?: string;   // เลขที่บิล
 }
 
 export interface NewsItem {

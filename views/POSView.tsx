@@ -88,7 +88,7 @@ export const POSView: React.FC = () => {
     // Unified Tab State
     const [customCP, setCustomCP] = useState<string>("18");
     const [activeTab, setActiveTab] = useState<string>('order');
-    const [salesSubTab, setSalesSubTab] = useState<'orders' | 'daily'>('orders');
+    const [salesSubTab, setSalesSubTab] = useState<'orders' | 'daily' | 'expenses' | 'cost_analysis'>('orders');
     const [selectedPizza, setSelectedPizza] = useState<Pizza | null>(null);
     const [registeredCustomers, setRegisteredCustomers] = useState<any[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState<boolean>(false);
@@ -541,6 +541,16 @@ export const POSView: React.FC = () => {
     const [deliveryPlatformRef, setDeliveryPlatformRef] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
+
+    const getPizzaPrice = (pizza: Pizza, source: OrderSource): number => {
+        if (source === 'grab' && pizza.grabPrice !== undefined && pizza.grabPrice > 0) {
+            return pizza.grabPrice;
+        }
+        if (source === 'lineman' && pizza.linemanPrice !== undefined && pizza.linemanPrice > 0) {
+            return pizza.linemanPrice;
+        }
+        return pizza.basePrice;
+    };
     
     // Reporting State
     const [salesFilter, setSalesFilter] = useState<'day' | 'month' | 'year' | 'all'>('day');
@@ -562,8 +572,36 @@ export const POSView: React.FC = () => {
         description: '',
         amount: '',
         category: 'COGS' as ExpenseCategory,
-        note: ''
+        note: '',
+        quantity: 1,
+        unit: 'แพ็ค',
+        unitPrice: 0,
+        vendor: '',
+        billNumber: '',
+        saveAsTemplate: false
     });
+
+    const [expenseTemplates, setExpenseTemplates] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('damac_expense_templates');
+            if (saved) {
+                try { return JSON.parse(saved); } catch(e) {}
+            }
+        }
+        return [
+            { id: 'tpl-1', description: 'แป้งพิซซ่าอเนกประสงค์', quantity: 10, unit: 'กิโลกรัม', unitPrice: 35, amount: 350, category: 'COGS', vendor: 'แม็คโคร', note: '' },
+            { id: 'tpl-2', description: 'มอสซาเรลล่าชีส 2kg', quantity: 2, unit: 'ถุง', unitPrice: 580, amount: 1160, category: 'COGS', vendor: 'แม็คโคร', note: '' },
+            { id: 'tpl-3', description: 'กล่องพิซซ่า 10 นิ้ว', quantity: 100, unit: 'ใบ', unitPrice: 8.5, amount: 850, category: 'COGS', vendor: 'โรงพิมพ์แพ็คเกจ', note: '' },
+            { id: 'tpl-4', description: 'ซอสมะเขือเทศเข้มข้น', quantity: 5, unit: 'กระป๋อง', unitPrice: 120, amount: 600, category: 'COGS', vendor: 'แม็คโคร', note: '' },
+            { id: 'tpl-5', description: 'ค่าน้ำไฟประจำเดือน', quantity: 1, unit: 'เดือน', unitPrice: 4200, amount: 4200, category: 'Utility', vendor: 'การไฟฟ้า/ประปา', note: '' }
+        ];
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('damac_expense_templates', JSON.stringify(expenseTemplates));
+        } catch(e) {}
+    }, [expenseTemplates]);
 
     // News Form State
     const [newsForm, setNewsForm] = useState({
@@ -1071,7 +1109,7 @@ export const POSView: React.FC = () => {
                 alert("Please select both halves for the Half-Half pizza!");
                 return;
             }
-            const calculatedBasePrice = Math.round((halfA.basePrice / 2) + (halfB.basePrice / 2) + 20);
+            const calculatedBasePrice = Math.round((getPizzaPrice(halfA, orderSource) / 2) + (getPizzaPrice(halfB, orderSource) / 2) + 20);
             const itemTotal = (calculatedBasePrice + toppingsPrice) * quantity;
             const nameEn = `Half-Half Pizza (${halfA.name} / ${halfB.name})`;
             const nameTh = `พิซซ่าครึ่ง-ครึ่ง (${halfA.nameTh || halfA.name} / ${halfB.nameTh || halfB.name})`;
@@ -1099,15 +1137,16 @@ export const POSView: React.FC = () => {
         }
 
         const localized = getLocalizedItem(selectedPizza);
+        const activePrice = getPizzaPrice(selectedPizza, orderSource);
         const item: CartItem = {
             id: editingCartItem ? editingCartItem.id : Date.now().toString() + Math.random().toString(),
             pizzaId: selectedPizza.id,
             name: localized.name,
             nameTh: selectedPizza.nameTh,
-            basePrice: selectedPizza.basePrice,
+            basePrice: activePrice,
             selectedToppings: selectedToppings,
             quantity: quantity,
-            totalPrice: (selectedPizza.basePrice + toppingsPrice) * quantity,
+            totalPrice: (activePrice + toppingsPrice) * quantity,
             specialInstructions: specialInstructions
         };
         if (editingCartItem) updateCartItem(item); else addToCart(item);
@@ -1502,9 +1541,64 @@ export const POSView: React.FC = () => {
 
     // Expenses & News
     const handleAddExpense = (e: React.FormEvent) => {
-        e.preventDefault(); if (!expenseForm.description || !expenseForm.amount) return;
-        addExpense({ id: 'exp-' + Date.now(), date: new Date().toISOString(), description: expenseForm.description, amount: parseFloat(expenseForm.amount), category: expenseForm.category, note: expenseForm.note });
-        setExpenseForm({ description: '', amount: '', category: 'COGS', note: '' });
+        e.preventDefault(); 
+        if (!expenseForm.description) return;
+        
+        const qty = expenseForm.quantity || 1;
+        const uPrice = expenseForm.unitPrice || 0;
+        const totalAmount = uPrice > 0 ? (qty * uPrice) : (parseFloat(expenseForm.amount) || 0);
+        
+        if (totalAmount <= 0) {
+            alert(language === 'th' ? "กรุณากรอกจำนวนเงินมากกว่า 0" : "Please enter an amount greater than 0");
+            return;
+        }
+
+        const newExpense = {
+            id: 'exp-' + Date.now(),
+            date: new Date().toISOString(),
+            description: expenseForm.description,
+            amount: totalAmount,
+            category: expenseForm.category,
+            note: expenseForm.note,
+            quantity: qty,
+            unit: expenseForm.unit || 'แพ็ค',
+            unitPrice: uPrice > 0 ? uPrice : totalAmount / qty,
+            vendor: expenseForm.vendor || '',
+            billNumber: expenseForm.billNumber || ''
+        };
+
+        addExpense(newExpense);
+
+        if (expenseForm.saveAsTemplate) {
+            const exists = expenseTemplates.some(t => t.description.toLowerCase().trim() === expenseForm.description.toLowerCase().trim());
+            if (!exists) {
+                const newTpl = {
+                    id: 'tpl-' + Date.now(),
+                    description: expenseForm.description,
+                    quantity: qty,
+                    unit: expenseForm.unit || 'แพ็ค',
+                    unitPrice: uPrice > 0 ? uPrice : totalAmount / qty,
+                    amount: totalAmount,
+                    category: expenseForm.category,
+                    vendor: expenseForm.vendor || '',
+                    note: expenseForm.note
+                };
+                setExpenseTemplates(prev => [...prev, newTpl]);
+            }
+        }
+
+        setExpenseForm({
+            description: '',
+            amount: '',
+            category: 'COGS',
+            note: '',
+            quantity: 1,
+            unit: 'แพ็ค',
+            unitPrice: 0,
+            vendor: '',
+            billNumber: '',
+            saveAsTemplate: false
+        });
     };
     const handleAddNews = (e: React.FormEvent) => {
         e.preventDefault(); if (!newsForm.title || !newsForm.summary) return;
@@ -2083,7 +2177,7 @@ export const POSView: React.FC = () => {
                                                     <h3 className="font-bold text-gray-800 text-base md:text-lg leading-tight mb-1">{localized.name}</h3>
                                                     <div className="mt-auto flex justify-between items-center pt-2">
                                                         <span className="font-bold text-brand-600 text-base md:text-lg">
-                                                            {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${item.basePrice}`}
+                                                            {item.id === 'p_half_half' ? (language === 'th' ? 'เลือก 2 หน้า' : 'Select halves') : `฿${getPizzaPrice(item, orderSource)}`}
                                                         </span>
                                                         {!isEditMode && (
                                                             <button 
@@ -2676,9 +2770,21 @@ export const POSView: React.FC = () => {
                                             >
                                                 📈 {language === 'th' ? 'สรุปยอดขายรายวัน' : 'Daily Sales Breakdown'}
                                             </button>
+                                            <button 
+                                                onClick={() => setSalesSubTab('expenses')}
+                                                className={`px-5 py-3 font-black text-sm border-b-2 transition ${salesSubTab === 'expenses' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                💸 {language === 'th' ? 'บันทึกบิล & รายจ่าย' : 'Bills & Expense Tracker'}
+                                            </button>
+                                            <button 
+                                                onClick={() => setSalesSubTab('cost_analysis')}
+                                                className={`px-5 py-3 font-black text-sm border-b-2 transition ${salesSubTab === 'cost_analysis' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                                            >
+                                                🥗 {language === 'th' ? 'วิเคราะห์อัตรากำไร' : 'Margin & COGS Analysis'}
+                                            </button>
                                         </div>
 
-                                        {salesSubTab === 'orders' ? (
+                                        {salesSubTab === 'orders' && (
                                             /* Order History */
                                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                                 <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -2749,7 +2855,9 @@ export const POSView: React.FC = () => {
                                                     </table>
                                                 </div>
                                             </div>
-                                        ) : (
+                                        )}
+
+                                        {salesSubTab === 'daily' && (
                                             /* Daily Sales breakdown */
                                             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                                 <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -4705,6 +4813,49 @@ export const POSView: React.FC = () => {
                                                 onChange={e => setItemForm({ ...itemForm, basePrice: parseInt(e.target.value) || 0 })} 
                                                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-gray-850 focus:border-brand-500 outline-none font-mono"
                                                 placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-b border-gray-100 py-4 my-2">
+                                        <div>
+                                            <label className="text-xs font-black text-amber-700 uppercase block mb-1">
+                                                {language === 'th' ? '🍖 ต้นทุนวัตถุดิบ (บาท)' : '🍖 Raw Ingredient Cost (฿)'}
+                                            </label>
+                                            <input 
+                                                type="number" 
+                                                step="0.01"
+                                                min="0"
+                                                value={itemForm.rawCost !== undefined ? itemForm.rawCost : ''} 
+                                                onChange={e => setItemForm({ ...itemForm, rawCost: parseFloat(e.target.value) || 0 })} 
+                                                className="w-full border-2 border-amber-100 bg-amber-50/20 rounded-xl px-4 py-2 font-black text-amber-900 focus:border-amber-500 focus:bg-white outline-none font-mono"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-black text-green-700 uppercase block mb-1">
+                                                {language === 'th' ? '🟢 ราคา Grab (บาท)' : '🟢 Grab Price (฿)'}
+                                            </label>
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                value={itemForm.grabPrice !== undefined ? itemForm.grabPrice : ''} 
+                                                onChange={e => setItemForm({ ...itemForm, grabPrice: parseInt(e.target.value) || 0 })} 
+                                                className="w-full border-2 border-green-100 bg-green-50/20 rounded-xl px-4 py-2 font-black text-green-900 focus:border-green-500 focus:bg-white outline-none font-mono"
+                                                placeholder={itemForm.basePrice ? String(itemForm.basePrice) : "0"}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-black text-blue-700 uppercase block mb-1">
+                                                {language === 'th' ? '🔵 ราคา Lineman (บาท)' : '🔵 Lineman Price (฿)'}
+                                            </label>
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                value={itemForm.linemanPrice !== undefined ? itemForm.linemanPrice : ''} 
+                                                onChange={e => setItemForm({ ...itemForm, linemanPrice: parseInt(e.target.value) || 0 })} 
+                                                className="w-full border-2 border-blue-100 bg-blue-50/20 rounded-xl px-4 py-2 font-black text-blue-900 focus:border-blue-500 focus:bg-white outline-none font-mono"
+                                                placeholder={itemForm.basePrice ? String(itemForm.basePrice) : "0"}
                                             />
                                         </div>
                                     </div>

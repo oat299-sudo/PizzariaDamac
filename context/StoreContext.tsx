@@ -1349,7 +1349,21 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [toppings]);
 
   const [orders, setOrders] = useState<Order[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+      if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('damac_expenses');
+          if (saved) {
+              try { return JSON.parse(saved); } catch(e) {}
+          }
+      }
+      return [];
+  });
+
+  useEffect(() => {
+      try {
+        localStorage.setItem('damac_expenses', JSON.stringify(expenses));
+      } catch(e) {}
+  }, [expenses]);
 
   // Partners State
   const [partners, setPartners] = useState<Partner[]>(() => {
@@ -1619,7 +1633,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                    category: d.category || local?.category || 'pizza',
                    available: d.available,
                    badge: savedLocal?.badge || local?.badge || d.badge || '',
-                   badgeTh: savedLocal?.badgeTh || local?.badgeTh || d.badge_th || ''
+                   badgeTh: savedLocal?.badgeTh || local?.badgeTh || d.badge_th || '',
+                   rawCost: d.raw_cost !== undefined ? d.raw_cost : (savedLocal?.rawCost || local?.rawCost || 0),
+                   grabPrice: d.grab_price !== undefined ? d.grab_price : (savedLocal?.grabPrice || d.base_price || local?.grabPrice || d.base_price),
+                   linemanPrice: d.lineman_price !== undefined ? d.lineman_price : (savedLocal?.linemanPrice || d.base_price || local?.linemanPrice || d.base_price)
                };
            });
 
@@ -1864,7 +1881,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 id: pizza.id, name: pizza.name, name_th: pizza.nameTh, 
                 description: pizza.description, description_th: pizza.descriptionTh,
                 base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false
+                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false,
+                raw_cost: pizza.rawCost, grab_price: pizza.grabPrice, lineman_price: pizza.linemanPrice
             }]);
           } catch (e) { console.error(e); }
       } 
@@ -1879,7 +1897,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 name: pizza.name, name_th: pizza.nameTh, 
                 description: pizza.description, description_th: pizza.descriptionTh,
                 base_price: pizza.basePrice, image: pizza.image, available: pizza.available, category: pizza.category,
-                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false
+                combo_count: pizza.comboCount, is_best_seller: pizza.isBestSeller || false,
+                raw_cost: pizza.rawCost, grab_price: pizza.grabPrice, lineman_price: pizza.linemanPrice
             });
           } catch(e) { console.error(e); }
       }
@@ -2721,11 +2740,29 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Expenses
   const addExpense = async (expense: Expense) => {
       if (isSupabaseConfigured) {
-          // Assuming 'expenses' table exists
-          await supabase.from('expenses').insert([{
-              id: expense.id, description: expense.description, amount: expense.amount, 
-              category: expense.category, date: expense.date, note: expense.note
-          }]);
+          try {
+              const payload = {
+                  id: expense.id, 
+                  description: expense.description, 
+                  amount: expense.amount, 
+                  category: expense.category, 
+                  date: expense.date, 
+                  note: expense.note,
+                  quantity: expense.quantity,
+                  unit: expense.unit,
+                  unit_price: expense.unitPrice,
+                  vendor: expense.vendor,
+                  bill_number: expense.billNumber
+              };
+              let { error } = await supabase.from('expenses').insert([payload]);
+              if (error) {
+                  console.warn("Retrying insert with basic fields in case table lacks custom columns.");
+                  await supabase.from('expenses').insert([{
+                      id: expense.id, description: expense.description, amount: expense.amount, 
+                      category: expense.category, date: expense.date, note: expense.note
+                  }]);
+              }
+          } catch(e) { console.error(e); }
       }
       setExpenses(prev => [...prev, expense]);
   };
