@@ -76,6 +76,7 @@ export interface CustomerProfile {
   savedFavorites: SavedFavorite[];
   orderHistory: string[]; // List of Order IDs
   pdpaAccepted?: boolean; // New: PDPA Consent
+  coupons?: Coupon[]; // Member coupons / vouchers
 }
 
 export type OrderType = 'dine-in' | 'online' | 'delivery';
@@ -118,6 +119,27 @@ export interface Order {
   // Discount & Promo code
   promoCode?: string;
   discountAmount?: number;
+  couponCode?: string;
+  couponDiscountAmount?: number;
+}
+
+export type CouponDiscountType = 'percentage_most_expensive' | 'fixed_discount' | 'free_delivery' | 'percentage_total';
+
+export interface Coupon {
+  id: string;
+  code: string;
+  title: string;
+  titleTh: string;
+  description: string;
+  descriptionTh: string;
+  discountType: CouponDiscountType;
+  discountValue: number; // e.g. 10 for 10% off most expensive pizza, or 50 for ฿50 off
+  minOrderAmount?: number;
+  applicableOrderTypes?: OrderType[]; // e.g. ['delivery', 'dine-in', 'online']
+  isUsed?: boolean;
+  expiryDate?: string; // ISO date format
+  badge?: string; // e.g. "สมาชิคใหม่" or "New Member", "Monthly"
+  badgeTh?: string;
 }
 
 export type PromoDiscountType = 'percentage' | 'fixed_order' | 'fixed_delivery';

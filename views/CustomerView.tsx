@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite, parseAnyMapLink } from '../types';
+import { Pizza, CartItem, Topping, PaymentMethod, ProductCategory, SubItem, OrderStatus, SavedFavorite, parseAnyMapLink, Coupon } from '../types';
 import { INITIAL_TOPPINGS, CATEGORIES, RESTAURANT_LOCATION, DEFAULT_STORE_SETTINGS } from '../constants';
 import { ShoppingCart, Plus, Minus, Trash2, X, User, ChefHat, Sparkles, MapPin, Truck, Clock, Banknote, QrCode, ShoppingBag, Star, ExternalLink, Heart, History, Gift, ArrowRight, ArrowLeft, Dices, Navigation, Globe, AlertTriangle, CalendarDays, PlayCircle, Info, ChevronRight, Check, Lock, CheckCircle2, Droplets, Utensils, Carrot, Youtube, Newspaper, Activity, Facebook, Phone, MessageCircle, RotateCw, Layers, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
@@ -107,6 +107,7 @@ export const CustomerView: React.FC = () => {
   // Promo Code States
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [appliedPromoCode, setAppliedPromoCode] = useState<any | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [promoError, setPromoError] = useState('');
 
   const handleApplyPromoCode = () => {
@@ -302,6 +303,40 @@ export const CustomerView: React.FC = () => {
       }
       return 0;
   }, [appliedPromoCode, cartTotal, orderType]);
+
+  const calculatedCouponDiscount = useMemo(() => {
+      if (!appliedCoupon) return 0;
+      if (cartTotal < (appliedCoupon.minOrderAmount || 0)) return 0;
+      
+      // Check order type applicability if specified
+      if (appliedCoupon.applicableOrderTypes && appliedCoupon.applicableOrderTypes.length > 0) {
+          const matched = appliedCoupon.applicableOrderTypes.includes(orderType);
+          if (!matched) return 0;
+      }
+      
+      if (appliedCoupon.discountType === 'percentage_most_expensive') {
+          // Find the most expensive single pizza item
+          let maxPizzaPrice = 0;
+          cart.forEach(item => {
+              const itemDef = menu.find(m => m.id === item.pizzaId);
+              if (itemDef?.category === 'pizza' || itemDef?.category === 'promotion') {
+                  const unitPrice = item.totalPrice / item.quantity;
+                  if (unitPrice > maxPizzaPrice) {
+                      maxPizzaPrice = unitPrice;
+                  }
+              }
+          });
+          return Math.round(maxPizzaPrice * ((appliedCoupon.discountValue || 0) / 100));
+      } else if (appliedCoupon.discountType === 'fixed_discount') {
+          return Math.min(cartTotal, appliedCoupon.discountValue || 0);
+      } else if (appliedCoupon.discountType === 'free_delivery') {
+          if (orderType !== 'delivery') return 0;
+          return Math.min(deliveryFee || 0, appliedCoupon.discountValue || 0);
+      } else if (appliedCoupon.discountType === 'percentage_total') {
+          return Math.round(cartTotal * ((appliedCoupon.discountValue || 0) / 100));
+      }
+      return 0;
+  }, [appliedCoupon, cartTotal, orderType, cart, menu, deliveryFee]);
   
   const [addressSaveType, setAddressSaveType] = useState<'home' | 'work' | 'none'>('none');
   const [savedProfiles, setSavedProfiles] = useState<{ [key: string]: { address: string, phone: string, mapSearch: string, lat: number, lng: number, hasPin: boolean } }>(() => {
@@ -876,13 +911,18 @@ export const CustomerView: React.FC = () => {
         pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,
         tableNumber: tableSession || undefined, 
         source: 'store',
-        partnerId: partnerSession || undefined, promoCode: appliedPromoCode?.code || undefined, discountAmount: calculatedDiscount || undefined
+        partnerId: partnerSession || undefined, 
+        promoCode: appliedPromoCode?.code || undefined, 
+        discountAmount: calculatedDiscount || undefined,
+        couponCode: appliedCoupon?.code || undefined,
+        couponDiscountAmount: calculatedCouponDiscount || undefined
      });
      setIsSubmitting(false);
      if (success) {
         setIsCartOpen(false);
         setOrderNote('');
         setAppliedPromoCode(null);
+        setAppliedCoupon(null);
         setPromoCodeInput('');
         const lastId = localStorage.getItem('damac_last_order');
         setLocalOrderId(lastId);
@@ -1914,47 +1954,7 @@ export const CustomerView: React.FC = () => {
                                                </div>
                                           </div>
 
-                                          {/* Piece B */}
-                                          <div className="text-left bg-white p-3.5 rounded-xl border border-blue-100">
-                                               <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">
-                                                   {language === 'th' ? 'ชิ้นที่ 2 (Side B)' : 'Piece 2 (Side B)'}
-                                               </label>
-                                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                   <select 
-                                                       className="w-full border-2 border-gray-250 rounded-xl p-2.5 focus:border-blue-500 outline-none text-sm font-bold bg-white text-gray-850"
-                                                       value={boatB?.id || ''}
-                                                       onChange={(e) => {
-                                                           const found = menu.find(p => p.id === e.target.value);
-                                                           setBoatB(found || null);
-                                                           setBoatPriceB(found ? Math.round(found.basePrice / 2) : 0);
-                                                       }}
-                                                   >
-                                                       <option value="">{language === 'th' ? '-- เลือกรสชาติชิ้นที่ 2 --' : '-- Choose Flavor B --'}</option>
-                                                       {menu.filter(p => p.category === 'pizza' && p.id !== 'custom_base' && p.id !== 'p_half_half' && p.id !== 'p_boat' && p.available).map(pItem => (
-                                                           <option key={pItem.id} value={pItem.id}>
-                                                               {language === 'th' ? pItem.nameTh || pItem.name : pItem.name} (฿{pItem.basePrice})
-                                                           </option>
-                                                       ))}
-                                                   </select>
 
-                                                   <div>
-                                                       <div className="flex items-center border-2 border-gray-250 bg-white rounded-xl overflow-hidden focus-within:border-blue-500 transition">
-                                                           <span className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-250">฿</span>
-                                                           <input 
-                                                               type="number" 
-                                                               placeholder={language === 'th' ? 'ราคาชิ้นที่สอง' : 'Price B'}
-                                                               value={boatPriceB || ''} 
-                                                               onChange={(e) => setBoatPriceB(Number(e.target.value))}
-                                                               className="w-full px-3 py-2 text-sm font-extrabold outline-none bg-transparent"
-                                                           />
-                                                       </div>
-                                                       <span className="text-[10px] text-gray-400 mt-0.5 block">{language === 'th' ? 'ปรับเปลี่ยนราคาของชิ้นนี้เองได้' : 'Can set custom price for this part'}</span>
-                                                   </div>
-                                               </div>
-                                          </div>
-                                     </div>
-                                </div>
-                            )}
 
                             <div className="mb-6">
                                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1"><MessageCircle size={14}/> Special Instructions</label>
@@ -2481,6 +2481,107 @@ export const CustomerView: React.FC = () => {
                             )}
                         </div>
 
+                        {/* Member Coupons Section */}
+                        {customer && (
+                            <div className="mb-4 border-b border-gray-100 pb-4">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Gift size={14} className="text-brand-600 shrink-0"/>
+                                    <span>{language === 'th' ? 'คูปองสมาชิกของคุณ' : 'Your Member Coupons'}</span>
+                                </label>
+                                
+                                {customer.coupons && customer.coupons.filter(c => !c.isUsed).length > 0 ? (
+                                    <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                                        {customer.coupons.filter(c => !c.isUsed).map(c => {
+                                            const isMinSpentOk = cartTotal >= (c.minOrderAmount || 0);
+                                            const isOrderTypeOk = !c.applicableOrderTypes || c.applicableOrderTypes.length === 0 || c.applicableOrderTypes.includes(orderType);
+                                            const isEligible = isMinSpentOk && isOrderTypeOk;
+                                            const isSelected = appliedCoupon?.id === c.id;
+                                            
+                                            let errorMsg = '';
+                                            if (!isMinSpentOk) {
+                                                errorMsg = language === 'th' ? `ขั้นต่ำ ฿${c.minOrderAmount}` : `Min. order ฿${c.minOrderAmount}`;
+                                            } else if (!isOrderTypeOk) {
+                                                errorMsg = language === 'th' ? 'ไม่รองรับการสั่งซื้อประเภทนี้' : 'Unsupported order type';
+                                            }
+
+                                            return (
+                                                <div 
+                                                    key={c.id}
+                                                    onClick={() => {
+                                                        if (isEligible) {
+                                                            setAppliedCoupon(isSelected ? null : c);
+                                                        }
+                                                    }}
+                                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-start gap-2.5 relative ${
+                                                        isSelected 
+                                                            ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500' 
+                                                            : isEligible 
+                                                                ? 'border-gray-200 bg-white hover:bg-gray-50' 
+                                                                : 'border-gray-150 bg-gray-50/75 opacity-60 cursor-not-allowed'
+                                                    }`}
+                                                >
+                                                    <div className={`p-1.5 rounded-lg text-white shrink-0 mt-0.5 ${
+                                                        isSelected 
+                                                            ? 'bg-brand-600' 
+                                                            : isEligible 
+                                                                ? 'bg-amber-500' 
+                                                                : 'bg-gray-400'
+                                                    }`}>
+                                                        <Gift size={16} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="text-xs font-black text-gray-900 font-mono tracking-tight bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                {c.code}
+                                                            </span>
+                                                            <span className={`text-[10px] px-1.5 py-0.5 font-bold rounded ${
+                                                                isSelected 
+                                                                    ? 'bg-brand-100 text-brand-700' 
+                                                                    : isEligible 
+                                                                        ? 'bg-amber-100 text-amber-800' 
+                                                                        : 'bg-gray-200 text-gray-600'
+                                                            }`}>
+                                                                {language === 'th' ? c.badgeTh || c.badge : c.badge}
+                                                            </span>
+                                                        </div>
+                                                        <h4 className="text-xs font-bold text-gray-800 mt-1">
+                                                            {language === 'th' ? c.titleTh || c.title : c.title}
+                                                        </h4>
+                                                        <p className="text-[10px] text-gray-500 mt-0.5 leading-normal">
+                                                            {language === 'th' ? c.descriptionTh || c.description : c.description}
+                                                        </p>
+                                                        {!isEligible && (
+                                                            <span className="text-[10px] text-red-500 font-bold mt-1 block">
+                                                                ⚠️ {errorMsg}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {isEligible && (
+                                                        <div className="shrink-0 self-center">
+                                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                                                                isSelected 
+                                                                    ? 'bg-brand-600 border-brand-600 text-white' 
+                                                                    : 'border-gray-300'
+                                                            }`}>
+                                                                {isSelected && <Check size={12} strokeWidth={3}/>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                        <p className="text-xs text-gray-400 font-bold">
+                                            {language === 'th' ? 'ไม่มีคูปองที่สามารถใช้งานได้ในขณะนี้' : 'No coupons available at the moment'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {orderType === 'delivery' && deliveryFee !== null ? (
                             <>
                                 <div className="flex justify-between items-center mb-1 text-sm font-bold text-gray-500">
@@ -2498,14 +2599,20 @@ export const CustomerView: React.FC = () => {
                                     </div>
                                 </div>
                                 {calculatedDiscount > 0 && (
-                                    <div className="flex justify-between items-center mb-2 text-sm font-bold text-green-600">
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
                                         <span>Discount ({appliedPromoCode?.code})</span>
                                         <span>-฿{calculatedDiscount}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                                {calculatedCouponDiscount > 0 && (
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
+                                        <span>Coupon ({appliedCoupon?.code})</span>
+                                        <span>-฿{calculatedCouponDiscount}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900 border-t border-gray-100 pt-2">
                                     <span>Total</span>
-                                    <span>฿{Math.max(0, cartTotal + deliveryFee - calculatedDiscount)}</span>
+                                    <span>฿{Math.max(0, cartTotal + deliveryFee - calculatedDiscount - calculatedCouponDiscount)}</span>
                                 </div>
                             </>
                         ) : orderType === 'delivery' ? (
@@ -2519,27 +2626,39 @@ export const CustomerView: React.FC = () => {
                                     <span>{hasMapPin ? 'Calculating...' : language === 'th' ? 'กรุณาระบุที่อยู่' : 'Pin location to calc'}</span>
                                 </div>
                                 {calculatedDiscount > 0 && (
-                                    <div className="flex justify-between items-center mb-2 text-sm font-bold text-green-600 border-b border-gray-100 pb-2">
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
                                         <span>Discount ({appliedPromoCode?.code})</span>
                                         <span>-฿{calculatedDiscount}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                                {calculatedCouponDiscount > 0 && (
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
+                                        <span>Coupon ({appliedCoupon?.code})</span>
+                                        <span>-฿{calculatedCouponDiscount}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900 border-t border-gray-100 pt-2">
                                     <span>Total (Excl. delivery)</span>
-                                    <span>฿{Math.max(0, cartTotal - calculatedDiscount)}</span>
+                                    <span>฿{Math.max(0, cartTotal - calculatedDiscount - calculatedCouponDiscount)}</span>
                                 </div>
                             </>
                         ) : (
                             <>
                                 {calculatedDiscount > 0 && (
-                                    <div className="flex justify-between items-center mb-2 text-sm font-bold text-green-600 border-b border-gray-100 pb-2">
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
                                         <span>Discount ({appliedPromoCode?.code})</span>
                                         <span>-฿{calculatedDiscount}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900">
+                                {calculatedCouponDiscount > 0 && (
+                                    <div className="flex justify-between items-center mb-1.5 text-sm font-bold text-green-600">
+                                        <span>Coupon ({appliedCoupon?.code})</span>
+                                        <span>-฿{calculatedCouponDiscount}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center mb-4 text-xl font-bold text-gray-900 border-t border-gray-100 pt-2">
                                     <span>Total</span>
-                                    <span>฿{Math.max(0, cartTotal - calculatedDiscount)}</span>
+                                    <span>฿{Math.max(0, cartTotal - calculatedDiscount - calculatedCouponDiscount)}</span>
                                 </div>
                             </>
                         )}
@@ -2656,6 +2775,66 @@ export const CustomerView: React.FC = () => {
                                  <p className="text-xs text-center text-gray-500">{10 - customer.loyaltyPoints} more points {t('toFreePizza')}</p>
                              )}
                          </div>
+
+                          {/* MEMBER COUPONS LIST */}
+                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 font-sans">
+                              <h3 className="font-bold text-gray-800 text-sm mb-3 flex items-center gap-1.5">
+                                  <Gift size={16} className="text-brand-600 shrink-0"/>
+                                  <span>{language === 'th' ? 'คูปองส่วนลดของฉัน' : 'My Discount Coupons'}</span>
+                              </h3>
+                              
+                              {customer.coupons && customer.coupons.length > 0 ? (
+                                  <div className="space-y-2.5">
+                                      {customer.coupons.map((c, i) => (
+                                          <div 
+                                              key={c.id || i} 
+                                              className={`p-3 rounded-xl border text-left flex items-start gap-3 ${
+                                                  c.isUsed 
+                                                      ? 'border-gray-200 bg-gray-50 opacity-60' 
+                                                      : 'border-brand-200 bg-brand-50/10'
+                                              }`}
+                                          >
+                                              <div className={`p-2 rounded-lg text-white shrink-0 ${
+                                                  c.isUsed ? 'bg-gray-400' : 'bg-brand-600'
+                                              }`}>
+                                                  <Gift size={16} />
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                      <span className="text-xs font-black text-gray-900 font-mono tracking-tight bg-gray-100 px-1.5 py-0.5 rounded">
+                                                          {c.code}
+                                                      </span>
+                                                      <span className={`text-[10px] px-1.5 py-0.5 font-bold rounded ${
+                                                          c.isUsed 
+                                                              ? 'bg-gray-200 text-gray-600' 
+                                                              : 'bg-brand-100 text-brand-700'
+                                                      }`}>
+                                                          {c.isUsed ? (language === 'th' ? 'ใช้แล้ว' : 'Used') : (language === 'th' ? c.badgeTh || c.badge : c.badge)}
+                                                      </span>
+                                                  </div>
+                                                  <h4 className={`text-xs font-bold mt-1 ${c.isUsed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                                                      {language === 'th' ? c.titleTh || c.title : c.title}
+                                                  </h4>
+                                                  <p className="text-[10px] text-gray-500 mt-0.5 leading-normal">
+                                                      {language === 'th' ? c.descriptionTh || c.description : c.description}
+                                                  </p>
+                                                  {c.minOrderAmount ? (
+                                                      <p className="text-[9px] text-gray-400 font-bold mt-1">
+                                                          * {language === 'th' ? `ยอดสั่งซื้อขั้นต่ำ ฿${c.minOrderAmount}` : `Minimum spend ฿${c.minOrderAmount}`}
+                                                      </p>
+                                                  ) : null}
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              ) : (
+                                  <div className="text-center p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                      <p className="text-xs text-gray-400 font-bold">
+                                          {language === 'th' ? 'ไม่มีคูปองสมาชิกสะสม' : 'No coupons accumulated yet'}
+                                      </p>
+                                  </div>
+                              )}
+                          </div>
 
                          {/* ACTIVE ORDER CARD */}
                          {activeOrder && (

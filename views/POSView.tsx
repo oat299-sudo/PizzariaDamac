@@ -5,7 +5,7 @@ import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -69,7 +69,7 @@ export const POSView: React.FC = () => {
         t, toggleLanguage, language, getLocalizedItem,
         isStoreOpen, toggleStoreStatus, storeSettings, updateStoreSettings, seedDatabase,
         partners, addPartner, updatePartner, deletePartner,
-        addNewsItem, deleteNewsItem, getAllCustomers, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount,
+        addNewsItem, deleteNewsItem, getAllCustomers, adminUpdateCustomerCoupons, completeOrder, updateOrderStatus, updateOrderDeliveryFee, updateOrderNetAmount,
         paperSize, setPaperSize,
         printerIpAddress, setPrinterIpAddress,
         printerPort, setPrinterPort,
@@ -93,6 +93,17 @@ export const POSView: React.FC = () => {
     const [registeredCustomers, setRegisteredCustomers] = useState<any[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState<boolean>(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+    const [selectedCouponCustomer, setSelectedCouponCustomer] = useState<any | null>(null);
+    const [newCouponCode, setNewCouponCode] = useState('');
+    const [newCouponTitleEn, setNewCouponTitleEn] = useState('');
+    const [newCouponTitleTh, setNewCouponTitleTh] = useState('');
+    const [newCouponDescEn, setNewCouponDescEn] = useState('');
+    const [newCouponDescTh, setNewCouponDescTh] = useState('');
+    const [newCouponType, setNewCouponType] = useState<string>('percentage_most_expensive');
+    const [newCouponValue, setNewCouponValue] = useState<number>(10);
+    const [newCouponMinOrder, setNewCouponMinOrder] = useState<number>(0);
+    const [newCouponBadgeEn, setNewCouponBadgeEn] = useState('New Member');
+    const [newCouponBadgeTh, setNewCouponBadgeTh] = useState('สมาชิกใหม่');
 
     // Sales Report Security states
     const [salesPasswordInput, setSalesPasswordInput] = useState<string>('');
@@ -159,6 +170,130 @@ export const POSView: React.FC = () => {
             fetchCustomersList();
         }
     }, [activeTab, getAllCustomers]);
+
+    const handleAddCouponToCustomer = async () => {
+        if (!selectedCouponCustomer) return;
+        if (!newCouponCode) {
+            alert(language === 'th' ? 'กรุณากรอกรหัสคูปอง' : 'Please enter coupon code');
+            return;
+        }
+
+        const newCoupon = {
+            id: 'coupon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            code: newCouponCode.trim().toUpperCase(),
+            title: newCouponTitleEn || 'Custom Discount',
+            titleTh: newCouponTitleTh || 'ส่วนลดพิเศษ',
+            description: newCouponDescEn || 'Special discount coupon',
+            descriptionTh: newCouponDescTh || 'คูปองส่วนลดพิเศษ',
+            badge: newCouponBadgeEn || 'Member',
+            badgeTh: newCouponBadgeTh || 'สมาชิก',
+            discountType: newCouponType,
+            discountValue: Number(newCouponValue || 0),
+            minOrderAmount: Number(newCouponMinOrder || 0),
+            isUsed: false
+        };
+
+        const currentCoupons = selectedCouponCustomer.coupons || [];
+        const updatedCoupons = [...currentCoupons, newCoupon];
+
+        // Call StoreContext function
+        await adminUpdateCustomerCoupons(selectedCouponCustomer.phone, updatedCoupons);
+
+        // Update local state for modal
+        setSelectedCouponCustomer((prev: any) => prev ? { ...prev, coupons: updatedCoupons } : null);
+
+        // Update list of registered customers to reflect immediately
+        setRegisteredCustomers(prev => prev.map(c => 
+            c.phone === selectedCouponCustomer.phone ? { ...c, coupons: updatedCoupons } : c
+        ));
+
+        // Reset form
+        setNewCouponCode('');
+        setNewCouponTitleEn('');
+        setNewCouponTitleTh('');
+        setNewCouponDescEn('');
+        setNewCouponDescTh('');
+        setNewCouponValue(10);
+        setNewCouponMinOrder(0);
+        setNewCouponBadgeEn('Member');
+        setNewCouponBadgeTh('สมาชิก');
+    };
+
+    const handleRemoveCouponFromCustomer = async (couponId: string) => {
+        if (!selectedCouponCustomer) return;
+        const currentCoupons = selectedCouponCustomer.coupons || [];
+        const updatedCoupons = currentCoupons.filter((c: any) => c.id !== couponId);
+
+        await adminUpdateCustomerCoupons(selectedCouponCustomer.phone, updatedCoupons);
+
+        setSelectedCouponCustomer((prev: any) => prev ? { ...prev, coupons: updatedCoupons } : null);
+        setRegisteredCustomers(prev => prev.map(c => 
+            c.phone === selectedCouponCustomer.phone ? { ...c, coupons: updatedCoupons } : c
+        ));
+    };
+
+    const handleToggleCouponUsedStatus = async (couponId: string) => {
+        if (!selectedCouponCustomer) return;
+        const currentCoupons = selectedCouponCustomer.coupons || [];
+        const updatedCoupons = currentCoupons.map((c: any) => 
+            c.id === couponId ? { ...c, isUsed: !c.isUsed } : c
+        );
+
+        await adminUpdateCustomerCoupons(selectedCouponCustomer.phone, updatedCoupons);
+
+        setSelectedCouponCustomer((prev: any) => prev ? { ...prev, coupons: updatedCoupons } : null);
+        setRegisteredCustomers(prev => prev.map(c => 
+            c.phone === selectedCouponCustomer.phone ? { ...c, coupons: updatedCoupons } : c
+        ));
+    };
+
+    const handleSelectCouponTemplate = (templateName: string) => {
+        if (templateName === 'new_member') {
+            setNewCouponCode('NEWMEMBER10');
+            setNewCouponTitleEn('10% Off Pizza Boat / Pizza');
+            setNewCouponTitleTh('ลด 10% พิซซ่าถาดที่แพงที่สุด');
+            setNewCouponDescEn('10% discount on the single most expensive pizza in your order');
+            setNewCouponDescTh('ส่วนลด 10% สำหรับพิซซ่า 1 ถาดที่ราคาแพงที่สุดในออเดอร์นั้น');
+            setNewCouponBadgeEn('New Member');
+            setNewCouponBadgeTh('สมาชิกใหม่');
+            setNewCouponType('percentage_most_expensive');
+            setNewCouponValue(10);
+            setNewCouponMinOrder(0);
+        } else if (templateName === 'monthly_promo') {
+            setNewCouponCode('MONTHLYPROMO');
+            setNewCouponTitleEn('15% Off Total Order');
+            setNewCouponTitleTh('คูปองลดพิเศษประจำเดือน 15%');
+            setNewCouponDescEn('15% discount on your order (pickup, delivery, dine-in)');
+            setNewCouponDescTh('ส่วนลด 15% สำหรับทุกช่องทางสั่งซื้อ');
+            setNewCouponBadgeEn('Promo');
+            setNewCouponBadgeTh('โปรโมชั่น');
+            setNewCouponType('percentage_total');
+            setNewCouponValue(15);
+            setNewCouponMinOrder(300);
+        } else if (templateName === 'free_delivery') {
+            setNewCouponCode('FREESHIP');
+            setNewCouponTitleEn('Free Delivery up to 100 THB');
+            setNewCouponTitleTh('คูปองส่งฟรี สูงสุด 100 บาท');
+            setNewCouponDescEn('Free delivery on orders above 500 THB');
+            setNewCouponDescTh('ฟรีค่าจัดส่งสูงสุด 100 บาท สำหรับสั่งเดลิเวอรี่');
+            setNewCouponBadgeEn('Free Delivery');
+            setNewCouponBadgeTh('ส่งฟรี');
+            setNewCouponType('free_delivery');
+            setNewCouponValue(100);
+            setNewCouponMinOrder(500);
+        } else if (templateName === 'member_discount') {
+            setNewCouponCode('MEMBER50');
+            setNewCouponTitleEn('50 THB Discount');
+            setNewCouponTitleTh('ส่วนลดเงินสด 50 บาท');
+            setNewCouponDescEn('Get 50 THB off your order');
+            setNewCouponDescTh('ส่วนลดเงินสด 50 บาท สำหรับทุกเมนู เมื่อสั่งขั้นต่ำ 300 บาท');
+            setNewCouponBadgeEn('Member');
+            setNewCouponBadgeTh('สมาชิก');
+            setNewCouponType('fixed_discount');
+            setNewCouponValue(50);
+            setNewCouponMinOrder(300);
+        }
+    };
 
     const handleAddPromoCodeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -3337,6 +3472,7 @@ export const POSView: React.FC = () => {
                                                             <th className="p-3">{language === 'th' ? 'ชื่อลูกค้า / ระดับ' : 'Customer Name / Tier'}</th>
                                                             <th className="p-3">{language === 'th' ? 'เบอร์โทรศัพท์' : 'Phone Number'}</th>
                                                             <th className="p-3">{language === 'th' ? 'แต้มสะสม' : 'Loyalty Points'}</th>
+                                                            <th className="p-3">{language === 'th' ? 'คูปอง' : 'Coupons'}</th>
                                                             <th className="p-3">{language === 'th' ? 'ที่อยู่จัดส่งเริ่มต้น' : 'Default Address'}</th>
                                                             <th className="p-3">{language === 'th' ? 'วันเกิด' : 'Birthday'}</th>
                                                         </tr>
@@ -3371,6 +3507,15 @@ export const POSView: React.FC = () => {
                                                                 </td>
                                                                 <td className="p-3 font-extrabold text-brand-600 whitespace-nowrap text-left text-sm">
                                                                     {cust.loyaltyPoints || 0} {language === 'th' ? 'แต้ม' : 'pts'}
+                                                                </td>
+                                                                <td className="p-3 whitespace-nowrap">
+                                                                    <button 
+                                                                        onClick={() => setSelectedCouponCustomer(cust)}
+                                                                        className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded border border-amber-200 transition cursor-pointer"
+                                                                    >
+                                                                        <Gift size={12}/>
+                                                                        <span>{cust.coupons ? cust.coupons.filter((c: any) => !c.isUsed).length : 0} {language === 'th' ? 'ใบ' : 'active'}</span>
+                                                                    </button>
                                                                 </td>
                                                                 <td className="p-3 max-w-[220px]">
                                                                     <p className="line-clamp-2 text-[11px] font-medium text-gray-500 leading-tight" title={cust.address}>
@@ -5559,6 +5704,295 @@ export const POSView: React.FC = () => {
                                 className="px-6 py-2.5 rounded-xl font-black bg-brand-600 hover:bg-brand-700 text-white shadow-md active:scale-95 transition text-xs"
                             >
                                 {language === 'th' ? '💾 บันทึกและอัปเดตออเดอร์' : '💾 Save & Update Queue'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Customer Coupon Management Modal */}
+            {selectedCouponCustomer && (
+                <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedCouponCustomer(null)}>
+                    <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col font-sans" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
+                            <div>
+                                <h2 className="font-extrabold text-lg text-gray-800 flex items-center gap-2">
+                                    <Gift className="text-amber-500" size={22}/>
+                                    <span>{language === 'th' ? `จัดการคูปองของ: ${selectedCouponCustomer.name || 'ลูกค้า'}` : `Manage Coupons for: ${selectedCouponCustomer.name || 'Customer'}`}</span>
+                                </h2>
+                                <p className="text-xs text-gray-400 mt-0.5">{language === 'th' ? `เบอร์โทรศัพท์: ${selectedCouponCustomer.phone}` : `Phone: ${selectedCouponCustomer.phone}`}</p>
+                            </div>
+                            <button onClick={() => setSelectedCouponCustomer(null)} className="text-gray-400 hover:text-gray-600 p-1 bg-white border border-gray-200 rounded-full hover:shadow-sm transition"><X size={18}/></button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                            {/* Issue Coupon Form */}
+                            <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-100 space-y-4 text-left">
+                                <h3 className="font-extrabold text-sm text-amber-800 flex items-center gap-1.5 border-b border-amber-100/60 pb-1.5">
+                                    <Sparkles size={16} className="text-amber-500 animate-pulse"/>
+                                    <span>{language === 'th' ? 'ออกคูปองใหม่ให้สมาชิก' : 'Issue New Coupon'}</span>
+                                </h3>
+
+                                {/* Quick Templates */}
+                                <div>
+                                    <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-2">
+                                        ⚡ {language === 'th' ? 'เลือกจากเทมเพลตด่วน' : 'Quick Templates'}
+                                    </label>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleSelectCouponTemplate('new_member')}
+                                            className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-[11px] font-bold text-gray-750 border border-gray-200 rounded-lg shadow-xs hover:border-amber-400 transition cursor-pointer text-left"
+                                        >
+                                            🆕 {language === 'th' ? 'สมาชิกใหม่ (10%)' : 'New Member (10%)'}
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleSelectCouponTemplate('monthly_promo')}
+                                            className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-[11px] font-bold text-gray-750 border border-gray-200 rounded-lg shadow-xs hover:border-amber-400 transition cursor-pointer text-left"
+                                        >
+                                            📅 {language === 'th' ? 'ส่วนลดเดือนนี้ (15%)' : 'Monthly Promo (15%)'}
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleSelectCouponTemplate('free_delivery')}
+                                            className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-[11px] font-bold text-gray-750 border border-gray-200 rounded-lg shadow-xs hover:border-amber-400 transition cursor-pointer text-left"
+                                        >
+                                            🚚 {language === 'th' ? 'ส่งฟรี (สูงสุด ฿100)' : 'Free Shipping (฿100)'}
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleSelectCouponTemplate('member_discount')}
+                                            className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-[11px] font-bold text-gray-750 border border-gray-200 rounded-lg shadow-xs hover:border-amber-400 transition cursor-pointer text-left"
+                                        >
+                                            🎟️ {language === 'th' ? 'ส่วนลดเงินสด (฿50)' : 'Cash Discount (฿50)'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Form Fields */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'รหัสคูปอง' : 'Coupon Code'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponCode}
+                                            onChange={(e) => setNewCouponCode(e.target.value)}
+                                            placeholder="e.g. SPECIAL10"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg font-mono text-xs uppercase font-extrabold outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'ป้ายแท็ก (TH)' : 'Badge/Tag (TH)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponBadgeTh}
+                                            onChange={(e) => setNewCouponBadgeTh(e.target.value)}
+                                            placeholder="เช่น สมาชิกใหม่"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'ป้ายแท็ก (EN)' : 'Badge/Tag (EN)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponBadgeEn}
+                                            onChange={(e) => setNewCouponBadgeEn(e.target.value)}
+                                            placeholder="e.g. New Member"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'หัวข้อคูปอง (TH)' : 'Coupon Title (TH)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponTitleTh}
+                                            onChange={(e) => setNewCouponTitleTh(e.target.value)}
+                                            placeholder="เช่น ส่วนลดพิเศษสมาชิกใหม่"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'หัวข้อคูปอง (EN)' : 'Coupon Title (EN)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponTitleEn}
+                                            onChange={(e) => setNewCouponTitleEn(e.target.value)}
+                                            placeholder="e.g. Special New Member Discount"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'คำอธิบาย (TH)' : 'Description (TH)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponDescTh}
+                                            onChange={(e) => setNewCouponDescTh(e.target.value)}
+                                            placeholder="เช่น ลด 10% สำหรับพิซซ่าหน้าใดก็ได้ 1 ถาดที่ราคาแพงที่สุด"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'คำอธิบาย (EN)' : 'Description (EN)'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCouponDescEn}
+                                            onChange={(e) => setNewCouponDescEn(e.target.value)}
+                                            placeholder="e.g. 10% off the most expensive single pizza item"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'ประเภทส่วนลด' : 'Discount Type'}</label>
+                                        <select 
+                                            value={newCouponType}
+                                            onChange={(e) => setNewCouponType(e.target.value)}
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white h-8"
+                                        >
+                                            <option value="percentage_most_expensive">{language === 'th' ? 'เปอร์เซ็นต์ (%): พิซซ่าที่แพงที่สุด' : 'Percentage (%): Most Expensive Pizza'}</option>
+                                            <option value="percentage_total">{language === 'th' ? 'เปอร์เซ็นต์ (%): ยอดรวมออเดอร์' : 'Percentage (%): Total Order'}</option>
+                                            <option value="fixed_discount">{language === 'th' ? 'ลดคงที่ (บาท): ยอดรวมออเดอร์' : 'Fixed Cash Discount (THB)'}</option>
+                                            <option value="free_delivery">{language === 'th' ? 'ส่งฟรี (บาท): ค่าส่งตามระยะทาง' : 'Free Shipping (THB Limit)'}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'มูลค่าส่วนลด' : 'Discount Value'}</label>
+                                        <input 
+                                            type="number" 
+                                            value={newCouponValue}
+                                            onChange={(e) => setNewCouponValue(Number(e.target.value || 0))}
+                                            placeholder="เช่น 10 หรือ 50"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold text-gray-600 mb-1">{language === 'th' ? 'ขั้นต่ำการสั่งซื้อ (บาท)' : 'Min. Order Amount (THB)'}</label>
+                                        <input 
+                                            type="number" 
+                                            value={newCouponMinOrder}
+                                            onChange={(e) => setNewCouponMinOrder(Number(e.target.value || 0))}
+                                            placeholder="เช่น 0 หรือ 300"
+                                            className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-amber-400 bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <button 
+                                        type="button"
+                                        onClick={handleAddCouponToCustomer}
+                                        className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-6 py-2 rounded-xl text-xs transition shadow-md hover:shadow flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                                    >
+                                        <Plus size={14}/>
+                                        <span>{language === 'th' ? 'มอบคูปองให้ลูกค้า' : 'Issue Coupon to Customer'}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Current Coupons List */}
+                            <div className="space-y-3 text-left">
+                                <h3 className="font-extrabold text-sm text-gray-700 flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                                    <Ticket size={16} className="text-gray-400"/>
+                                    <span>{language === 'th' ? 'รายการคูปองปัจจุบันของลูกค้า' : 'Customer Active & Used Coupons'}</span>
+                                    <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs font-bold text-gray-500 ml-auto">
+                                        {(selectedCouponCustomer.coupons || []).length}
+                                    </span>
+                                </h3>
+
+                                {(selectedCouponCustomer.coupons || []).length === 0 ? (
+                                    <div className="p-8 text-center text-gray-400 font-medium text-xs border border-dashed border-gray-200 rounded-xl bg-gray-50">
+                                        🎟️ {language === 'th' ? 'ยังไม่มีคูปอง' : 'No coupons issued yet'}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                                        {(selectedCouponCustomer.coupons || []).map((c: any) => (
+                                            <div 
+                                                key={c.id}
+                                                className={`p-3 rounded-xl border flex items-start gap-3 transition relative ${
+                                                    c.isUsed 
+                                                        ? 'bg-gray-50/80 border-gray-200 opacity-60' 
+                                                        : 'bg-white border-amber-200 ring-1 ring-amber-100/50'
+                                                }`}
+                                            >
+                                                <div className={`p-2 rounded-xl text-white shrink-0 mt-0.5 ${c.isUsed ? 'bg-gray-400' : 'bg-amber-500 animate-pulse'}`}>
+                                                    <Gift size={16} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-xs font-black text-gray-900 font-mono bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                                                            {c.code}
+                                                        </span>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 font-bold rounded ${c.isUsed ? 'bg-gray-200 text-gray-650' : 'bg-amber-100 text-amber-800'}`}>
+                                                            {language === 'th' ? c.badgeTh || c.badge : c.badge}
+                                                        </span>
+                                                        {c.isUsed && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 font-extrabold rounded bg-red-100 text-red-700">
+                                                                {language === 'th' ? 'ใช้แล้ว' : 'USED'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="text-xs font-extrabold text-gray-800 mt-2">
+                                                        {language === 'th' ? c.titleTh || c.title : c.title}
+                                                    </h4>
+                                                    <p className="text-[10.5px] text-gray-500 mt-0.5 leading-snug">
+                                                        {language === 'th' ? c.descriptionTh || c.description : c.description}
+                                                    </p>
+                                                    <div className="text-[10px] font-semibold text-gray-400 mt-1 font-mono">
+                                                        {language === 'th' 
+                                                            ? `ประเภท: ${c.discountType === 'percentage_most_expensive' ? 'ลดหน้าแพงสุด %' : c.discountType === 'percentage_total' ? 'ลดท้ายบิล %' : c.discountType === 'fixed_discount' ? 'ลดคงที่' : 'ส่งฟรี'}, มูลค่า: ฿${c.discountValue}, ขั้นต่ำ: ฿${c.minOrderAmount}`
+                                                            : `Type: ${c.discountType}, Value: ${c.discountValue}, Min: ฿${c.minOrderAmount}`}
+                                                    </div>
+                                                    
+                                                    {/* Actions inside individual coupon */}
+                                                    <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-gray-100">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleToggleCouponUsedStatus(c.id)}
+                                                            className={`px-2 py-0.5 text-[9.5px] font-bold rounded transition cursor-pointer flex items-center gap-0.5 ${
+                                                                c.isUsed 
+                                                                    ? 'bg-green-50 hover:bg-green-100 text-green-700 border border-green-200' 
+                                                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-250'
+                                                            }`}
+                                                        >
+                                                            <CheckCircle2 size={10}/>
+                                                            <span>{c.isUsed ? (language === 'th' ? 'เปลี่ยนเป็นยังไม่ใช้' : 'Mark Unused') : (language === 'th' ? 'เปลี่ยนเป็นใช้แล้ว' : 'Mark Used')}</span>
+                                                        </button>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveCouponFromCustomer(c.id)}
+                                                            className="px-2 py-0.5 text-[9.5px] font-bold rounded bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 transition cursor-pointer flex items-center gap-0.5 ml-auto text-red-650"
+                                                        >
+                                                            <Trash2 size={10}/>
+                                                            <span>{language === 'th' ? 'ลบออก' : 'Delete'}</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="bg-gray-50 p-4 border-t border-gray-150 flex justify-end shrink-0">
+                            <button 
+                                type="button"
+                                onClick={() => setSelectedCouponCustomer(null)} 
+                                className="px-5 py-2 rounded-xl font-bold border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition text-xs cursor-pointer"
+                            >
+                                {language === 'th' ? 'ปิดหน้าต่าง' : 'Close Management'}
                             </button>
                         </div>
                     </div>

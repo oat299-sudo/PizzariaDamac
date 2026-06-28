@@ -4,7 +4,7 @@ import {
   Pizza, Topping, CartItem, Order, OrderType, OrderSource, OrderStatus, 
   PaymentMethod, CustomerProfile, Expense, StoreSettings, NewsItem, 
   SavedFavorite, Language, AppView, ProductCategory, SubItem, ExpenseCategory, Partner,
-  PromoCode
+  PromoCode, Coupon, CouponDiscountType
 } from '../types';
 import { 
   INITIAL_MENU, INITIAL_TOPPINGS, DEFAULT_STORE_SETTINGS, 
@@ -57,6 +57,7 @@ interface StoreContextType {
   registerCustomer: (profile: CustomerProfile) => Promise<'created' | 'updated'>;
   customerLogin: (phone: string, pass: string) => Promise<boolean>;
   getAllCustomers: () => Promise<any[]>;
+  adminUpdateCustomerCoupons: (customerPhone: string, coupons: Coupon[]) => Promise<void>;
   addToFavorites: (name: string, pizzaId: string, toppings: Topping[]) => Promise<void>;
   claimReward: () => boolean;
 
@@ -73,6 +74,10 @@ interface StoreContextType {
       status?: OrderStatus;
       deliveryPlatformRef?: string;
       partnerId?: string;
+      promoCode?: string;
+      discountAmount?: number;
+      couponCode?: string;
+      couponDiscountAmount?: number;
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -152,6 +157,69 @@ interface StoreContextType {
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
+
+export const generateInitialCoupons = (): Coupon[] => {
+  return [
+    {
+      id: 'coupon_new_member',
+      code: 'NEWMEMBER10',
+      title: 'คูปองสมาชิกใหม่ ลด 10% พิซซ่าถาดที่แพงที่สุด',
+      titleTh: 'คูปองสมาชิกใหม่ ลด 10% พิซซ่าถาดที่แพงที่สุด',
+      description: 'Get 10% off the most expensive pizza in your order',
+      descriptionTh: 'ลดทันที 10% สำหรับพิซซ่าถาดที่ราคาสูงที่สุดในออเดอร์',
+      discountType: 'percentage_most_expensive',
+      discountValue: 10,
+      minOrderAmount: 0,
+      isUsed: false,
+      badge: 'New Member',
+      badgeTh: 'สมาชิกใหม่',
+    },
+    {
+      id: 'coupon_monthly_promo',
+      code: 'JUNEPROMO50',
+      title: 'คูปองส่วนลดประจำเดือน ฿50',
+      titleTh: 'คูปองส่วนลดประจำเดือน ฿50',
+      description: 'Save ฿50 on any order over ฿350 (Dine-in, Pickup, or Delivery)',
+      descriptionTh: 'ลดทันที ฿50 เมื่อสั่งอาหารครบ ฿350 ขึ้นไป (ได้ทุกช่องทาง ทานที่ร้าน, สั่งกลับบ้าน หรือจัดส่ง)',
+      discountType: 'fixed_discount',
+      discountValue: 50,
+      minOrderAmount: 350,
+      isUsed: false,
+      applicableOrderTypes: ['dine-in', 'online', 'delivery'],
+      badge: 'Monthly Promo',
+      badgeTh: 'คูปองประจำเดือน',
+    },
+    {
+      id: 'coupon_free_delivery',
+      code: 'JUNEFREESHIP',
+      title: 'คูปองส่วนลดค่าจัดส่ง ฿30',
+      titleTh: 'คูปองส่วนลดค่าจัดส่ง ฿30',
+      description: 'Get ฿30 off delivery fee on orders over ฿300',
+      descriptionTh: 'ส่วนลดค่าจัดส่ง ฿30 เมื่อสั่งครบ ฿300 ขึ้นไป (เฉพาะจัดส่งเดลิเวอรี่)',
+      discountType: 'free_delivery',
+      discountValue: 30,
+      minOrderAmount: 300,
+      isUsed: false,
+      applicableOrderTypes: ['delivery'],
+      badge: 'Free Delivery',
+      badgeTh: 'ลดค่าจัดส่ง',
+    },
+    {
+      id: 'coupon_member_percentage',
+      code: 'MEMBERVIP5',
+      title: 'คูปองลดพิเศษทั้งออเดอร์ 5%',
+      titleTh: 'คูปองลดพิเศษทั้งออเดอร์ 5%',
+      description: 'Get 5% off your entire bill, no minimum purchase',
+      descriptionTh: 'ลดทันที 5% จากราคาทั้งออเดอร์ ไม่มีขั้นต่ำในการสั่งซื้อ',
+      discountType: 'percentage_total',
+      discountValue: 5,
+      minOrderAmount: 0,
+      isUsed: false,
+      badge: 'VIP Member',
+      badgeTh: 'สมาชิก VIP',
+    },
+  ];
+};
 
 export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // --- Language State ---
@@ -1444,7 +1512,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustState] = useState<CustomerProfile | null>(() => {
     const saved = localStorage.getItem('damac_customer');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as CustomerProfile;
+        if (parsed && (!parsed.coupons || parsed.coupons.length === 0)) {
+          parsed.coupons = generateInitialCoupons();
+        }
+        return parsed;
+      } catch(e) {
+        console.error("Error parsing customer", e);
+      }
+    }
+    return null;
   });
 
   // --- Store Settings State (From DB + Local Storage Backup) ---
@@ -1969,7 +2048,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 loyalty_points: profile.loyaltyPoints, 
                 tier: profile.tier,
                 saved_favorites: profile.savedFavorites, 
-                order_history: profile.orderHistory
+                order_history: profile.orderHistory,
+                coupons: profile.coupons || []
             };
             
             if (profile.pdpaAccepted !== undefined) payload.pdpa_accepted = profile.pdpaAccepted;
@@ -1977,13 +2057,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
             let { error: upsertError } = await supabase.from('customers').upsert(payload);
             if (upsertError) {
-                // Resilient fallback logic: If db schema is older and lacks pdpa_accepted or saved_addresses
+                // Resilient fallback logic: If db schema is older and lacks pdpa_accepted, saved_addresses or coupons
                 if (upsertError.message && upsertError.message.includes("column") && 
-                    (upsertError.message.includes("pdpa_accepted") || upsertError.message.includes("saved_addresses") || upsertError.message.includes("schema cache"))) {
-                    console.warn("Database structure is missing pdpa_accepted or saved_addresses column. Retrying sync with a stripped payload.");
+                    (upsertError.message.includes("pdpa_accepted") || upsertError.message.includes("saved_addresses") || upsertError.message.includes("coupons") || upsertError.message.includes("schema cache"))) {
+                    console.warn("Database structure is missing columns. Retrying sync with a stripped payload.");
                     const strippedPayload = { ...payload };
                     delete strippedPayload.pdpa_accepted;
                     delete strippedPayload.saved_addresses;
+                    delete strippedPayload.coupons;
                     const { error: retryError } = await supabase.from('customers').upsert(strippedPayload);
                     upsertError = retryError;
                 }
@@ -2006,6 +2087,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       let existingFavorites: SavedFavorite[] = [];
       let existingTier: 'Bronze' | 'Silver' | 'Gold' | undefined = undefined;
       let existingSavedAddresses: string[] = [];
+      let existingCoupons: Coupon[] = [];
       let action: 'created' | 'updated' = 'created';
 
       if (isSupabaseConfigured) {
@@ -2018,6 +2100,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   existingFavorites = data.saved_favorites || [];
                   existingTier = data.tier;
                   existingSavedAddresses = data.saved_addresses || [];
+                  existingCoupons = data.coupons || [];
                   action = 'updated';
               }
           } catch(e) {}
@@ -2033,6 +2116,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                    existingFavorites = found.savedFavorites;
                    existingTier = found.tier;
                    existingSavedAddresses = found.savedAddresses;
+                   existingCoupons = found.coupons || [];
                    action = 'updated';
                }
            }
@@ -2044,7 +2128,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           orderHistory: existingHistory,
           savedFavorites: existingFavorites,
           tier: existingTier,
-          savedAddresses: existingSavedAddresses.length > 0 ? existingSavedAddresses : (newProfile.address ? [newProfile.address] : [])
+          savedAddresses: existingSavedAddresses.length > 0 ? existingSavedAddresses : (newProfile.address ? [newProfile.address] : []),
+          coupons: existingCoupons.length > 0 ? existingCoupons : (newProfile.coupons || generateInitialCoupons())
       };
 
       await setCustomer(finalProfile);
@@ -2067,7 +2152,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   savedFavorites: data.saved_favorites || [],
                   orderHistory: data.order_history || [],
                   pdpaAccepted: data.pdpa_accepted,
-                  savedAddresses: data.saved_addresses || []
+                  savedAddresses: data.saved_addresses || [],
+                  coupons: data.coupons || generateInitialCoupons()
               };
               setCustState(profile);
               try {
@@ -2083,6 +2169,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
            const list = JSON.parse(saved);
            const found = list.find((c: any) => c.phone === phone && c.password === pass);
            if (found) {
+               if (!found.coupons || found.coupons.length === 0) {
+                   found.coupons = generateInitialCoupons();
+               }
                setCustState(found);
                try {
                 localStorage.setItem('damac_customer', JSON.stringify(found));
@@ -2119,6 +2208,40 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return combined;
   }
 
+  const adminUpdateCustomerCoupons = async (customerPhone: string, coupons: Coupon[]) => {
+      // Find and update in localStorage damac_mock_customers
+      try {
+          const saved = localStorage.getItem('damac_mock_customers');
+          let list = saved ? JSON.parse(saved) : [];
+          let found = false;
+          list = list.map((c: any) => {
+              if (c.phone === customerPhone) {
+                  found = true;
+                  return { ...c, coupons };
+              }
+              return c;
+          });
+          if (!found) {
+              // If not found offline, let's fetch the customer and save
+              list.push({ phone: customerPhone, coupons, loyaltyPoints: 0, savedFavorites: [], orderHistory: [] });
+          }
+          localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+      } catch(e) { console.error(e); }
+
+      // Also if the currently logged-in customer is this customer, update their state
+      if (customer && customer.phone === customerPhone) {
+          setCustState(prev => prev ? { ...prev, coupons } : null);
+          localStorage.setItem('damac_customer', JSON.stringify({ ...customer, coupons }));
+      }
+
+      // Sync to DB if connected
+      if (isSupabaseConfigured) {
+          try {
+              await supabase.from('customers').update({ coupons }).eq('phone', customerPhone);
+          } catch(e) { console.error(e); }
+      }
+  };
+
   const addToFavorites = async (name: string, pizzaId: string, toppings: Topping[]) => {
       if (!customer) return;
       const newFav: SavedFavorite = { id: Date.now().toString(), name, pizzaId, toppings };
@@ -2149,6 +2272,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       partnerId?: string;
       promoCode?: string;
       discountAmount?: number;
+      couponCode?: string;
+      couponDiscountAmount?: number;
     }
   ) => {
       // Check for an existing active order (same table for dine-in, or same customer phone)
@@ -2297,7 +2422,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Calculate Total
       const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
       const deliveryFee = details?.delivery?.fee === 'pending' ? 0 : (details?.delivery?.fee || 0);
-      const discount = details?.discountAmount || 0;
+      const discount = (details?.discountAmount || 0) + (details?.couponDiscountAmount || 0);
       const totalAmount = Math.max(0, subtotal + deliveryFee - discount);
       
       // Calculate Net (GP Deduction)
@@ -2322,6 +2447,10 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           const promoStr = `[Promo: ${details.promoCode} (-${details.discountAmount} THB)]`;
           computedNote = computedNote ? `${computedNote} | ${promoStr}` : promoStr;
       }
+      if (details?.couponCode && details?.couponDiscountAmount) {
+          const couponStr = `[Coupon: ${details.couponCode} (-${details.couponDiscountAmount} THB)]`;
+          computedNote = computedNote ? `${computedNote} | ${couponStr}` : couponStr;
+      }
 
       const newOrder: Order = {
           id: Date.now().toString(),
@@ -2345,7 +2474,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           partnerId: details?.partnerId,
           partnerCommissionAmount: partnerCommissionAmount,
           promoCode: details?.promoCode,
-          discountAmount: details?.discountAmount
+          discountAmount: details?.discountAmount,
+          couponCode: details?.couponCode,
+          couponDiscountAmount: details?.couponDiscountAmount
       };
 
       if (isSupabaseConfigured) {
@@ -2420,11 +2551,19 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
               }
           }
 
+          let updatedCoupons = customer.coupons || [];
+          if (details?.couponCode) {
+              updatedCoupons = updatedCoupons.map(c => 
+                  c.code.toUpperCase() === details.couponCode?.toUpperCase() ? { ...c, isUsed: true } : c
+              );
+          }
+
           const updatedCustomer = { 
               ...customer, 
               loyaltyPoints: newPoints, 
               orderHistory: newHistory,
-              savedAddresses: newSavedAddresses
+              savedAddresses: newSavedAddresses,
+              coupons: updatedCoupons
           };
           await setCustomer(updatedCustomer);
       }
@@ -2712,7 +2851,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       menu, addPizza, updatePizza, deletePizza, updatePizzaPrice, togglePizzaAvailability, toggleBestSeller, generateLuckyPizza, seedDatabase, reorderMenu,
       toppings, addTopping, updateTopping, deleteTopping,
       cart, addToCart, removeFromCart, updateCartItemQuantity, updateCartItem, clearCart, cartTotal,
-      customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, addToFavorites, claimReward,
+      customer, setCustomer, registerCustomer, customerLogin, getAllCustomers, adminUpdateCustomerCoupons, addToFavorites, claimReward,
       orders, placeOrder, updateOrderStatus, updateOrderTypeToPickup, updateOrderDeliveryFee, updateOrderNetAmount, completeOrder, deleteOrder, updateOrderFields, reorderItem, fetchOrders, submitOrderFeedback,
       expenses, addExpense, deleteExpense,
       isStoreOpen, isHoliday, closedMessage: storeSettings.closedMessage, storeSettings, toggleStoreStatus, updateStoreSettings, generateTimeSlots, canOrderForToday,
