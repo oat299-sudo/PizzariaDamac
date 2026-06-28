@@ -2161,11 +2161,9 @@ export const POSView: React.FC = () => {
             {/* --- MOBILE BOTTOM NAV --- */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-900 border-t border-gray-800 flex justify-around items-center z-50 px-2 print:hidden font-sans">
                 <button onClick={() => { playClickSound(); setActiveTab('order'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'order' && !showMobileCart ? 'text-brand-500' : 'text-gray-400'}`}><ShoppingBag size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'สั่งอาหาร' : 'Order'}</span></button>
-                 <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">{language === 'th' ? 'กำลังทำ' : 'Active'}</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('tables'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 relative ${activeTab === 'tables' ? 'text-brand-500' : 'text-gray-400'}`}><Layers size={20}/>{activeTables.length > 0 && <span className="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}<span className="text-[10px] font-bold">{language === 'th' ? 'กำลังทำ' : 'Active'}</span></button>
                 <div className="relative -top-5"><button onClick={() => { playClickSound(); setShowMobileCart(!showMobileCart); }} className="bg-brand-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900">{showMobileCart ? <X size={24}/> : (<><ShoppingBag size={24}/>{cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{cart.reduce((s,i)=>s+i.quantity,0)}</span>}</>)}</button></div>
-                <button onClick={() => { playClickSound(); setActiveTab('qr_gen'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'qr_gen' ? 'text-brand-500' : 'text-gray-400'}`}><QrCode size={20}/><span className="text-[10px] font-bold">QR</span></button>
-                <button onClick={() => { playClickSound(); setActiveTab('partners'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-brand-500' : 'text-gray-400'}`}><Store size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'พาร์ทเนอร์' : 'Partners'}</span></button>
-                <button onClick={() => { playClickSound(); setActiveTab('promos'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'promos' ? 'text-brand-500' : 'text-gray-400'}`}><Tag size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'ส่วนลด' : 'Promos'}</span></button>
+                <button onClick={() => { playClickSound(); setActiveTab('sales'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'sales' ? 'text-brand-500' : 'text-gray-400'}`}><PieChart size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'รายงานขาย' : 'Reports'}</span></button>
                 <button onClick={() => { playClickSound(); setActiveTab('manage'); setShowMobileCart(false); }} className={`flex flex-col items-center gap-1 ${activeTab === 'manage' ? 'text-brand-500' : 'text-gray-400'}`}><Settings size={20}/><span className="text-[10px] font-bold">{language === 'th' ? 'ตั้งค่าร้าน' : 'Settings'}</span></button>
             </div>
 
@@ -2649,6 +2647,9 @@ export const POSView: React.FC = () => {
                                                 ? 'กรุณากรอกรหัสผ่านผู้จัดการเพื่อดูรายงานยอดขาย วิเคราะห์ต้นทุน และรายชื่อลูกค้า' 
                                                 : 'Please enter the manager passcode to access reports, cost analysis, and customer profiles.'}
                                         </p>
+                                        <div className="bg-amber-50 text-amber-800 text-[10px] font-bold px-3 py-1.5 rounded-lg border border-amber-200 inline-block">
+                                            🔑 {language === 'th' ? 'รหัสผ่านตั้งต้นของร้านคือ: 123456*' : 'Your default passcode is: 123456*'}
+                                        </div>
                                     </div>
 
                                     <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -3974,8 +3975,45 @@ export const POSView: React.FC = () => {
 
                 {activeTab === 'manage' && (
                     <div className="flex-1 bg-gray-100 p-6 overflow-y-auto pb-24 lg:pb-6">
-                        <div className="max-w-4xl mx-auto space-y-6">
+                        <div className="max-w-4xl mx-auto space-y-6 text-left">
                             <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><Settings className="text-brand-600"/> Store Settings & Management</h2>
+                            
+                            {/* Manager Quick Navigation Hub for Mobile */}
+                            <div className="lg:hidden bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
+                                <h3 className="font-extrabold text-sm text-gray-700 flex items-center gap-2 border-b border-gray-100 pb-2">
+                                    <span>🛠️</span> {language === 'th' ? 'แผงควบคุมเมนูลัดผู้จัดการ' : 'Manager Quick Controls'}
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={() => { playClickSound(); setActiveTab('sales'); }}
+                                        className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-100 text-amber-800 transition text-center cursor-pointer font-bold animate-pulse"
+                                    >
+                                        <PieChart size={18} className="text-amber-600" />
+                                        <span className="text-[11px] font-black">{language === 'th' ? 'รายงานขาย & บันทึกรายจ่าย' : 'Reports & Expenses'}</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => { playClickSound(); setActiveTab('promos'); }}
+                                        className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-800 transition text-center cursor-pointer font-bold"
+                                    >
+                                        <Tag size={18} className="text-indigo-600" />
+                                        <span className="text-[11px] font-black">{language === 'th' ? 'โปรโมชั่น & ส่วนลด' : 'Promotions'}</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => { playClickSound(); setActiveTab('qr_gen'); }}
+                                        className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-800 transition text-center cursor-pointer font-bold"
+                                    >
+                                        <QrCode size={18} className="text-emerald-600" />
+                                        <span className="text-[11px] font-black">{language === 'th' ? 'สร้างคิวอาร์ (QR)' : 'QR Generator'}</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => { playClickSound(); setActiveTab('partners'); }}
+                                        className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-800 transition text-center cursor-pointer font-bold"
+                                    >
+                                        <Store size={18} className="text-blue-600" />
+                                        <span className="text-[11px] font-black">{language === 'th' ? 'ระบบพาร์ทเนอร์ร้านค้า' : 'Partners Ecosystem'}</span>
+                                    </button>
+                                </div>
+                            </div>
                             
                             {/* Registered Customers List (รายชื่อสมาชิกที่ลงทะเบียน) */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
