@@ -560,6 +560,44 @@ export const POSView: React.FC = () => {
     const [itemForm, setItemForm] = useState<Partial<Pizza>>({
         name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: []
     });
+    const [ingredientCostsMap, setIngredientCostsMap] = useState<Record<string, { id: string; name: string; cost: number }[]>>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('damac_ingredient_costs');
+            if (saved) {
+                try { return JSON.parse(saved); } catch(e) {}
+            }
+        }
+        return {
+            'p_damac': [
+                { id: '1', name: 'Pizza Dough Base', cost: 35 },
+                { id: '2', name: 'Signature Tomato Sauce', cost: 20 },
+                { id: '3', name: 'Premium Mozzarella Cheese', cost: 65 },
+                { id: '4', name: 'Italian Prosciutto', cost: 80 },
+                { id: '5', name: 'Fresh Basil & Olive Oil', cost: 15 }
+            ],
+            'p_custom': [
+                { id: '1', name: 'Pizza Dough Base', cost: 30 },
+                { id: '2', name: 'Basic Tomato Sauce', cost: 15 },
+                { id: '3', name: 'Mozzarella Cheese', cost: 45 }
+            ],
+            'p_margherita': [
+                { id: '1', name: 'Pizza Dough Base', cost: 30 },
+                { id: '2', name: 'Classic Marinara Sauce', cost: 15 },
+                { id: '3', name: 'Fresh Mozzarella Cheese', cost: 50 },
+                { id: '4', name: 'Fresh Basil Leaves', cost: 5 },
+                { id: '5', name: 'Extra Virgin Olive Oil', cost: 10 }
+            ],
+            'p_pepperoni': [
+                { id: '1', name: 'Pizza Dough Base', cost: 30 },
+                { id: '2', name: 'Classic Marinara Sauce', cost: 15 },
+                { id: '3', name: 'Fresh Mozzarella Cheese', cost: 50 },
+                { id: '4', name: 'Spicy Pepperoni Slices', cost: 75 }
+            ]
+        };
+    });
+    const [modalIngredients, setModalIngredients] = useState<{ id: string; name: string; cost: number }[]>([]);
+    const [newIngredientName, setNewIngredientName] = useState('');
+    const [newIngredientCost, setNewIngredientCost] = useState<number>(0);
     
     // Manage Toppings State
     const [showToppingsModal, setShowToppingsModal] = useState(false);
@@ -1423,19 +1461,62 @@ export const POSView: React.FC = () => {
     // --- ITEM & TOPPING MANAGEMENT ---
     const handleOpenAddModal = () => {
         setItemForm({ name: '', nameTh: '', description: '', descriptionTh: '', basePrice: 0, image: '', available: true, category: 'pizza', comboCount: 0, allowedPromotions: [], badge: '', badgeTh: '' });
+        setModalIngredients([]);
         setShowItemModal(true);
     };
     const handleEditMenuItem = (item: Pizza) => {
         setItemForm({ ...item, comboCount: item.comboCount || 0, allowedPromotions: item.allowedPromotions || [], badge: item.badge || '', badgeTh: item.badgeTh || '' });
+        setModalIngredients(ingredientCostsMap[item.id] || []);
         setShowItemModal(true);
     };
     const handleSaveItem = async () => {
         if (itemForm.name && itemForm.basePrice !== undefined) {
-            if (itemForm.id) await updatePizza(itemForm as Pizza);
-            else await addPizza({ ...itemForm as Pizza, id: 'p' + Date.now(), image: itemForm.image || 'https://via.placeholder.com/150' });
+            const itemId = itemForm.id || 'p' + Date.now();
+            const totalIngredientCost = modalIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+            
+            const pizzaToSave: Pizza = {
+                ...itemForm,
+                id: itemId,
+                rawCost: totalIngredientCost,
+                image: itemForm.image || 'https://via.placeholder.com/150'
+            } as Pizza;
+
+            if (itemForm.id) {
+                await updatePizza(pizzaToSave);
+            } else {
+                await addPizza(pizzaToSave);
+            }
+
+            // Save ingredients map
+            const updatedMap = { ...ingredientCostsMap, [itemId]: modalIngredients };
+            setIngredientCostsMap(updatedMap);
+            localStorage.setItem('damac_ingredient_costs', JSON.stringify(updatedMap));
+
             if (itemForm.category) setActiveCategory(itemForm.category);
             setShowItemModal(false);
         }
+    };
+
+    const handleAddIngredient = () => {
+        if (!newIngredientName.trim()) return;
+        const newIng = {
+            id: 'ing_' + Date.now(),
+            name: newIngredientName.trim(),
+            cost: Number(newIngredientCost) || 0
+        };
+        const updated = [...modalIngredients, newIng];
+        setModalIngredients(updated);
+        const total = updated.reduce((sum, ing) => sum + ing.cost, 0);
+        setItemForm(prev => ({ ...prev, rawCost: total }));
+        setNewIngredientName('');
+        setNewIngredientCost(0);
+    };
+
+    const handleRemoveIngredient = (id: string) => {
+        const updated = modalIngredients.filter(ing => ing.id !== id);
+        setModalIngredients(updated);
+        const total = updated.reduce((sum, ing) => sum + ing.cost, 0);
+        setItemForm(prev => ({ ...prev, rawCost: total }));
     };
     
     const handleMoveMenuItem = (pizzaId: string, direction: 'up' | 'down') => {
@@ -2897,6 +2978,414 @@ export const POSView: React.FC = () => {
                                                 </div>
                                             </div>
                                         )}
+
+                                        {salesSubTab === 'expenses' && (
+                                            <div className="space-y-6">
+                                                {/* Quick Templates Panel */}
+                                                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                                                    <h4 className="font-extrabold text-gray-800 text-sm mb-3">⚡ {language === 'th' ? 'ต้นแบบรายจ่ายด่วน (แตะเพื่อกรอกข้อมูล)' : 'Quick Expense Templates (Tap to autofill)'}</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {expenseTemplates.map(tpl => (
+                                                            <button 
+                                                                key={tpl.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    playClickSound();
+                                                                    setExpenseForm({
+                                                                        description: tpl.description,
+                                                                        category: tpl.category || 'COGS',
+                                                                        quantity: tpl.quantity || 1,
+                                                                        unit: tpl.unit || 'แพ็ค',
+                                                                        unitPrice: tpl.unitPrice || 0,
+                                                                        amount: String(tpl.amount || ''),
+                                                                        vendor: tpl.vendor || '',
+                                                                        billNumber: '',
+                                                                        note: tpl.note || '',
+                                                                        saveAsTemplate: false
+                                                                    });
+                                                                }}
+                                                                className="px-3.5 py-2 bg-gray-50 border border-gray-200 hover:border-brand-500 hover:bg-brand-50/50 rounded-xl text-xs font-bold text-gray-700 transition flex items-center gap-1.5 cursor-pointer"
+                                                            >
+                                                                <span>📦</span>
+                                                                <span>{tpl.description}</span>
+                                                                <span className="text-[10px] text-gray-400 font-mono">฿{tpl.amount}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Add Expense Form */}
+                                                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm text-left">
+                                                    <h3 className="font-extrabold text-gray-800 text-base mb-4 flex items-center gap-2">
+                                                        <span>💸</span> {language === 'th' ? 'บันทึกรายจ่าย / บิลซื้อของ' : 'Log New Expense / Bill'}
+                                                    </h3>
+                                                    <form onSubmit={handleAddExpense} className="space-y-4">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'คำอธิบายรายจ่าย *' : 'Description *'}</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    required
+                                                                    value={expenseForm.description}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                    placeholder="e.g. แป้งสาลีตราพัด, ค่าน้ำประปา"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'หมวดหมู่รายจ่าย' : 'Category'}</label>
+                                                                <select 
+                                                                    value={expenseForm.category}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, category: e.target.value as any }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                >
+                                                                    <option value="COGS">{language === 'th' ? 'ต้นทุนวัตถุดิบอาหาร (COGS)' : 'Cost of Ingredients (COGS)'}</option>
+                                                                    <option value="Rent">{language === 'th' ? 'ค่าเช่าสถานที่' : 'Rent / Location'}</option>
+                                                                    <option value="Utility">{language === 'th' ? 'ค่าสาธารณูปโภค (น้ำ/ไฟ/เน็ต)' : 'Utilities (Water/Electric/Net)'}</option>
+                                                                    <option value="Staff">{language === 'th' ? 'เงินเดือน/ค่าจ้างพนักงาน' : 'Staff Salary & Wages'}</option>
+                                                                    <option value="Marketing">{language === 'th' ? 'การตลาดและโฆษณา' : 'Marketing & Ads'}</option>
+                                                                    <option value="Other">{language === 'th' ? 'ค่าใช้จ่ายอื่นๆ' : 'Other Expenses'}</option>
+                                                                </select>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'จำนวน' : 'Quantity'}</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min={1}
+                                                                    value={expenseForm.quantity || 1}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'หน่วยนับ' : 'Unit'}</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={expenseForm.unit || 'แพ็ค'}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, unit: e.target.value }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                    placeholder="e.g. กิโลกรัม, ลัง, ชิ้น"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'ราคาต่อหน่วย (บาท)' : 'Unit Price (THB)'}</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    step="any"
+                                                                    value={expenseForm.unitPrice || 0}
+                                                                    onChange={e => {
+                                                                        const up = parseFloat(e.target.value) || 0;
+                                                                        setExpenseForm(prev => ({ ...prev, unitPrice: up, amount: String(up * (prev.quantity || 1)) }));
+                                                                    }}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'ราคารวมทั้งหมด (บาท) *' : 'Total Amount (THB) *'}</label>
+                                                                <input 
+                                                                    type="number" 
+                                                                    step="any"
+                                                                    required
+                                                                    value={expenseForm.amount}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-brand-50/50 text-brand-700 border-brand-200"
+                                                                    placeholder="e.g. 1500"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'ร้านค้า/ซัพพลายเออร์' : 'Supplier / Vendor'}</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={expenseForm.vendor || ''}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, vendor: e.target.value }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                    placeholder="e.g. แม็คโคร"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'เลขที่บิล/ใบเสร็จ' : 'Bill / Receipt No.'}</label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    value={expenseForm.billNumber || ''}
+                                                                    onChange={e => setExpenseForm(prev => ({ ...prev, billNumber: e.target.value }))}
+                                                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50"
+                                                                    placeholder="e.g. RE-10943"
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-end pb-3">
+                                                                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-gray-600 select-none">
+                                                                    <input 
+                                                                        type="checkbox"
+                                                                        checked={expenseForm.saveAsTemplate || false}
+                                                                        onChange={e => setExpenseForm(prev => ({ ...prev, saveAsTemplate: e.target.checked }))}
+                                                                        className="w-4 h-4 text-brand-600 rounded border-gray-300 focus:ring-brand-500"
+                                                                    />
+                                                                    <span>{language === 'th' ? 'บันทึกเป็นต้นแบบด่วนเพื่อใช้ซ้ำ' : 'Save as quick template'}</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-500 mb-1">{language === 'th' ? 'หมายเหตุเพิ่มเติม' : 'Note / Remarks'}</label>
+                                                            <textarea 
+                                                                value={expenseForm.note || ''}
+                                                                onChange={e => setExpenseForm(prev => ({ ...prev, note: e.target.value }))}
+                                                                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-bold text-sm bg-gray-50 h-16"
+                                                                placeholder="..."
+                                                            />
+                                                        </div>
+                                                        <div className="flex justify-end pt-2">
+                                                            <button 
+                                                                type="submit"
+                                                                className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black shadow-md shadow-brand-50 hover:shadow-brand-100 transition active:scale-95 cursor-pointer"
+                                                            >
+                                                                ➕ {language === 'th' ? 'บันทึกรายการจ่ายเงิน' : 'Add Expense Entry'}
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+
+                                                {/* Expenses History List */}
+                                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden text-left">
+                                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                                        <h3 className="font-extrabold text-gray-800 text-base">{language === 'th' ? 'รายการรายจ่ายตามตัวกรอง' : 'Expense Log Details'}</h3>
+                                                        <span className="text-xs font-black text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">฿{totalExpensesValue.toLocaleString()}</span>
+                                                    </div>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                                            <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px] border-b border-gray-100">
+                                                                <tr>
+                                                                    <th className="p-4">{language === 'th' ? 'วันที่' : 'Date'}</th>
+                                                                    <th className="p-4">{language === 'th' ? 'รายการ' : 'Expense Detail'}</th>
+                                                                    <th className="p-4">{language === 'th' ? 'หมวดหมู่' : 'Category'}</th>
+                                                                    <th className="p-4">{language === 'th' ? 'จำนวน' : 'Qty'}</th>
+                                                                    <th className="p-4 text-right">{language === 'th' ? 'ราคาต่อหน่วย' : 'Unit Price'}</th>
+                                                                    <th className="p-4 text-right">{language === 'th' ? 'ราคารวม' : 'Total'}</th>
+                                                                    <th className="p-4">{language === 'th' ? 'ร้านค้า' : 'Vendor'}</th>
+                                                                    <th className="p-4 text-center">{language === 'th' ? 'จัดการ' : 'Action'}</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-gray-100">
+                                                                {filteredExpenses.map(exp => (
+                                                                    <tr key={exp.id} className="hover:bg-gray-50 transition text-xs font-bold text-gray-600">
+                                                                        <td className="p-4 font-mono text-gray-400">{new Date(exp.date).toLocaleDateString()}</td>
+                                                                        <td className="p-4">
+                                                                            <span className="text-gray-900 block font-black">{exp.description}</span>
+                                                                            {exp.note && <span className="text-[10px] text-gray-400 font-normal">{exp.note}</span>}
+                                                                        </td>
+                                                                        <td className="p-4">
+                                                                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-600 font-extrabold uppercase">
+                                                                                {exp.category}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="p-4">{exp.quantity} {exp.unit}</td>
+                                                                        <td className="p-4 text-right font-mono">฿{Number(exp.unitPrice || 0).toLocaleString()}</td>
+                                                                        <td className="p-4 text-right font-black text-gray-900 font-mono">฿{Number(exp.amount || 0).toLocaleString()}</td>
+                                                                        <td className="p-4">
+                                                                            <span className="text-gray-800 font-extrabold block">{exp.vendor || '-'}</span>
+                                                                            {exp.billNumber && <span className="text-[9px] text-gray-400 font-mono">Bill: {exp.billNumber}</span>}
+                                                                        </td>
+                                                                        <td className="p-4 text-center">
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    if (confirm(language === 'th' ? "คุณแน่ใจหรือไม่ที่จะลบรายจ่ายรายการนี้?" : "Are you sure you want to delete this expense?")) {
+                                                                                        deleteExpense(exp.id);
+                                                                                    }
+                                                                                }}
+                                                                                className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                                                            >
+                                                                                🗑️
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                                {filteredExpenses.length === 0 && (
+                                                                    <tr>
+                                                                        <td colSpan={8} className="p-8 text-center text-gray-400 font-bold">
+                                                                            {language === 'th' ? 'ไม่พบประวัติการใช้จ่ายในช่วงเวลานี้' : 'No expenses logged during this period.'}
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {salesSubTab === 'cost_analysis' && (() => {
+                                            // Compute aggregated statistics per menu item
+                                            const itemStats: Record<string, { qty: number; revenue: number; cogs: number; profit: number }> = {};
+                                            
+                                            // Pre-populate stats for each menu item to have complete product table
+                                            menu.forEach(pizza => {
+                                                itemStats[pizza.id] = { qty: 0, revenue: 0, cogs: 0, profit: 0 };
+                                            });
+
+                                            // Sum up stats from confirmed/completed orders in the selected filter window
+                                            filteredOrders.forEach(order => {
+                                                if (order.status === 'cancelled') return;
+                                                (order.items || []).forEach(oItem => {
+                                                    const pid = oItem.pizzaId;
+                                                    const qty = oItem.quantity || 1;
+                                                    const rev = oItem.totalPrice;
+                                                    
+                                                    // Get the ingredient cost (COGS)
+                                                    const matchedPizza = menu.find(m => m.id === pid);
+                                                    let singleCogs = matchedPizza?.rawCost || 0;
+                                                    if (singleCogs === 0 && pid) {
+                                                        const ingredients = ingredientCostsMap[pid] || [];
+                                                        singleCogs = ingredients.reduce((s, ing) => s + ing.cost, 0);
+                                                    }
+                                                    const totalCogs = singleCogs * qty;
+
+                                                    if (pid && itemStats[pid]) {
+                                                        itemStats[pid].qty += qty;
+                                                        itemStats[pid].revenue += rev;
+                                                        itemStats[pid].cogs += totalCogs;
+                                                        itemStats[pid].profit += (rev - totalCogs);
+                                                    } else if (pid) {
+                                                        itemStats[pid] = {
+                                                            qty,
+                                                            revenue: rev,
+                                                            cogs: totalCogs,
+                                                            profit: rev - totalCogs
+                                                        };
+                                                    }
+                                                });
+                                            });
+
+                                            // Accumulate overall store stats
+                                            let overallRev = 0;
+                                            let overallCogs = 0;
+                                            let overallProfit = 0;
+                                            let overallQty = 0;
+
+                                            Object.keys(itemStats).forEach(key => {
+                                                const stat = itemStats[key];
+                                                overallRev += stat.revenue;
+                                                overallCogs += stat.cogs;
+                                                overallProfit += stat.profit;
+                                                overallQty += stat.qty;
+                                            });
+
+                                            const overallMarginPercent = overallRev > 0 ? (overallProfit / overallRev) * 100 : 0;
+
+                                            return (
+                                                <div className="space-y-6 text-left">
+                                                    {/* Cost Analysis KPI Header cards */}
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">{language === 'th' ? 'ต้นทุนรวมตามยอดขาย (COGS)' : 'Total Cost of Sales (COGS)'}</span>
+                                                            <p className="text-2xl font-black text-gray-900 mt-1 font-mono">฿{overallCogs.toLocaleString()}</p>
+                                                            <span className="text-[10px] text-gray-400 block mt-1">{language === 'th' ? 'ต้นทุนวัตถุดิบอาหารรวม' : 'Theoretical aggregate cost'}</span>
+                                                        </div>
+                                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">{language === 'th' ? 'กำไรขั้นต้นทางทฤษฎี' : 'Theoretical Gross Margin'}</span>
+                                                            <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">฿{overallProfit.toLocaleString()}</p>
+                                                            <span className="text-[10px] text-gray-400 block mt-1">{language === 'th' ? 'ยอดหลังหักต้นทุนอาหาร' : 'Sales minus food cost'}</span>
+                                                        </div>
+                                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">{language === 'th' ? 'อัตรากำไรขั้นต้นเฉลี่ย' : 'Average Margin %'}</span>
+                                                            <p className="text-2xl font-black text-brand-600 mt-1 font-mono">{overallMarginPercent.toFixed(1)}%</p>
+                                                            <div className="w-full bg-gray-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                                                <div className="bg-brand-600 h-full rounded-full" style={{ width: `${overallMarginPercent}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                                                            <span className="text-[10px] font-bold text-gray-400 uppercase">{language === 'th' ? 'จำนวนชิ้นอาหารที่ขายได้' : 'Total Items Sold'}</span>
+                                                            <p className="text-2xl font-black text-blue-600 mt-1 font-mono">{overallQty} {language === 'th' ? 'จาน' : 'units'}</p>
+                                                            <span className="text-[10px] text-gray-400 block mt-1">{language === 'th' ? 'นับตามปริมาณออเดอร์ย่อย' : 'Counted items from order list'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Products Margin Breakdown Table */}
+                                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                                            <h3 className="font-extrabold text-gray-800 text-base">{language === 'th' ? 'วิเคราะห์ต้นทุนและกำไรจำแนกตามรายสินค้า' : 'Theoretical Item Profit & COGS Ledger'}</h3>
+                                                            <span className="text-xs text-gray-500 font-bold">{menu.length} {language === 'th' ? 'รายการเมนู' : 'Menu Items'}</span>
+                                                        </div>
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                                <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px] border-b border-gray-100">
+                                                                    <tr>
+                                                                        <th className="p-4">{language === 'th' ? 'ชื่อเมนู' : 'Menu Item'}</th>
+                                                                        <th className="p-4">{language === 'th' ? 'หมวดหมู่' : 'Category'}</th>
+                                                                        <th className="p-4 text-right">{language === 'th' ? 'ราคาขาย' : 'Retail Price'}</th>
+                                                                        <th className="p-4 text-right">{language === 'th' ? 'ต้นทุนวัตถุดิบ' : 'Ingredient Cost'}</th>
+                                                                        <th className="p-4 text-right">{language === 'th' ? 'กำไรทางทฤษฎี/ชิ้น' : 'Margin / Unit'}</th>
+                                                                        <th className="p-4 text-right">{language === 'th' ? 'อัตรากำไร (%)' : 'Margin %'}</th>
+                                                                        <th className="p-4 text-right">{language === 'th' ? 'จำนวนที่ขาย' : 'Qty Sold'}</th>
+                                                                        <th className="p-4 text-right text-brand-600">{language === 'th' ? 'รายรับสะสม' : 'Gross Rev'}</th>
+                                                                        <th className="p-4 text-right text-emerald-600">{language === 'th' ? 'กำไรสะสม' : 'Total Profit'}</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-100">
+                                                                    {menu.map(pizza => {
+                                                                        const stats = itemStats[pizza.id] || { qty: 0, revenue: 0, cogs: 0, profit: 0 };
+                                                                        
+                                                                        // Determine COGS for unit
+                                                                        let unitCogs = pizza.rawCost || 0;
+                                                                        if (unitCogs === 0) {
+                                                                            const ingredients = ingredientCostsMap[pizza.id] || [];
+                                                                            unitCogs = ingredients.reduce((s, ing) => s + ing.cost, 0);
+                                                                        }
+
+                                                                        const unitMargin = Math.max(0, pizza.basePrice - unitCogs);
+                                                                        const unitMarginPercent = pizza.basePrice > 0 ? (unitMargin / pizza.basePrice) * 100 : 0;
+
+                                                                        // Determine Margin Color Label
+                                                                        let marginColorClass = 'text-red-600 bg-red-50';
+                                                                        if (unitMarginPercent >= 60) {
+                                                                            marginColorClass = 'text-green-700 bg-green-50';
+                                                                        } else if (unitMarginPercent >= 45) {
+                                                                            marginColorClass = 'text-amber-700 bg-amber-50';
+                                                                        }
+
+                                                                        return (
+                                                                            <tr key={pizza.id} className="hover:bg-gray-50 transition text-xs font-bold text-gray-700">
+                                                                                <td className="p-4">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <img 
+                                                                                            src={pizza.image || 'https://via.placeholder.com/150'} 
+                                                                                            className="w-8 h-8 rounded-lg object-cover border border-gray-100 shrink-0" 
+                                                                                            referrerPolicy="no-referrer"
+                                                                                        />
+                                                                                        <div className="flex flex-col text-left">
+                                                                                            <span className="text-gray-900 block font-black">{language === 'th' ? pizza.nameTh || pizza.name : pizza.name}</span>
+                                                                                            <span className="text-[10px] text-gray-400 font-mono">ID: {pizza.id}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-4 font-normal text-gray-400 uppercase text-[10px]">{pizza.category}</td>
+                                                                                <td className="p-4 text-right font-mono text-gray-900">฿{pizza.basePrice.toLocaleString()}</td>
+                                                                                <td className="p-4 text-right font-mono text-gray-500">
+                                                                                    {unitCogs > 0 ? `฿${unitCogs}` : '-'}
+                                                                                </td>
+                                                                                <td className="p-4 text-right font-mono text-emerald-600">
+                                                                                    {unitCogs > 0 ? `฿${unitMargin}` : '-'}
+                                                                                </td>
+                                                                                <td className="p-4 text-right font-mono">
+                                                                                    {unitCogs > 0 ? (
+                                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${marginColorClass}`}>
+                                                                                            {unitMarginPercent.toFixed(0)}%
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="text-gray-400 text-[10px] font-normal italic">{language === 'th' ? 'ไม่มีข้อมูลต้นทุนวัตถุดิบ' : 'No ingredients set'}</span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="p-4 text-right font-mono text-gray-600">{stats.qty} ชิ้น</td>
+                                                                                <td className="p-4 text-right font-mono text-brand-600">฿{stats.revenue.toLocaleString()}</td>
+                                                                                <td className="p-4 text-right font-mono text-emerald-600 font-extrabold">฿{stats.profit.toLocaleString()}</td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Right Column: Dynamic Intelligence Panel (Monthly Best Sellers & Customer Insight) */}
@@ -4880,6 +5369,138 @@ export const POSView: React.FC = () => {
                                             className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-medium text-gray-850 focus:border-brand-500 outline-none"
                                             placeholder="เช่น ครีมเข้มข้น ไข่แดง เบคอน และชีสขูด เสิร์ฟพร้อมพาสต้าเส้นสด"
                                         />
+                                    </div>
+
+                                    {/* INGREDIENT COST ASSIGNMENT & MARGIN SECTION */}
+                                    <div className="bg-amber-50/40 p-4 rounded-xl border border-amber-200 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-extrabold text-xs text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                                                <span>🍖 {language === 'th' ? 'ต้นทุนวัตถุดิบและกำไรขั้นต้นทางทฤษฎี' : 'Ingredient Cost & Theoretical Margin'}</span>
+                                            </h5>
+                                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded">
+                                                {language === 'th' ? 'คำนวณอัตโนมัติ' : 'Auto-calculated'}
+                                            </span>
+                                        </div>
+
+                                        {/* List of current ingredients */}
+                                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                            {modalIngredients.length === 0 ? (
+                                                <p className="text-[11px] text-gray-500 italic py-1 text-center bg-white/50 rounded border border-dashed border-gray-200">
+                                                    {language === 'th' ? 'ยังไม่ได้ระบุต้นทุนวัตถุดิบย่อย' : 'No ingredient costs assigned yet.'}
+                                                </p>
+                                            ) : (
+                                                modalIngredients.map(ing => (
+                                                    <div key={ing.id} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-gray-150 text-xs">
+                                                        <span className="font-bold text-gray-700">{ing.name}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-extrabold text-amber-800 font-mono">฿{ing.cost.toLocaleString()}</span>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => handleRemoveIngredient(ing.id)}
+                                                                className="text-red-500 hover:text-red-700 p-0.5 rounded transition hover:bg-red-50"
+                                                                title={language === 'th' ? 'ลบออก' : 'Remove'}
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {/* Add new ingredient form */}
+                                        <div className="grid grid-cols-12 gap-1.5 pt-1">
+                                            <div className="col-span-7">
+                                                <input 
+                                                    type="text"
+                                                    placeholder={language === 'th' ? 'ชื่อวัตถุดิบ เช่น มอสซาเรลล่าชีส' : 'e.g. Mozzarella Cheese'}
+                                                    value={newIngredientName}
+                                                    onChange={e => setNewIngredientName(e.target.value)}
+                                                    className="w-full text-[11px] font-bold border border-gray-200 rounded-lg px-2 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <input 
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder={language === 'th' ? 'ต้นทุน' : 'Cost'}
+                                                    value={newIngredientCost || ''}
+                                                    onChange={e => setNewIngredientCost(parseFloat(e.target.value) || 0)}
+                                                    className="w-full text-[11px] font-bold border border-gray-200 rounded-lg px-2 py-1.5 focus:border-brand-500 outline-none bg-white text-gray-800 font-mono"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddIngredient}
+                                                    className="w-full h-full bg-amber-600 text-white font-extrabold text-[11px] rounded-lg hover:bg-amber-700 active:scale-95 transition flex items-center justify-center gap-0.5 cursor-pointer"
+                                                >
+                                                    <Plus size={12} />
+                                                    <span>{language === 'th' ? 'เพิ่ม' : 'Add'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Theoretical Gross Margin Summary */}
+                                        {(() => {
+                                            const totalCost = modalIngredients.reduce((sum, ing) => sum + ing.cost, 0);
+                                            const basePrice = itemForm.basePrice || 0;
+                                            const grossProfit = basePrice - totalCost;
+                                            const marginPct = basePrice > 0 ? (grossProfit / basePrice) * 100 : 0;
+
+                                            let healthBg = 'bg-gray-100 text-gray-800';
+                                            let healthText = 'No price';
+                                            if (basePrice > 0) {
+                                                if (marginPct >= 60) {
+                                                    healthBg = 'bg-green-100 text-green-800 border border-green-200';
+                                                    healthText = language === 'th' ? 'กำไรดีมาก (Excellent)' : 'Excellent Margin';
+                                                } else if (marginPct >= 40) {
+                                                    healthBg = 'bg-teal-100 text-teal-800 border border-teal-200';
+                                                    healthText = language === 'th' ? 'กำไรปานกลาง (Healthy)' : 'Healthy Margin';
+                                                } else if (marginPct >= 0) {
+                                                    healthBg = 'bg-orange-100 text-orange-800 border border-orange-200';
+                                                    healthText = language === 'th' ? 'กำไรบาง (Thin Margin)' : 'Thin Margin';
+                                                } else {
+                                                    healthBg = 'bg-red-100 text-red-800 border border-red-200 animate-pulse';
+                                                    healthText = language === 'th' ? 'ขาดทุน (Negative Margin)' : 'Losing Money';
+                                                }
+                                            }
+
+                                            return (
+                                                <div className="bg-white p-3 rounded-xl border border-amber-200/60 grid grid-cols-2 gap-2 text-xs font-sans">
+                                                    <div className="border-r border-gray-100 pr-2">
+                                                        <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">
+                                                            {language === 'th' ? 'รวมต้นทุนวัตถุดิบ' : 'Total Ingredient Cost'}
+                                                        </span>
+                                                        <span className="text-sm font-black text-amber-900 font-mono">
+                                                            ฿{totalCost.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
+                                                    <div className="pl-2">
+                                                        <span className="text-[10px] font-bold text-gray-500 uppercase block mb-0.5">
+                                                            {language === 'th' ? 'กำไรขั้นต้น / อัตรากำไร' : 'Gross Profit / Margin %'}
+                                                        </span>
+                                                        <div className="flex flex-col">
+                                                            <span className={`text-sm font-black font-mono ${grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                ฿{grossProfit.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                                                                <span className="text-xs font-extrabold ml-1.5">
+                                                                    ({marginPct.toFixed(1)}%)
+                                                                </span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-span-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[10px]">
+                                                        <span className="text-gray-500 font-bold">
+                                                            {language === 'th' ? 'สถานะอัตรากำไรขั้นต้น:' : 'Gross Margin Status:'}
+                                                        </span>
+                                                        <span className={`px-2 py-0.5 rounded-full font-black text-[9px] ${healthBg}`}>
+                                                            {healthText}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* Promotion Bundle Fields if category is promotion */}

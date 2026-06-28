@@ -2684,46 +2684,119 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         localStorage.setItem('damac_last_order', newOrder.id);
       } catch(e) {}
       
-      // Update Customer (Loyalty + History + Saved Address)
-      if (customer) {
-          // Loyalty: 1 point per pizza item
-          const pizzaCount = cart.filter(i => {
-               const itemDef = menu.find(m => m.id === i.pizzaId);
-               return itemDef?.category === 'pizza' || itemDef?.category === 'promotion';
-          }).reduce((sum, i) => sum + i.quantity, 0);
+      // Update Customer (Loyalty + History + Saved Address + Coupon Prevention)
+      const targetPhone = customer?.phone || newOrder.customerPhone;
+      if (targetPhone) {
+          // Let's resolve the customer's profile (either active logged in customer, or offline/online profile)
+          let targetCustomerProfile: CustomerProfile | null = null;
+          let isCurrentLoggedIn = false;
 
-          let newPoints = customer.loyaltyPoints + pizzaCount;
-          const newHistory = [newOrder.id, ...customer.orderHistory];
-          
-          let newSavedAddresses = customer.savedAddresses || [];
-          if (type === 'delivery' && details?.delivery?.address) {
-              if (!newSavedAddresses.includes(details.delivery.address)) {
-                  newSavedAddresses = [details.delivery.address, ...newSavedAddresses].slice(0, 5); // Keep last 5
+          if (customer && customer.phone === targetPhone) {
+              targetCustomerProfile = customer;
+              isCurrentLoggedIn = true;
+          } else {
+              // Retrieve from offline backup
+              try {
+                  const saved = localStorage.getItem('damac_mock_customers');
+                  const list = saved ? JSON.parse(saved) : [];
+                  const found = list.find((c: any) => c.phone === targetPhone);
+                  if (found) {
+                      targetCustomerProfile = found;
+                  }
+              } catch(e) {}
+
+              // Retrieve from Supabase if DB is active and not found yet
+              if (!targetCustomerProfile && isSupabaseConfigured) {
+                  try {
+                      const { data } = await supabase.from('customers').select('*').eq('phone', targetPhone).single();
+                      if (data) {
+                          targetCustomerProfile = {
+                              phone: data.phone,
+                              name: data.name || '',
+                              address: data.address || '',
+                              birthday: data.birthday || '',
+                              password: data.password || '',
+                              loyaltyPoints: data.loyalty_points || 0,
+                              tier: data.tier || 'Bronze',
+                              savedFavorites: data.saved_favorites || [],
+                              orderHistory: data.order_history || [],
+                              coupons: data.coupons || [],
+                              pdpaAccepted: data.pdpa_accepted || false,
+                              savedAddresses: data.saved_addresses || []
+                          };
+                      }
+                  } catch(e) {}
               }
           }
 
-          let updatedCoupons = customer.coupons || [];
-          if (details?.couponId || details?.couponCode) {
-              let matched = false;
-              updatedCoupons = updatedCoupons.map(c => {
-                  const matchesId = details.couponId && c.id === details.couponId;
-                  const matchesCode = !details.couponId && details.couponCode && c.code.toUpperCase() === details.couponCode.toUpperCase() && !c.isUsed && !matched;
-                  if (matchesId || matchesCode) {
-                      matched = true;
-                      return { ...c, isUsed: true };
-                  }
-                  return c;
-              });
-          }
+          if (targetCustomerProfile) {
+              // Loyalty calculation
+              const pizzaCount = cart.filter(i => {
+                   const itemDef = menu.find(m => m.id === i.pizzaId);
+                   return itemDef?.category === 'pizza' || itemDef?.category === 'promotion';
+              }).reduce((sum, i) => sum + i.quantity, 0);
 
-          const updatedCustomer = { 
-              ...customer, 
-              loyaltyPoints: newPoints, 
-              orderHistory: newHistory,
-              savedAddresses: newSavedAddresses,
-              coupons: updatedCoupons
-          };
-          await setCustomer(updatedCustomer);
+              const newPoints = targetCustomerProfile.loyaltyPoints + pizzaCount;
+              const newHistory = targetCustomerProfile.orderHistory.includes(newOrder.id) 
+                  ? targetCustomerProfile.orderHistory 
+                  : [newOrder.id, ...targetCustomerProfile.orderHistory];
+
+              let newSavedAddresses = targetCustomerProfile.savedAddresses || [];
+              if (type === 'delivery' && details?.delivery?.address) {
+                  if (!newSavedAddresses.includes(details.delivery.address)) {
+                      newSavedAddresses = [details.delivery.address, ...newSavedAddresses].slice(0, 5);
+                  }
+              }
+
+              // Update Coupons Status
+              let updatedCoupons = targetCustomerProfile.coupons || [];
+              if (details?.couponId || details?.couponCode) {
+                  let matched = false;
+                  updatedCoupons = updatedCoupons.map(c => {
+                      const matchesId = details.couponId && c.id === details.couponId;
+                      const matchesCode = !details.couponId && details.couponCode && c.code.toUpperCase() === details.couponCode.toUpperCase() && !c.isUsed && !matched;
+                      if (matchesId || matchesCode) {
+                          matched = true;
+                          return { ...c, isUsed: true };
+                      }
+                      return c;
+                  });
+              }
+
+              const updatedCustomerProfile = {
+                  ...targetCustomerProfile,
+                  loyaltyPoints: newPoints,
+                  orderHistory: newHistory,
+                  savedAddresses: newSavedAddresses,
+                  coupons: updatedCoupons
+              };
+
+              // Persist profile
+              if (isCurrentLoggedIn) {
+                  await setCustomer(updatedCustomerProfile);
+              } else {
+                  // Save offline list
+                  try {
+                      const saved = localStorage.getItem('damac_mock_customers');
+                      let list = saved ? JSON.parse(saved) : [];
+                      list = list.filter((c: any) => c.phone !== targetPhone);
+                      list.push(updatedCustomerProfile);
+                      localStorage.setItem('damac_mock_customers', JSON.stringify(list));
+                  } catch(e) {}
+
+                  // Save to Supabase
+                  if (isSupabaseConfigured) {
+                      try {
+                          await supabase.from('customers').update({
+                              loyalty_points: updatedCustomerProfile.loyaltyPoints,
+                              order_history: updatedCustomerProfile.orderHistory,
+                              saved_addresses: updatedCustomerProfile.savedAddresses,
+                              coupons: updatedCustomerProfile.coupons
+                          }).eq('phone', targetPhone);
+                      } catch(e) {}
+                  }
+              }
+          }
       }
       
       // Clear Cart if online/delivery or if specifically requested (Store orders might keep cart for next? No, clear it)
