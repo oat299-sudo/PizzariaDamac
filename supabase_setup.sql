@@ -66,7 +66,8 @@ CREATE TABLE customers (
     saved_favorites JSONB DEFAULT '[]'::jsonb,
     order_history JSONB DEFAULT '[]'::jsonb,
     pdpa_accepted BOOLEAN DEFAULT true,
-    saved_addresses JSONB DEFAULT '[]'::jsonb
+    saved_addresses JSONB DEFAULT '[]'::jsonb,
+    coupons JSONB DEFAULT '[]'::jsonb
 );
 
 -- 5. Orders Table

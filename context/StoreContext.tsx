@@ -78,6 +78,7 @@ interface StoreContextType {
       discountAmount?: number;
       couponCode?: string;
       couponDiscountAmount?: number;
+      couponId?: string;
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -1795,6 +1796,30 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           // Fetch latest profile including addresses
           const { data } = await supabase.from('customers').select('*').eq('phone', customer.phone).single();
           if (data) {
+              // Look up if there are any locally assigned coupons
+              let localCoupons = [];
+              try {
+                  const saved = localStorage.getItem('damac_mock_customers');
+                  if (saved) {
+                      const list = JSON.parse(saved);
+                      const foundLocal = list.find((lc: any) => lc.phone === customer.phone);
+                      if (foundLocal && foundLocal.coupons) {
+                          localCoupons = foundLocal.foundLocal;
+                          localCoupons = foundLocal.coupons;
+                      }
+                  }
+              } catch(e) {}
+
+              const rawFavorites = data.saved_favorites || [];
+              const cleanFavorites = rawFavorites.filter((f: any) => f.id !== "SYSTEM_COUPONS_BACKUP");
+              const backupItem = rawFavorites.find((f: any) => f.id === "SYSTEM_COUPONS_BACKUP");
+              let backupCoupons = [];
+              if (backupItem) {
+                  try {
+                      backupCoupons = JSON.parse(backupItem.name);
+                  } catch(e) {}
+              }
+
               const updatedProfile: CustomerProfile = {
                   name: data.name,
                   phone: data.phone,
@@ -1803,11 +1828,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   birthday: data.birthday,
                   loyaltyPoints: data.loyalty_points,
                   tier: data.tier,
-                  savedFavorites: data.saved_favorites || [],
+                  savedFavorites: cleanFavorites,
                   orderHistory: data.order_history || [],
                   pdpaAccepted: data.pdpa_accepted,
                   savedAddresses: data.saved_addresses || [],
-                  coupons: data.coupons || generateInitialCoupons()
+                  coupons: (data.coupons && data.coupons.length > 0) ? data.coupons : (backupCoupons.length > 0 ? backupCoupons : (localCoupons.length > 0 ? localCoupons : generateInitialCoupons()))
               };
               setCustState(updatedProfile);
               try {
@@ -2059,6 +2084,15 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Sync to DB if connected
       if (isSupabaseConfigured) {
           try {
+            const cleanFavorites = (profile.savedFavorites || []).filter((f: any) => f.id !== "SYSTEM_COUPONS_BACKUP");
+            const backupItem = {
+                id: "SYSTEM_COUPONS_BACKUP",
+                name: JSON.stringify(profile.coupons || []),
+                pizzaId: "system_coupons",
+                toppings: []
+            };
+            const favoritesWithBackup = [...cleanFavorites, backupItem];
+
             const payload: any = {
                 phone: profile.phone, 
                 name: profile.name, 
@@ -2067,7 +2101,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 password: profile.password,
                 loyalty_points: profile.loyaltyPoints, 
                 tier: profile.tier,
-                saved_favorites: profile.savedFavorites, 
+                saved_favorites: favoritesWithBackup, 
                 order_history: profile.orderHistory,
                 coupons: profile.coupons || []
             };
@@ -2121,6 +2155,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   existingTier = data.tier;
                   existingSavedAddresses = data.saved_addresses || [];
                   existingCoupons = data.coupons || [];
+                  if (existingCoupons.length === 0) {
+                      try {
+                          const saved = localStorage.getItem('damac_mock_customers');
+                          if (saved) {
+                              const list = JSON.parse(saved);
+                              const foundLocal = list.find((lc: any) => lc.phone === newProfile.phone);
+                              if (foundLocal && foundLocal.coupons) {
+                                  existingCoupons = foundLocal.coupons;
+                              }
+                          }
+                      } catch(e) {}
+                  }
                   action = 'updated';
               }
           } catch(e) {}
@@ -2161,6 +2207,29 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (isSupabaseConfigured) {
           const { data } = await supabase.from('customers').select('*').eq('phone', phone).single();
           if (data && data.password === pass) {
+              // Look up if there are any locally assigned coupons
+              let localCoupons = [];
+              try {
+                  const saved = localStorage.getItem('damac_mock_customers');
+                  if (saved) {
+                      const list = JSON.parse(saved);
+                      const foundLocal = list.find((lc: any) => lc.phone === phone);
+                      if (foundLocal && foundLocal.coupons) {
+                          localCoupons = foundLocal.coupons;
+                      }
+                  }
+              } catch(e) {}
+
+              const rawFavorites = data.saved_favorites || [];
+              const cleanFavorites = rawFavorites.filter((f: any) => f.id !== "SYSTEM_COUPONS_BACKUP");
+              const backupItem = rawFavorites.find((f: any) => f.id === "SYSTEM_COUPONS_BACKUP");
+              let backupCoupons = [];
+              if (backupItem) {
+                  try {
+                      backupCoupons = JSON.parse(backupItem.name);
+                  } catch(e) {}
+              }
+
               const profile: CustomerProfile = {
                   name: data.name,
                   phone: data.phone,
@@ -2169,16 +2238,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   birthday: data.birthday,
                   loyaltyPoints: data.loyalty_points,
                   tier: data.tier,
-                  savedFavorites: data.saved_favorites || [],
+                  savedFavorites: cleanFavorites,
                   orderHistory: data.order_history || [],
                   pdpaAccepted: data.pdpa_accepted,
                   savedAddresses: data.saved_addresses || [],
-                  coupons: data.coupons || generateInitialCoupons()
+                  coupons: (data.coupons && data.coupons.length > 0) ? data.coupons : (backupCoupons.length > 0 ? backupCoupons : (localCoupons.length > 0 ? localCoupons : generateInitialCoupons()))
               };
-              setCustState(profile);
-              try {
-                localStorage.setItem('damac_customer', JSON.stringify(profile));
-              } catch(e) { console.warn("Login Storage Error", e); }
+              await setCustomer(profile);
               return true;
           }
       } 
@@ -2203,22 +2269,73 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const getAllCustomers = async () => {
-      let dbCustomers = [];
-      let localCustomers = [];
+      let dbCustomers: any[] = [];
+      let localCustomers: any[] = [];
 
       if (isSupabaseConfigured) {
           const { data } = await supabase.from('customers').select('*');
-          if (data) dbCustomers = data;
+          if (data) {
+              dbCustomers = data.map((row: any) => {
+                  const rawFavorites = row.saved_favorites || [];
+                  const cleanFavorites = rawFavorites.filter((f: any) => f.id !== "SYSTEM_COUPONS_BACKUP");
+                  const backupItem = rawFavorites.find((f: any) => f.id === "SYSTEM_COUPONS_BACKUP");
+                  let backupCoupons = [];
+                  if (backupItem) {
+                      try {
+                          backupCoupons = JSON.parse(backupItem.name);
+                      } catch(e) {}
+                  }
+
+                  return {
+                      phone: row.phone,
+                      name: row.name,
+                      address: row.address,
+                      birthday: row.birthday,
+                      password: row.password,
+                      loyaltyPoints: row.loyalty_points || 0,
+                      tier: row.tier || 'Bronze',
+                      savedFavorites: cleanFavorites,
+                      orderHistory: row.order_history || [],
+                      pdpaAccepted: row.pdpa_accepted,
+                      savedAddresses: row.saved_addresses || [],
+                      coupons: (row.coupons && row.coupons.length > 0) ? row.coupons : (backupCoupons.length > 0 ? backupCoupons : generateInitialCoupons())
+                  };
+              });
+          }
       }
       
       // Merge with offline data
       const saved = localStorage.getItem('damac_mock_customers');
       if (saved) {
-          localCustomers = JSON.parse(saved);
+          try {
+              localCustomers = JSON.parse(saved);
+          } catch(e) {}
       }
 
-      // Combine arrays, removing duplicates based on phone
-      const combined = [...dbCustomers];
+      // Map localCustomers to have consistent types and fields
+      localCustomers = localCustomers.map((c: any) => ({
+          ...c,
+          loyaltyPoints: c.loyaltyPoints !== undefined ? c.loyaltyPoints : (c.loyalty_points || 0),
+          savedFavorites: c.savedFavorites || c.saved_favorites || [],
+          orderHistory: c.orderHistory || c.order_history || [],
+          savedAddresses: c.savedAddresses || c.saved_addresses || [],
+          coupons: c.coupons || []
+      }));
+
+      // Merge database customers with local coupons/data if DB is missing coupons column
+      const combined = dbCustomers.map((dbCust: any) => {
+          const matchingLocal = localCustomers.find((lc: any) => lc.phone === dbCust.phone);
+          if (matchingLocal) {
+              return {
+                  ...dbCust,
+                  // If DB coupons are missing or empty, prefer local assigned coupons
+                  coupons: (dbCust.coupons && dbCust.coupons.length > 0) ? dbCust.coupons : (matchingLocal.coupons || [])
+              };
+          }
+          return dbCust;
+      });
+
+      // Combine arrays, adding any local-only customers
       for (const local of localCustomers) {
           if (!combined.find(c => c.phone === local.phone)) {
               combined.push(local);
@@ -2257,7 +2374,20 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Sync to DB if connected
       if (isSupabaseConfigured) {
           try {
-              await supabase.from('customers').update({ coupons }).eq('phone', customerPhone);
+              const { error } = await supabase.from('customers').update({ coupons }).eq('phone', customerPhone);
+              
+              // We also back up to saved_favorites in both cases to make sure it's 100% robust
+              const { data } = await supabase.from('customers').select('saved_favorites').eq('phone', customerPhone).single();
+              const rawFavorites = data?.saved_favorites || [];
+              const cleanFavorites = rawFavorites.filter((f: any) => f.id !== "SYSTEM_COUPONS_BACKUP");
+              const backupItem = {
+                  id: "SYSTEM_COUPONS_BACKUP",
+                  name: JSON.stringify(coupons),
+                  pizzaId: "system_coupons",
+                  toppings: []
+              };
+              const favoritesWithBackup = [...cleanFavorites, backupItem];
+              await supabase.from('customers').update({ saved_favorites: favoritesWithBackup }).eq('phone', customerPhone);
           } catch(e) { console.error(e); }
       }
   };
@@ -2294,6 +2424,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       discountAmount?: number;
       couponCode?: string;
       couponDiscountAmount?: number;
+      couponId?: string;
     }
   ) => {
       // Check for an existing active order (same table for dine-in, or same customer phone)
@@ -2572,10 +2703,17 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           }
 
           let updatedCoupons = customer.coupons || [];
-          if (details?.couponCode) {
-              updatedCoupons = updatedCoupons.map(c => 
-                  c.code.toUpperCase() === details.couponCode?.toUpperCase() ? { ...c, isUsed: true } : c
-              );
+          if (details?.couponId || details?.couponCode) {
+              let matched = false;
+              updatedCoupons = updatedCoupons.map(c => {
+                  const matchesId = details.couponId && c.id === details.couponId;
+                  const matchesCode = !details.couponId && details.couponCode && c.code.toUpperCase() === details.couponCode.toUpperCase() && !c.isUsed && !matched;
+                  if (matchesId || matchesCode) {
+                      matched = true;
+                      return { ...c, isUsed: true };
+                  }
+                  return c;
+              });
           }
 
           const updatedCustomer = { 

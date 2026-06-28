@@ -853,6 +853,23 @@ export const CustomerView: React.FC = () => {
         setShowAuthModal(true);
         return;
      }
+     
+     // Limit to 1 coupon per account per day
+     if (appliedCoupon && customer) {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const usedCouponToday = orders.some(o => {
+            if (o.customerPhone !== customer.phone || !o.couponCode || o.status === 'cancelled') return false;
+            try {
+                return new Date(o.createdAt).toLocaleDateString('en-CA') === todayStr;
+            } catch(e) { return false; }
+        });
+        if (usedCouponToday) {
+            alert(language === 'th' ? 'คุณใช้คูปองไปแล้วในวันนี้ (จำกัด 1 คูปอง/วัน)' : 'You have already used a coupon today (limit 1 coupon per day).');
+            setAppliedCoupon(null);
+            return;
+        }
+     }
+
      if (orderType === 'delivery') {
         if (!hasMapPin) {
            alert(language === 'th' ? 'กรุณากด "ดึงพิกัดปัจจุบัน" เพื่อคำนวณค่าส่ง' : 'Please tap "Use Live GPS" to calculate delivery fee.');
@@ -916,7 +933,8 @@ export const CustomerView: React.FC = () => {
         promoCode: appliedPromoCode?.code || undefined, 
         discountAmount: calculatedDiscount || undefined,
         couponCode: appliedCoupon?.code || undefined,
-        couponDiscountAmount: calculatedCouponDiscount || undefined
+        couponDiscountAmount: calculatedCouponDiscount || undefined,
+        couponId: appliedCoupon?.id || undefined
      });
      setIsSubmitting(false);
      if (success) {
@@ -2626,13 +2644,23 @@ export const CustomerView: React.FC = () => {
                                 {customer.coupons && customer.coupons.filter(c => !c.isUsed).length > 0 ? (
                                     <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                                         {customer.coupons.filter(c => !c.isUsed).map(c => {
+                                            const todayStr = new Date().toLocaleDateString('en-CA');
+                                            const usedCouponToday = orders.some(o => {
+                                                if (o.customerPhone !== customer.phone || !o.couponCode || o.status === 'cancelled') return false;
+                                                try {
+                                                    return new Date(o.createdAt).toLocaleDateString('en-CA') === todayStr;
+                                                } catch(e) { return false; }
+                                            });
+
                                             const isMinSpentOk = cartTotal >= (c.minOrderAmount || 0);
                                             const isOrderTypeOk = !c.applicableOrderTypes || c.applicableOrderTypes.length === 0 || c.applicableOrderTypes.includes(orderType);
-                                            const isEligible = isMinSpentOk && isOrderTypeOk;
+                                            const isEligible = isMinSpentOk && isOrderTypeOk && !usedCouponToday;
                                             const isSelected = appliedCoupon?.id === c.id;
                                             
                                             let errorMsg = '';
-                                            if (!isMinSpentOk) {
+                                            if (usedCouponToday) {
+                                                errorMsg = language === 'th' ? 'จำกัด 1 คูปอง/วัน (คุณใช้สิทธิ์วันนี้ไปแล้ว)' : 'Limit 1 coupon/day (used today)';
+                                            } else if (!isMinSpentOk) {
                                                 errorMsg = language === 'th' ? `ขั้นต่ำ ฿${c.minOrderAmount}` : `Min. order ฿${c.minOrderAmount}`;
                                             } else if (!isOrderTypeOk) {
                                                 errorMsg = language === 'th' ? 'ไม่รองรับการสั่งซื้อประเภทนี้' : 'Unsupported order type';
