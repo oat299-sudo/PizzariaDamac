@@ -1204,7 +1204,7 @@ export const CustomerView: React.FC = () => {
         
         {/* TABLE MODE BANNER */}
         {tableSession && (
-             <div className="bg-green-600 text-white p-3 text-center sticky top-16 z-20 shadow-md">
+             <div className="bg-green-600 text-white p-3 text-center relative z-20 shadow-md">
                  <div className="font-bold text-lg flex items-center justify-center gap-2">
                      <Utensils size={20}/> You are ordering for Table {tableSession}
                  </div>
@@ -1218,7 +1218,7 @@ export const CustomerView: React.FC = () => {
              const partner = partners?.find(p => p.id === partnerSession);
              if (!partner) return null;
              return (
-                 <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 text-center sticky top-16 z-20 shadow-md flex items-center justify-center gap-4">
+                 <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 text-center relative z-20 shadow-md flex items-center justify-center gap-4">
                      <div className="font-bold text-sm md:text-base flex items-center justify-center gap-2">
                          <span className="animate-bounce">☕️</span>
                          {language === 'th' ? `ยินดีต้อนรับ สั่งส่งตรงจากร้านกาแฟ ${partner.nameTh || partner.name}` : `Referral order from ${partner.name}`}
@@ -1229,7 +1229,7 @@ export const CustomerView: React.FC = () => {
         })()}
 
         {/* Categories */}
-        <div className={`bg-white border-b sticky z-30 shadow-sm ${tableSession ? 'top-28' : 'top-16'}`}>
+        <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
                 {CATEGORIES.map(cat => (
                     <button 
@@ -1407,16 +1407,22 @@ export const CustomerView: React.FC = () => {
                                     {(() => {
                                         const activeBadge = language === 'th' ? (item.badgeTh || item.badge) : (item.badge || item.badgeTh);
                                         return activeBadge ? (
-                                            <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[9px] md:text-[11px] uppercase tracking-wider py-1 px-2.5 rounded-lg shadow-md animate-pulse">
+                                            <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[8px] md:text-[11px] uppercase tracking-wider py-0.5 px-1.5 md:py-1 md:px-2.5 rounded shadow-md animate-pulse">
                                                 {activeBadge}
                                             </div>
                                         ) : null;
                                     })()}
 
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
-                                    {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
                                 <div className="px-1">
+                                    <div className="flex flex-wrap gap-1 mb-1 items-center">
+                                        {item.isBestSeller && (
+                                            <span className="bg-yellow-400 text-white text-[8px] md:text-[10px] font-black uppercase tracking-wider py-0.5 px-1.5 rounded-md flex items-center gap-0.5 shadow-sm">
+                                                <Star size={8} fill="currentColor" className="md:w-2.5 md:h-2.5"/> Hit
+                                            </span>
+                                        )}
+                                    </div>
                                     <h3 className="font-bold text-gray-900 text-sm md:text-lg leading-tight mb-1 line-clamp-2">{localized.name}</h3>
                                     <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
@@ -1537,16 +1543,22 @@ export const CustomerView: React.FC = () => {
                                     {(() => {
                                         const activeBadge = language === 'th' ? (item.badgeTh || item.badge) : (item.badge || item.badgeTh);
                                         return activeBadge ? (
-                                            <div className="absolute top-2 left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[9px] md:text-[11px] uppercase tracking-wider py-1 px-2.5 rounded-lg shadow-md animate-pulse">
+                                            <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 z-10 bg-gradient-to-r from-red-600 to-amber-500 text-white font-black text-[8px] md:text-[11px] uppercase tracking-wider py-0.5 px-1.5 md:py-1 md:px-2.5 rounded shadow-md animate-pulse">
                                                 {activeBadge}
                                             </div>
                                         ) : null;
                                     })()}
 
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold">{t('soldOut')}</div>}
-                                    {item.isBestSeller && <div className="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><Star size={10} fill="currentColor"/> Hit</div>}
                                 </div>
                                 <div className="px-1">
+                                    <div className="flex flex-wrap gap-1 mb-1 items-center">
+                                        {item.isBestSeller && (
+                                            <span className="bg-yellow-400 text-white text-[8px] md:text-[10px] font-black uppercase tracking-wider py-0.5 px-1.5 rounded-md flex items-center gap-0.5 shadow-sm">
+                                                <Star size={8} fill="currentColor" className="md:w-2.5 md:h-2.5"/> Hit
+                                            </span>
+                                        )}
+                                    </div>
                                     <h3 className="font-bold text-gray-900 text-sm md:text-lg leading-tight mb-1 line-clamp-2">{localized.name}</h3>
                                     <p className="text-gray-500 text-xs md:text-sm line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">{localized.description}</p>
                                     <div className="flex justify-between items-center">
@@ -1645,7 +1657,7 @@ export const CustomerView: React.FC = () => {
         )}
 
         {showTracker && activeOrder && (
-             <div className="fixed bottom-4 right-4 z-40 w-80 max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-200 animate-fade-in custom-scrollbar">
+             <div className="fixed bottom-4 left-4 right-4 md:left-auto md:w-80 z-40 max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-200 animate-fade-in custom-scrollbar">
                  <div className="bg-brand-600 p-3 text-white sticky top-0 z-10 flex justify-between items-center shadow-sm">
                      <h3 className="font-bold flex items-center gap-2"><Activity size={18}/> {language === 'th' ? 'สถานะ:' : 'Status:'} {t(activeOrder.status as any)}</h3>
                      <div className="flex gap-2">
