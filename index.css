@@ -17,6 +17,16 @@
   --animate-fade-in: fadeIn 0.5s ease-in-out;
 }
 
+/* Hide scrollbars but allow touch swiping/scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+  -webkit-overflow-scrolling: touch !important; /* Enable kinetic scroll on iOS */
+}
+
 @keyframes fadeIn {
   0% { opacity: 0; }
   100% { opacity: 1; }

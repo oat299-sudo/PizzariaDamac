@@ -1230,12 +1230,12 @@ export const CustomerView: React.FC = () => {
 
         {/* Categories */}
         <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex gap-3">
+            <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex flex-nowrap gap-3">
                 {CATEGORIES.map(cat => (
                     <button 
                         key={cat.id} 
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all transform ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-lg scale-105 ring-2 ring-brand-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-bold transition-all transform shrink-0 ${activeCategory === cat.id ? 'bg-brand-600 text-white shadow-lg scale-105 ring-2 ring-brand-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                     >
                         {language === 'th' ? cat.labelTh : cat.label}
                     </button>
@@ -1273,11 +1273,11 @@ export const CustomerView: React.FC = () => {
                     </h2>
                     <button onClick={() => setShowProfile(true)} className="text-xs text-brand-600 font-bold hover:underline">View History</button>
                 </div>
-                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar pb-2">
                     {recentItems.map(item => {
                          const localized = getLocalizedItem(item);
                          return (
-                            <div key={'recent-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[150px] w-[150px] bg-white rounded-xl shadow-sm p-3 border border-orange-100 cursor-pointer hover:shadow-md transition group hover:border-brand-300">
+                            <div key={'recent-'+item.id} onClick={() => handleCustomize(item)} className="min-w-[150px] w-[150px] shrink-0 bg-white rounded-xl shadow-sm p-3 border border-orange-100 cursor-pointer hover:shadow-md transition group hover:border-brand-300">
                                 <div className="aspect-square rounded-lg overflow-hidden mb-2 relative">
                                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
                                     {!item.available && <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">{t('soldOut')}</div>}
@@ -1313,7 +1313,7 @@ export const CustomerView: React.FC = () => {
                     </span>
                 </div>
                 
-                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-3">
+                <div className="flex flex-nowrap gap-4 overflow-x-auto no-scrollbar pb-3">
                     {customer.coupons.filter(c => !c.isUsed).map(c => {
                         const isSelected = appliedCoupon?.id === c.id;
                         const isMinSpentOk = cartTotal >= (c.minOrderAmount || 0);
@@ -1321,7 +1321,7 @@ export const CustomerView: React.FC = () => {
                             <div 
                                 key={'dashboard-coupon-'+c.id} 
                                 onClick={() => setAppliedCoupon(isSelected ? null : c)}
-                                className={`min-w-[280px] md:min-w-[320px] bg-white rounded-2xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition relative overflow-hidden flex flex-col justify-between ${
+                                className={`min-w-[280px] md:min-w-[320px] shrink-0 bg-white rounded-2xl shadow-sm border p-4 cursor-pointer hover:shadow-md transition relative overflow-hidden flex flex-col justify-between ${
                                     isSelected 
                                         ? 'border-brand-500 bg-brand-50/10 ring-1 ring-brand-500' 
                                         : 'border-orange-100 hover:border-brand-300'
