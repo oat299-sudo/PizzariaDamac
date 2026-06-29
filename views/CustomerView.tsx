@@ -1074,7 +1074,7 @@ export const CustomerView: React.FC = () => {
         : (DEFAULT_STORE_SETTINGS.eventGalleryUrls || []);
 
   return (
-    <div className="min-h-screen bg-orange-50 pb-32 md:pb-0 font-sans text-gray-900 flex flex-col relative">
+    <div className="min-h-screen bg-orange-50 pb-32 md:pb-0 font-sans text-gray-900 flex flex-col relative w-full max-w-full overflow-x-hidden">
         {/* --- REAL-TIME ORDER STATUS UPDATES NOTIFICATION --- */}
         {activeNotification && (
             <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 animate-fade-in">
@@ -1229,7 +1229,7 @@ export const CustomerView: React.FC = () => {
         })()}
 
         {/* Categories */}
-        <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
+        <div className="bg-white border-b sticky top-16 z-30 shadow-sm w-full max-w-full overflow-hidden">
             <div className="max-w-7xl mx-auto px-4 overflow-x-auto no-scrollbar py-3 flex flex-nowrap gap-3">
                 {CATEGORIES.map(cat => (
                     <button 
@@ -1266,7 +1266,7 @@ export const CustomerView: React.FC = () => {
 
         {/* --- IMPROVED BUY AGAIN SECTION (Logged In) --- */}
         {customer && recentItems.length > 0 && activeCategory === 'promotion' && (
-            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-orange-50/50">
+            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-orange-50/50 w-full max-w-full overflow-hidden">
                 <div className="flex justify-between items-end mb-4">
                     <h2 className="text-lg font-bold flex items-center gap-2 text-brand-800">
                          <History size={20} className="text-brand-600"/> {t('buyAgain')}
@@ -1302,7 +1302,7 @@ export const CustomerView: React.FC = () => {
 
         {/* --- MEMBER COUPONS DASHBOARD SECTION (Logged In) --- */}
         {customer && customer.coupons && customer.coupons.filter(c => !c.isUsed).length > 0 && activeCategory === 'promotion' && (
-            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent">
+            <section className="max-w-7xl mx-auto px-4 py-6 border-b bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent w-full max-w-full overflow-hidden">
                 <div className="flex justify-between items-end mb-4">
                     <h2 className="text-lg font-black flex items-center gap-2 text-brand-800">
                          <Gift size={22} className="text-brand-600 shrink-0"/> 
@@ -1446,7 +1446,7 @@ export const CustomerView: React.FC = () => {
         {/* ... (Review Video, News, Regular Menu, Events, Footer remain same) ... */}
         {/* --- REVIEW VIDEO SECTION --- */}
         {activeCategory === 'promotion' && storeSettings.reviewLinks && storeSettings.reviewLinks.filter(l => l).length > 0 && (
-            <section className="bg-white py-8 border-b">
+            <section className="bg-white py-8 border-b w-full max-w-full overflow-hidden">
                 <div className="max-w-7xl mx-auto px-4">
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
                         <PlayCircle className="text-red-500" fill="currentColor" /> {t('customerReviews')}
