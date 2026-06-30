@@ -103,6 +103,22 @@ CREATE TABLE expenses (
     note TEXT
 );
 
+-- 7. Promo Codes Table
+CREATE TABLE promo_codes (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    value NUMERIC NOT NULL,
+    min_spend NUMERIC DEFAULT 0,
+    max_discount NUMERIC,
+    start_date TEXT,
+    end_date TEXT,
+    usage_limit INTEGER,
+    usage_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    applicable_categories JSONB DEFAULT '[]'::jsonb
+);
+
 -- Set generous payload size limit to prevent PostgREST errors for large base64 images
 -- Wait, we can't alter role like this often without superuser, but it's safe to include inside Supabase SQL editor.
 -- Note: If you have problems with inserting large base64 images, contact Supabase Support to increase max_request_size.

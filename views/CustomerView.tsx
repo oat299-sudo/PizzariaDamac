@@ -99,7 +99,7 @@ export const CustomerView: React.FC = () => {
     menu, addToCart, cart, cartTotal, customer, setCustomer, registerCustomer, customerLogin, placeOrder, removeFromCart, updateCartItemQuantity, navigateTo, 
     addToFavorites, orders, reorderItem, claimReward, shopLogo, generateLuckyPizza, submitOrderFeedback, updateOrderTypeToPickup,
     language, toggleLanguage, t, getLocalizedItem,
-    isStoreOpen, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
+    isStoreOpen, isHoliday, closedMessage, generateTimeSlots, storeSettings, canOrderForToday,
     toppings, fetchOrders, tableSession, partnerSession, setPartnerSession, partners,
     promoCodes
   } = useStore();
