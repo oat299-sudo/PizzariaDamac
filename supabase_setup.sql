@@ -4,7 +4,7 @@
 -- ==========================================
 
 -- 1. Store Settings Table
-CREATE TABLE store_settings (
+CREATE TABLE IF NOT EXISTS store_settings (
     id SERIAL PRIMARY KEY,
     is_open BOOLEAN DEFAULT true,
     closed_message TEXT,
@@ -25,11 +25,11 @@ CREATE TABLE store_settings (
     partners JSONB DEFAULT '[]'::jsonb
 );
 
--- Initialize the first row for settings
-INSERT INTO store_settings (id, is_open) VALUES (1, true);
+-- Initialize the first row for settings if it doesn't exist
+INSERT INTO store_settings (id, is_open) VALUES (1, true) ON CONFLICT (id) DO NOTHING;
 
 -- 2. Menu Items Table
-CREATE TABLE menu_items (
+CREATE TABLE IF NOT EXISTS menu_items (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     name_th TEXT,
@@ -44,7 +44,7 @@ CREATE TABLE menu_items (
 );
 
 -- 3. Toppings Table
-CREATE TABLE toppings (
+CREATE TABLE IF NOT EXISTS toppings (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     name_th TEXT,
@@ -55,7 +55,7 @@ CREATE TABLE toppings (
 );
 
 -- 4. Customers Table (Loyalty Program)
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     phone TEXT PRIMARY KEY,
     name TEXT,
     address TEXT,
@@ -71,7 +71,7 @@ CREATE TABLE customers (
 );
 
 -- 5. Orders Table
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     customer_name TEXT,
     customer_phone TEXT,
@@ -94,7 +94,7 @@ CREATE TABLE orders (
 );
 
 -- 6. Expenses Table
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
     id TEXT PRIMARY KEY,
     description TEXT NOT NULL,
     amount NUMERIC NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE expenses (
 );
 
 -- 7. Promo Codes Table
-CREATE TABLE promo_codes (
+CREATE TABLE IF NOT EXISTS promo_codes (
     id TEXT PRIMARY KEY,
     code TEXT NOT NULL UNIQUE,
     type TEXT NOT NULL,
@@ -133,6 +133,15 @@ ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
 -- ==========================================
 -- CREATE PUBLIC POLICIES FOR ALL TABLES (Prototype Mode)
 -- ==========================================
+-- Drop existing policies to prevent errors if they already exist
+DROP POLICY IF EXISTS "Allow public all on store_settings" ON store_settings;
+DROP POLICY IF EXISTS "Allow public all on menu_items" ON menu_items;
+DROP POLICY IF EXISTS "Allow public all on toppings" ON toppings;
+DROP POLICY IF EXISTS "Allow public all on customers" ON customers;
+DROP POLICY IF EXISTS "Allow public all on orders" ON orders;
+DROP POLICY IF EXISTS "Allow public all on expenses" ON expenses;
+DROP POLICY IF EXISTS "Allow public all on promo_codes" ON promo_codes;
+
 -- This allows the React app to read and write data without complex authentication setup
 CREATE POLICY "Allow public all on store_settings" ON store_settings FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all on menu_items" ON menu_items FOR ALL USING (true) WITH CHECK (true);
