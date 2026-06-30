@@ -119,6 +119,15 @@ CREATE TABLE promo_codes (
     applicable_categories JSONB DEFAULT '[]'::jsonb
 );
 
+-- Enable RLS for promo_codes
+ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
+
+-- Allow public access for all operations (for prototype purposes)
+CREATE POLICY "Allow public select on promo_codes" ON promo_codes FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on promo_codes" ON promo_codes FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update on promo_codes" ON promo_codes FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete on promo_codes" ON promo_codes FOR DELETE USING (true);
+
 -- Set generous payload size limit to prevent PostgREST errors for large base64 images
 -- Wait, we can't alter role like this often without superuser, but it's safe to include inside Supabase SQL editor.
 -- Note: If you have problems with inserting large base64 images, contact Supabase Support to increase max_request_size.
