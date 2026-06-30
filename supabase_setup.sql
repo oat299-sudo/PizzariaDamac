@@ -119,15 +119,25 @@ CREATE TABLE promo_codes (
     applicable_categories JSONB DEFAULT '[]'::jsonb
 );
 
--- Enable RLS for promo_codes
+-- ==========================================
+-- ENABLE ROW LEVEL SECURITY (RLS) FOR ALL TABLES
+-- ==========================================
+ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE toppings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
 
--- Allow public access for all operations (for prototype purposes)
-CREATE POLICY "Allow public select on promo_codes" ON promo_codes FOR SELECT USING (true);
-CREATE POLICY "Allow public insert on promo_codes" ON promo_codes FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update on promo_codes" ON promo_codes FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete on promo_codes" ON promo_codes FOR DELETE USING (true);
-
--- Set generous payload size limit to prevent PostgREST errors for large base64 images
--- Wait, we can't alter role like this often without superuser, but it's safe to include inside Supabase SQL editor.
--- Note: If you have problems with inserting large base64 images, contact Supabase Support to increase max_request_size.
+-- ==========================================
+-- CREATE PUBLIC POLICIES FOR ALL TABLES (Prototype Mode)
+-- ==========================================
+-- This allows the React app to read and write data without complex authentication setup
+CREATE POLICY "Allow public all on store_settings" ON store_settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on menu_items" ON menu_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on toppings" ON toppings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on customers" ON customers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on orders" ON orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all on promo_codes" ON promo_codes FOR ALL USING (true) WITH CHECK (true);
