@@ -1593,17 +1593,23 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   useEffect(() => {
-     // Check if explicit holiday in DB OR manually closed
-     const isScheduledHoliday = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
-     const effectiveHoliday = isScheduledHoliday || !storeSettings.isOpen;
-     
-     // Store is "Open" if no holiday/manual close AND within hours
-     const withinHours = checkOperatingHours();
-     
-     setIsHoliday(isScheduledHoliday);
-     // Note: isStoreOpen tracks "Currently accepting ASAP orders". 
-     // If closed (morning), you can still preorder for today.
-     setIsStoreOpen(!effectiveHoliday && withinHours);
+     const updateStatus = () => {
+         // Check if explicit holiday in DB OR manually closed
+         const isScheduledHoliday = checkHolidayStatus(storeSettings.holidayStart, storeSettings.holidayEnd);
+         const effectiveHoliday = isScheduledHoliday || !storeSettings.isOpen;
+         
+         // Store is "Open" if no holiday/manual close AND within hours
+         const withinHours = checkOperatingHours();
+         
+         setIsHoliday(isScheduledHoliday);
+         // Note: isStoreOpen tracks "Currently accepting ASAP orders". 
+         // If closed (morning), you can still preorder for today.
+         setIsStoreOpen(!effectiveHoliday && withinHours);
+     };
+
+     updateStatus();
+     const interval = setInterval(updateStatus, 30000); // Check every 30 seconds
+     return () => clearInterval(interval);
   }, [storeSettings]);
 
   // DB Sync
@@ -3000,6 +3006,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (isSupabaseConfigured) {
           // Map camelCase to snake_case for DB
           const payload: any = {};
+          if (settings.isOpen !== undefined) payload.is_open = settings.isOpen;
+          if (settings.closedMessage !== undefined) payload.closed_message = settings.closedMessage;
           if (settings.promoBannerUrl !== undefined) payload.promo_banner_url = settings.promoBannerUrl;
           if (settings.promoContentType !== undefined) payload.promo_content_type = settings.promoContentType;
           if (settings.reviewLinks !== undefined) payload.review_links = settings.reviewLinks;

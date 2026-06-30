@@ -120,7 +120,7 @@ const MainLayout = () => {
 const App = () => {
   return (
     <StoreProvider>
-      <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+      <div className="min-h-screen bg-gray-50 font-sans text-gray-900 w-full max-w-full overflow-x-hidden">
         {!isSupabaseConfigured && (
           <div className="bg-red-600 text-white text-center p-2 text-xs font-bold flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
             <AlertTriangle size={16} />

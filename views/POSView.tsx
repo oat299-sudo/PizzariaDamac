@@ -857,6 +857,13 @@ export const POSView: React.FC = () => {
         deliveryFeePerKm: 10,
         baseDeliveryFee: 0
     });
+
+    const [storeStatusForm, setStoreStatusForm] = useState({
+        isOpen: true,
+        closedMessage: '',
+        holidayStart: '',
+        holidayEnd: ''
+    });
     
     // Robust Receipt Data Interface
     interface ReceiptData {
@@ -914,6 +921,12 @@ export const POSView: React.FC = () => {
                 freeDeliveryRadiusKm: storeSettings.freeDeliveryRadiusKm ?? 5,
                 deliveryFeePerKm: storeSettings.deliveryFeePerKm ?? 10,
                 baseDeliveryFee: storeSettings.baseDeliveryFee ?? 0
+            });
+            setStoreStatusForm({
+                isOpen: storeSettings.isOpen ?? true,
+                closedMessage: storeSettings.closedMessage || '',
+                holidayStart: storeSettings.holidayStart || '',
+                holidayEnd: storeSettings.holidayEnd || ''
             });
             setTempClosedMsg(storeSettings.closedMessage);
         }
@@ -4339,6 +4352,75 @@ export const POSView: React.FC = () => {
                                     await updateStoreSettings({...deliveryForm, storeLocationGps: resolvedGps}); 
                                     alert("Delivery Settings Saved!"); 
                                 }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
+                            </div>
+
+                            {/* Store Operating Status & Holiday Settings */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mt-6">
+                                <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Clock size={20} className="text-brand-500"/>
+                                    {language === 'th' ? 'ตั้งค่าการเปิด-ปิดร้าน & วันหยุด (Store Operating & Holiday Settings)' : 'Store Operating & Holiday Settings'}
+                                </h3>
+                                <div className="space-y-4">
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <div>
+                                              <label className="text-xs font-bold text-gray-500 uppercase">{language === 'th' ? 'สถานะเปิด-ปิดร้านปกติ (Store Status)' : 'Store Status'}</label>
+                                              <select 
+                                                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" 
+                                                  value={storeStatusForm.isOpen ? "open" : "closed"} 
+                                                  onChange={e => setStoreStatusForm({...storeStatusForm, isOpen: e.target.value === "open"})}
+                                              >
+                                                  <option value="open">🟢 {language === 'th' ? 'เปิดให้บริการปกติ' : 'Open (Accept orders)'}</option>
+                                                  <option value="closed">🔴 {language === 'th' ? 'ปิดให้บริการชั่วคราว / นอกเวลา' : 'Closed (Disable ASAP orders)'}</option>
+                                              </select>
+                                          </div>
+                                          <div>
+                                              <label className="text-xs font-bold text-gray-500 uppercase">{language === 'th' ? 'ข้อความเมื่อปิดร้าน (Custom Closed Message)' : 'Custom Closed Message'}</label>
+                                              <input 
+                                                  type="text" 
+                                                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" 
+                                                  value={storeStatusForm.closedMessage} 
+                                                  onChange={e => setStoreStatusForm({...storeStatusForm, closedMessage: e.target.value})} 
+                                                  placeholder={language === 'th' ? 'เช่น ปิดเตาชั่วคราวเพื่อเติมวัตถุดิบ จะเปิดให้บริการอีกครั้งพรุ่งนี้ค่ะ' : 'e.g. Temporarily closed for kitchen restocking. Reopening tomorrow!'} 
+                                              />
+                                          </div>
+                                     </div>
+
+                                     <div className="border-t border-dashed border-gray-100 pt-4">
+                                          <h4 className="font-extrabold text-sm text-gray-700 mb-3">{language === 'th' ? '🏖️ กำหนดช่วงวันหยุดร้าน (Store Holiday dates)' : '🏖️ Set Store Holiday dates'}</h4>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                               <div>
+                                                   <label className="text-xs font-bold text-gray-500 uppercase">{language === 'th' ? 'วันเริ่มต้นหยุด (Holiday Start Date)' : 'Holiday Start Date'}</label>
+                                                   <input 
+                                                       type="date" 
+                                                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" 
+                                                       value={storeStatusForm.holidayStart} 
+                                                       onChange={e => setStoreStatusForm({...storeStatusForm, holidayStart: e.target.value})} 
+                                                   />
+                                               </div>
+                                               <div>
+                                                   <label className="text-xs font-bold text-gray-500 uppercase">{language === 'th' ? 'วันสิ้นสุดหยุด (Holiday End Date)' : 'Holiday End Date'}</label>
+                                                   <input 
+                                                       type="date" 
+                                                       className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 mt-1 font-bold text-gray-700 focus:border-brand-500 outline-none" 
+                                                       value={storeStatusForm.holidayEnd} 
+                                                       onChange={e => setStoreStatusForm({...storeStatusForm, holidayEnd: e.target.value})} 
+                                                   />
+                                               </div>
+                                          </div>
+                                          <p className="text-[10px] text-gray-400 mt-2 font-semibold">
+                                               * {language === 'th' ? 'หากกำหนดช่วงวันหยุดร้าน ระบบจะปิดรับออเดอร์ด่วน (ASAP) และขึ้นแจ้งแบนเนอร์วันหยุดให้กับลูกค้าโดยอัตโนมัติในช่วงวันที่ดังกล่าว' : 'During these dates, the store will automatically display a Holiday banner to customers and disable immediate (ASAP) orders.'}
+                                          </p>
+                                     </div>
+                                </div>
+                                <button 
+                                    onClick={async () => { 
+                                        await updateStoreSettings(storeStatusForm); 
+                                        alert(language === 'th' ? "บันทึกการตั้งค่าร้านสำเร็จ!" : "Store Status Settings Saved!"); 
+                                    }} 
+                                    className="mt-4 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-6 rounded-xl shadow transition w-full lg:w-auto"
+                                >
+                                    {language === 'th' ? 'บันทึกการเปิด-ปิดร้าน & วันหยุด' : 'Save Status & Holidays'}
+                                </button>
                             </div>
 
                             {/* Manage Toppings Card (จัดการส่วนผสมและท็อปปิ้ง) */}

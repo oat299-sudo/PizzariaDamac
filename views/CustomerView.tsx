@@ -589,10 +589,15 @@ export const CustomerView: React.FC = () => {
   }, [tableSession]);
   
   useEffect(() => {
-      if (isStoreOpen && orderDate === 'tomorrow' && !pickupTime) {
-          setOrderDate('today');
-      } else if (!isStoreOpen && !canOrderForToday()) {
-          setOrderDate('tomorrow');
+      if (isStoreOpen) {
+          if (orderDate === 'tomorrow' && !pickupTime) {
+              setOrderDate('today');
+          }
+      } else {
+          setAsapOrder(false); // Force pre-order when store is closed
+          if (!canOrderForToday()) {
+              setOrderDate('tomorrow');
+          }
       }
   }, [isStoreOpen]);
 
@@ -1227,6 +1232,53 @@ export const CustomerView: React.FC = () => {
                  </div>
              );
         })()}
+
+        {/* STORE CLOSED / HOLIDAY BANNER */}
+        {!isStoreOpen && (
+             <div className="bg-amber-50 border-b border-amber-200 text-amber-900 p-4 relative z-20 shadow-sm">
+                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                     <div className="flex gap-3 items-start">
+                         <div className="bg-amber-100 text-amber-800 p-2.5 rounded-xl shrink-0 mt-0.5">
+                             <Clock size={20} className="animate-pulse" />
+                         </div>
+                         <div>
+                             <h4 className="font-extrabold text-sm md:text-base flex items-center gap-1.5">
+                                 {language === 'th' ? '🔴 ขณะนี้ร้านปิดรับออเดอร์ทันที (เปิดสั่งล่วงหน้าได้ค่ะ)' : '🔴 Store is Closed for ASAP Orders (Pre-orders Open)'}
+                             </h4>
+                             <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                                 {isHoliday ? (
+                                     <span>
+                                         {language === 'th' 
+                                             ? `🏖️ ร้านหยุดเทศกาล/วันหยุดพิเศษ${storeSettings.holidayStart ? ` ตั้งแต่วันที่ ${storeSettings.holidayStart}` : ''}${storeSettings.holidayEnd ? ` ถึงวันที่ ${storeSettings.holidayEnd}` : ''}` 
+                                             : `🏖️ Shop is closed for holiday${storeSettings.holidayStart ? ` from ${storeSettings.holidayStart}` : ''}${storeSettings.holidayEnd ? ` to ${storeSettings.holidayEnd}` : ''}`}
+                                     </span>
+                                 ) : !storeSettings.isOpen ? (
+                                     <span>
+                                         {storeSettings.closedMessage || (language === 'th' ? 'ขออภัยในความไม่สะดวก ร้านปิดให้บริการชั่วคราวค่ะ' : 'We are temporarily closed. Sorry for any inconvenience.')}
+                                     </span>
+                                 ) : (
+                                     <span>
+                                         {language === 'th' 
+                                             ? `🕒 นอกเวลาทำการปกติของร้าน (เวลาเปิดทำการ: ทุกวัน 11:00 น. - 20:30 น.)` 
+                                             : `🕒 Outside normal business hours (Hours: Daily 11:00 AM - 8:30 PM)`}
+                                     </span>
+                                 )}
+                             </p>
+                             {storeSettings.closedMessage && (isHoliday || !storeSettings.isOpen) && (
+                                 <p className="text-xs font-semibold text-amber-950 mt-1.5 bg-white/60 px-2.5 py-1.5 rounded-lg border border-amber-200/50 inline-block">
+                                     📢 {storeSettings.closedMessage}
+                                 </p>
+                             )}
+                         </div>
+                     </div>
+                     <div className="text-left md:text-right shrink-0">
+                         <span className="inline-block bg-amber-600 text-white text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
+                             {language === 'th' ? 'สั่งอาหารล่วงหน้า (Pre-order) ได้เลย!' : 'Pre-order available now!'}
+                         </span>
+                     </div>
+                 </div>
+             </div>
+        )}
 
         {/* Categories */}
         <div className="bg-white border-b sticky top-16 z-30 shadow-sm w-full max-w-full overflow-hidden">
@@ -2524,13 +2576,14 @@ export const CustomerView: React.FC = () => {
                                              <div className="grid grid-cols-2 gap-2 mb-3">
                                                  <button 
                                                      type="button"
+                                                     disabled={!isStoreOpen}
                                                      onClick={() => {
                                                          setAsapOrder(true);
                                                          setPickupTime('');
                                                      }}
-                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${!isStoreOpen ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
                                                  >
-                                                     {language === 'th' ? 'เตรียมทันที (ASAP)' : 'Prepare ASAP (20m)'}
+                                                     {language === 'th' ? 'เตรียมทันที (ร้านปิด)' : 'Prepare ASAP (Closed)'}
                                                  </button>
                                                  <button 
                                                      type="button"
@@ -2538,11 +2591,17 @@ export const CustomerView: React.FC = () => {
                                                          setAsapOrder(false);
                                                          if (!pickupTime && timeSlots.length > 0) setPickupTime(timeSlots[0]);
                                                      }}
-                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${!asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600'}`}
+                                                     className={`py-2 text-xs font-bold rounded-lg border transition ${!asapOrder ? 'border-brand-500 bg-brand-50 text-brand-700 font-extrabold' : 'border-gray-200 text-gray-600'}`}
                                                  >
                                                      {language === 'th' ? 'สั่งอาหารล่วงหน้า' : 'Schedule Pre-order'}
                                                  </button>
                                              </div>
+
+                                             {!isStoreOpen && (
+                                                 <p className="text-[10px] text-amber-700 font-extrabold mb-3 leading-tight">
+                                                     ⚠️ {language === 'th' ? 'ขณะนี้ร้านอยู่นอกเวลาทำการหรือปิดชั่วคราว จึงไม่สามารถสั่งอาหารให้ส่งทันทีได้ แต่คุณยังสั่งซื้อล่วงหน้า (Pre-order) ด้านล่างนี้ได้ค่ะ' : 'The store is currently closed/outside hours. ASAP ordering is disabled, but you can schedule a pre-order below!'}
+                                                 </p>
+                                             )}
 
                                              {!asapOrder && (
                                                  <div className="space-y-3 pt-2.5 border-t border-dashed border-gray-100">
