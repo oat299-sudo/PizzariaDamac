@@ -79,6 +79,9 @@ interface StoreContextType {
       couponCode?: string;
       couponDiscountAmount?: number;
       couponId?: string;
+      isPosOrder?: boolean;
+      customerName?: string;
+      customerPhone?: string;
     }
   ) => Promise<boolean>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
@@ -2431,11 +2434,14 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       couponCode?: string;
       couponDiscountAmount?: number;
       couponId?: string;
+      isPosOrder?: boolean;
+      customerName?: string;
+      customerPhone?: string;
     }
   ) => {
       // Check for an existing active order (same table for dine-in, or same customer phone)
       const tableNumberToMatch = details?.tableNumber;
-      const phoneToMatch = customer ? customer.phone : '';
+      const phoneToMatch = details?.isPosOrder ? (details?.customerPhone || '') : (customer ? customer.phone : '');
 
       let existingOrder: Order | undefined = undefined;
 
@@ -2611,8 +2617,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       const newOrder: Order = {
           id: Date.now().toString(),
-          customerName: customer ? customer.name : (details?.tableNumber ? `Table ${details.tableNumber}` : 'Guest'),
-          customerPhone: customer ? customer.phone : '',
+          customerName: details?.isPosOrder 
+              ? (details?.customerName || (details?.tableNumber ? `Table ${details.tableNumber}` : 'Guest'))
+              : (customer ? customer.name : (details?.tableNumber ? `Table ${details.tableNumber}` : 'Guest')),
+          customerPhone: details?.isPosOrder 
+              ? (details?.customerPhone || '')
+              : (customer ? customer.phone : ''),
           type,
           source: source,
           status: details?.status || 'pending',
@@ -2691,7 +2701,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch(e) {}
       
       // Update Customer (Loyalty + History + Saved Address + Coupon Prevention)
-      const targetPhone = customer?.phone || newOrder.customerPhone;
+      const targetPhone = details?.isPosOrder ? (details?.customerPhone || '') : (customer?.phone || newOrder.customerPhone);
       if (targetPhone) {
           // Let's resolve the customer's profile (either active logged in customer, or offline/online profile)
           let targetCustomerProfile: CustomerProfile | null = null;

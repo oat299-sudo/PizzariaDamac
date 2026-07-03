@@ -1270,7 +1270,8 @@ export const POSView: React.FC = () => {
             tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : 'Walk-in'),
             source: orderSource, paymentMethod: undefined, status: 'confirmed', 
             note: orderSource === 'store' ? 'Pay Later' : `${orderSource.toUpperCase()} Order`,
-            deliveryPlatformRef: deliveryPlatformRef
+            deliveryPlatformRef: deliveryPlatformRef,
+            isPosOrder: true
         });
         if (success) { setTableNumber(''); setDeliveryPlatformRef(''); setShowMobileCart(false); setOrderSource('store'); setActiveTab('tables'); }
     };
@@ -1345,7 +1346,8 @@ export const POSView: React.FC = () => {
         } else {
             playSuccessFeedback();
             const success = await placeOrder('dine-in', {
-                tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef
+                tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef,
+                isPosOrder: true
             });
             if (success) { 
                 alert(
