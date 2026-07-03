@@ -1289,7 +1289,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // --- Auth State ---
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => sessionStorage.getItem('damac_auth') === 'true');
   const adminLogin = (u: string, p: string) => {
-    if ((u === 'oat299@gmail.com' && p === 'PizzaDamac2025*') || (u === 'admin' && p === '123')) {
+    if (u === 'oatto' && p === 'Wachirus299*') {
         setIsAdminLoggedIn(true);
         sessionStorage.setItem('damac_auth', 'true');
         return true;

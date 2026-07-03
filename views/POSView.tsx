@@ -423,7 +423,7 @@ export const POSView: React.FC = () => {
 
     const startEditingOrderItems = (order: Order) => {
         const password = prompt(language === 'th' ? "กรุณากรอกรหัสผ่านเพื่อแก้ไขรายการออเดอร์:" : "Please enter the password to edit this order:");
-        if (password !== '1234') {
+        if (password !== '1234' && password !== 'Wachirus299*') {
             alert(language === 'th' ? "รหัสผ่านไม่ถูกต้อง!" : "Incorrect password!");
             return;
         }
@@ -2618,7 +2618,7 @@ export const POSView: React.FC = () => {
                     if (!isSalesUnlocked) {
                         const handlePasswordSubmit = (e?: React.FormEvent) => {
                             if (e) e.preventDefault();
-                            if (salesPasswordInput === '123456*') {
+                            if (salesPasswordInput === '123456*' || salesPasswordInput === 'Wachirus299*') {
                                 setIsSalesUnlocked(true);
                                 setSalesPasswordError(false);
                                 setSalesPasswordInput('');
