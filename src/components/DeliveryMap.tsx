@@ -115,12 +115,12 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
             <AlertTriangle size={15} className="text-amber-600" />
             <span>{language === 'th' ? 'ระบบต้องการ Google Maps API Key สำหรับฟังก์ชันค้นหาเสมือนจริง' : 'Google Maps API Key Required for Live Map Pinning'}</span>
           </div>
-          <p className="text-[11px] text-amber-700">
+          <p className="text-sm text-amber-700">
             {language === 'th' 
               ? 'คุณยังไม่ได้เปิดใช้ Google Maps API Key หรือยังไม่ได้กำหนดในระบบ Secrets เพื่อให้แผนที่ Google Maps จริงทำงาน กรุณาเพิ่มคีย์ตามขั้นตอนดังนี้:'
               : 'The real-time Google Maps widget and Place Autocomplete require a valid Google Maps Platform Key to load. Follow these steps:'}
           </p>
-          <ol className="list-decimal pl-4 space-y-1 text-[11px] text-amber-800 font-medium">
+          <ol className="list-decimal pl-4 space-y-1 text-sm text-amber-800 font-medium">
             <li>
               <a href="https://console.cloud.google.com/google/maps-apis/start?utm_campaign=gmp-code-assist-ais" target="_blank" rel="noopener" className="underline text-blue-600 font-bold">
                 {language === 'th' ? 'คลิกที่นี่เพื่อรับ API Key ฟรี' : 'Get a Google Maps API Key'}
@@ -137,7 +137,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
                 : 'Create a secret named GOOGLE_MAPS_PLATFORM_KEY and paste your key.'}
             </li>
           </ol>
-          <p className="text-[10px] text-amber-600 font-semibold bg-white/60 p-1.5 rounded border border-amber-200/50">
+          <p className="text-sm text-amber-600 font-semibold bg-white/60 p-1.5 rounded border border-amber-200/50">
             {language === 'th'
               ? '💡 ตอนนี้ระบบเปิดใช้งาน โหมดสาธิตแบบจำลองแผนที่ (Mock Map Sandbox) ให้คุณทดสอบการส่งพิกัดและคำนวณค่าส่ง Lalamove ได้ทันที!'
               : '💡 Sandbox Mode is active! You can pick simulation landmarks or drop mock pins to calculate estimated Lalamove rates now.'}
@@ -149,7 +149,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
       <div className="relative">
         {hasValidKey ? (
           // REAL GOOGLE MAP
-          <div className="w-full h-[240px] rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50">
+          <div className="w-full h-[350px] rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50">
             <APIProvider apiKey={apiKey} version="weekly">
               <MapInstance 
                 lat={lat} 
@@ -163,12 +163,12 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
           </div>
         ) : (
           // MOCK Sandbox Map
-          <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-sky-50 relative p-4 flex flex-col justify-between h-[240px] bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
+          <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-sky-50 relative p-4 flex flex-col justify-between h-[350px] bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
             {/* Simulation Shop Center Indicator */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
               <div className="w-4 h-4 bg-red-600 animate-ping rounded-full absolute"></div>
-              <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-white border-2 border-white shadow-md z-10 font-bold text-[10px]">🍕</div>
-              <span className="text-[10px] bg-brand-900 text-white font-extrabold px-2 py-0.5 rounded shadow mt-1 whitespace-nowrap">Pizza Damac (Shop)</span>
+              <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-white border-2 border-white shadow-md z-10 font-bold text-sm">🍕</div>
+              <span className="text-sm bg-brand-900 text-white font-extrabold px-2 py-0.5 rounded shadow mt-1 whitespace-nowrap">Pizza Damac (Shop)</span>
             </div>
 
             {/* Simulation Destination Marker */}
@@ -180,7 +180,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
               }}
             >
               <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white border-2 border-white shadow-md z-10 font-bold text-xs">📍</div>
-              <span className="text-[10px] bg-emerald-900 text-white font-extrabold px-1.5 py-0.5 rounded shadow mt-1 max-w-[120px] truncate">
+              <span className="text-sm bg-emerald-900 text-white font-extrabold px-1.5 py-0.5 rounded shadow mt-1 max-w-[120px] truncate">
                 {language === 'th' ? 'จุดส่งสินค้า' : 'Dropoff'}
               </span>
             </div>
@@ -193,14 +193,14 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
             </div>
 
             <div className="z-10 bg-white/95 backdrop-blur-sm border border-gray-200/50 p-2 rounded-lg max-w-full shadow-sm">
-              <p className="text-[10px] font-extrabold text-gray-500 uppercase">{language === 'th' ? 'จำลองค้นหาพิกัด / เลือกสถานที่จัดส่งหลัก' : 'Mock Search / Select Location'}</p>
-              <div className="grid grid-cols-2 gap-1.5 mt-1.5 max-h-[100px] overflow-y-auto pr-1">
+              <p className="text-sm font-extrabold text-gray-500 uppercase">{language === 'th' ? 'จำลองค้นหาพิกัด / เลือกสถานที่จัดส่งหลัก' : 'Mock Search / Select Location'}</p>
+              <div className="grid grid-cols-2 gap-1.5 mt-1.5 max-h-[160px] overflow-y-auto pr-1">
                 {MOCK_DESTINATIONS.map((dest) => (
                   <button
                     key={dest.name}
                     type="button"
                     onClick={() => handleSelectMockDestination(dest)}
-                    className="p-1 px-1.5 rounded bg-gray-50 border border-gray-200 hover:bg-emerald-50 hover:border-emerald-300 text-left text-[10px] font-semibold text-gray-700 truncate"
+                    className="p-1 px-1.5 rounded bg-gray-50 border border-gray-200 hover:bg-emerald-50 hover:border-emerald-300 text-left text-sm font-semibold text-gray-700 truncate"
                   >
                     🚀 {dest.name}
                   </button>
@@ -209,10 +209,10 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
             </div>
 
             <div className="z-10 flex justify-between items-end">
-              <div className="bg-emerald-900 text-white rounded px-2 py-1 text-[10px] font-extrabold shadow flex items-center gap-1">
+              <div className="bg-emerald-900 text-white rounded px-2 py-1 text-sm font-extrabold shadow flex items-center gap-1">
                 <span>⚡ {estimatedDistance.toFixed(2)} km</span>
               </div>
-              <div className="bg-white px-2 py-1 rounded text-[10px] text-gray-500 border border-gray-200 max-w-[150px] truncate shadow-sm">
+              <div className="bg-white px-2 py-1 rounded text-sm text-gray-500 border border-gray-200 max-w-[150px] truncate shadow-sm">
                 📌 {resolvedAddress || 'Bangkok, Thailand'}
               </div>
             </div>
@@ -241,11 +241,11 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
       {estimatedDistance > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2.5 animate-fade-in">
           <div className="flex justify-between items-center border-b border-gray-200/80 pb-1.5">
-            <span className="text-[11px] font-extrabold text-orange-600 flex items-center gap-1 uppercase">
+            <span className="text-sm font-extrabold text-orange-600 flex items-center gap-1 uppercase">
               <Truck size={14} />
               {language === 'th' ? 'ประมาณการค่าส่งลาร่ามูฟ (Lalamove Estimations)' : 'Lalamove Delivery Quotes'}
             </span>
-            <span className="text-[10px] text-gray-400 font-bold bg-white border border-gray-200 px-1.5 py-0.5 rounded">
+            <span className="text-sm text-gray-400 font-bold bg-white border border-gray-200 px-1.5 py-0.5 rounded">
               {estimatedDistance.toFixed(2)} km
             </span>
           </div>
@@ -261,10 +261,10 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
                     {quote.vehicleType === 'motorcycle' ? '🛵' : quote.vehicleType === 'car' ? '🚗' : '🚚'}
                   </span>
                   <div>
-                    <div className="text-[11px] font-extrabold text-gray-800">
+                    <div className="text-sm font-extrabold text-gray-800">
                       {language === 'th' ? quote.vehicleNameTh : quote.vehicleName}
                     </div>
-                    <div className="text-[9px] text-gray-400 font-semibold">
+                    <div className="text-xs text-gray-400 font-semibold">
                       {language === 'th' ? `ระยะเวลาประมาณ ${quote.etaMinutes} นาที` : `ETA: ~${quote.etaMinutes} mins`}
                     </div>
                   </div>
@@ -274,7 +274,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
                   <div className="text-xs font-extrabold text-orange-600">
                     ฿{quote.totalFare}
                   </div>
-                  <div className="text-[8px] text-gray-400 font-semibold">
+                  <div className="text-xs text-gray-400 font-semibold">
                     {language === 'th' ? `เริ่มต้น ฿${quote.baseFare}` : `Base ฿${quote.baseFare}`}
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
             ))}
           </div>
 
-          <div className="text-[9px] text-gray-400 leading-normal bg-orange-50/50 p-2 rounded border border-orange-100/30 flex items-start gap-1">
+          <div className="text-xs text-gray-400 leading-normal bg-orange-50/50 p-2 rounded border border-orange-100/30 flex items-start gap-1">
             <InfoIcon size={10} className="shrink-0 mt-0.5 text-orange-400" />
             <span>
               {language === 'th'

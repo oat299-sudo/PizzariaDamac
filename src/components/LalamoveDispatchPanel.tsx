@@ -105,13 +105,13 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
   const status = order.lalamoveStatus || 'none';
 
   return (
-    <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-3 mt-3 shadow-xs space-y-3 animate-fade-in text-xs">
+    <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-3 mt-3 shadow-xs space-y-3 animate-fade-in text-sm">
       <div className="flex justify-between items-center border-b border-orange-200/50 pb-2">
         <span className="font-extrabold text-orange-700 flex items-center gap-1">
           <Truck size={14} className="animate-pulse" />
           {language === 'th' ? 'Lalamove Delivery Dispatch' : 'Lalamove Dispatch Hub'}
         </span>
-        <span className="text-[10px] bg-white border border-orange-200 text-orange-600 px-2 py-0.5 rounded font-bold">
+        <span className="text-sm bg-white border border-orange-200 text-orange-600 px-2 py-0.5 rounded font-bold">
           {distance.toFixed(2)} km
         </span>
       </div>
@@ -119,7 +119,7 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
       {status === 'none' ? (
         // QUOTE AND BOOKING VIEW
         <div className="space-y-2.5">
-          <p className="font-bold text-gray-500 uppercase text-[10px]">
+          <p className="font-bold text-gray-500 uppercase text-sm">
             {language === 'th' ? 'เลือกประเภทรถเพื่อคำนวณราคาและเรียกไรเดอร์' : 'Select vehicle to book:'}
           </p>
 
@@ -136,17 +136,17 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
                     {q.vehicleType === 'motorcycle' ? '🛵' : q.vehicleType === 'car' ? '🚗' : '🚚'}
                   </span>
                   <div>
-                    <div className="font-bold text-gray-800 text-[11px]">
+                    <div className="font-bold text-gray-800 text-sm">
                       {language === 'th' ? q.vehicleNameTh : q.vehicleName}
                     </div>
-                    <div className="text-[9px] text-gray-400 font-semibold">
+                    <div className="text-xs text-gray-400 font-semibold">
                       {language === 'th' ? `ระยะเวลาประมาณ ${q.etaMinutes} นาที` : `ETA: ~${q.etaMinutes} mins`}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-orange-600 text-xs">฿{q.totalFare}</div>
-                  <div className="text-[8px] text-gray-400 font-semibold">Lalamove rate</div>
+                  <div className="text-xs text-gray-400 font-semibold">Lalamove rate</div>
                 </div>
               </button>
             ))}
@@ -172,10 +172,10 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
           {/* Status Stepper */}
           <div className="bg-white rounded-lg p-2.5 border border-orange-200/50 space-y-2">
             <div className="flex justify-between items-center">
-              <span className="font-extrabold text-[10px] text-gray-400 uppercase">
+              <span className="font-extrabold text-sm text-gray-400 uppercase">
                 {language === 'th' ? 'สถานะจัดส่ง' : 'Dispatch Status'}
               </span>
-              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+              <span className={`px-2 py-0.5 rounded text-sm font-extrabold uppercase ${
                 status === 'assigned' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                 status === 'picking_up' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                 status === 'in_transit' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
@@ -192,23 +192,23 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
             <div className="relative pt-1">
               <div className="flex mb-2 items-center justify-between">
                 <div className="flex flex-col items-center">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${status !== 'none' ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
-                  <span className="text-[9px] font-bold mt-1 text-gray-500">{language === 'th' ? 'จับคู่' : 'Match'}</span>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold ${status !== 'none' ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>1</div>
+                  <span className="text-xs font-bold mt-1 text-gray-500">{language === 'th' ? 'จับคู่' : 'Match'}</span>
                 </div>
                 <div className="flex-1 border-t-2 border-dashed border-gray-200 mx-1"></div>
                 <div className="flex flex-col items-center">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${['picking_up', 'in_transit', 'completed'].includes(status) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
-                  <span className="text-[9px] font-bold mt-1 text-gray-500">{language === 'th' ? 'รับอาหาร' : 'Pickup'}</span>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold ${['picking_up', 'in_transit', 'completed'].includes(status) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div>
+                  <span className="text-xs font-bold mt-1 text-gray-500">{language === 'th' ? 'รับอาหาร' : 'Pickup'}</span>
                 </div>
                 <div className="flex-1 border-t-2 border-dashed border-gray-200 mx-1"></div>
                 <div className="flex flex-col items-center">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${['in_transit', 'completed'].includes(status) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>3</div>
-                  <span className="text-[9px] font-bold mt-1 text-gray-500">{language === 'th' ? 'นำส่ง' : 'Transit'}</span>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold ${['in_transit', 'completed'].includes(status) ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>3</div>
+                  <span className="text-xs font-bold mt-1 text-gray-500">{language === 'th' ? 'นำส่ง' : 'Transit'}</span>
                 </div>
                 <div className="flex-1 border-t-2 border-dashed border-gray-200 mx-1"></div>
                 <div className="flex flex-col items-center">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>4</div>
-                  <span className="text-[9px] font-bold mt-1 text-gray-500">{language === 'th' ? 'ส่งแล้ว' : 'Arrived'}</span>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold ${status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>4</div>
+                  <span className="text-xs font-bold mt-1 text-gray-500">{language === 'th' ? 'ส่งแล้ว' : 'Arrived'}</span>
                 </div>
               </div>
             </div>
@@ -217,8 +217,8 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
           {/* Rider Info Card */}
           <div className="bg-white rounded-lg p-3 border border-orange-200/50 space-y-2">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase">{language === 'th' ? 'ข้อมูลไรเดอร์' : 'Rider Details'}</span>
-              <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+              <span className="text-sm font-bold text-gray-400 uppercase">{language === 'th' ? 'ข้อมูลไรเดอร์' : 'Rider Details'}</span>
+              <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
                 ID: {order.lalamoveTrackingId}
               </span>
             </div>
@@ -250,7 +250,7 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
             <button
               type="button"
               onClick={handleCancelBooking}
-              className="flex-1 py-1.5 rounded bg-white text-red-600 border border-red-200 hover:bg-red-50 text-[11px] font-bold shadow-sm transition active:scale-95"
+              className="flex-1 py-1.5 rounded bg-white text-red-600 border border-red-200 hover:bg-red-50 text-sm font-bold shadow-sm transition active:scale-95"
             >
               {language === 'th' ? 'ยกเลิกการเรียก' : 'Cancel Lalamove'}
             </button>
