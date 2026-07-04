@@ -94,7 +94,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
         <button
           type="button"
           onClick={() => setShowKeyHelp(!showKeyHelp)}
-          className="text-xs text-brand-600 hover:text-brand-800 flex items-center gap-1 font-semibold"
+          className="hidden text-xs text-brand-600 hover:text-brand-800 flex items-center gap-1 font-semibold"
         >
           <HelpCircle size={14} />
           {language === 'th' ? 'คู่มือแผนที่กูเกิล' : 'Google Map Setup'}
@@ -102,7 +102,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
       </div>
 
       {/* Google Map Key Setup Help Box */}
-      {(showKeyHelp || !hasValidKey) && (
+      {false && (
         <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-lg text-xs leading-relaxed text-amber-800 animate-fade-in space-y-2">
           <div className="flex items-center gap-1.5 font-bold text-amber-900">
             <AlertTriangle size={15} className="text-amber-600" />
