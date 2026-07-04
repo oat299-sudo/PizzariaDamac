@@ -7,6 +7,8 @@ import { ShoppingCart, Plus, Minus, Trash2, X, User, ChefHat, Sparkles, MapPin, 
 import { calculateDistanceKm, reverseGeocode } from '../utils/geo';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { generatePromptPayPayload } from '../utils/promptpay';
+import DeliveryMap from '../src/components/DeliveryMap';
+import { getLalamoveQuote } from '../services/lalamoveService';
 
 // ... (VideoCard Component remains unchanged) ...
 const VideoCard: React.FC<{ url: string; key?: string }> = ({ url }) => {
@@ -409,11 +411,9 @@ export const CustomerView: React.FC = () => {
               const d = calculateDistanceKm(storeLat, storeLng, deliveryLat, deliveryLng);
               setDeliveryDistanceKm(d);
               
-              const freeKm = 0; // Temporarily removed free delivery radius (set to 0)
-              const rateKm = storeSettings.deliveryFeePerKm ?? 10;
-              const base = storeSettings.baseDeliveryFee ?? 0;
-              
-              const calculatedFee = base + Math.ceil(d) * rateKm;
+              const quotes = getLalamoveQuote(d);
+              const mcQuote = quotes.find(q => q.vehicleType === 'motorcycle');
+              const calculatedFee = mcQuote ? mcQuote.totalFare : Math.round(33 + Math.ceil(d) * (storeSettings.deliveryFeePerKm ?? 10));
               setDeliveryFee(calculatedFee);
           }
           
@@ -2495,6 +2495,23 @@ export const CustomerView: React.FC = () => {
                                                          )}
                                                      </div>
 
+                                                     {/* 2.5 Google Interactive Map Selector */}
+                                                     <div className="pt-2">
+                                                         <DeliveryMap 
+                                                             lat={deliveryLat}
+                                                             lng={deliveryLng}
+                                                             language={language}
+                                                             onChange={(newLat, newLng, dist, addrName) => {
+                                                                 setDeliveryLat(newLat);
+                                                                 setDeliveryLng(newLng);
+                                                                 setHasMapPin(true);
+                                                                 if (!deliveryAddress) {
+                                                                     setDeliveryAddress(addrName);
+                                                                 }
+                                                             }}
+                                                         />
+                                                     </div>
+
                                                      {/* 3. Options to save address (Max 2) */}
                                                      <div className="space-y-1.5 pt-2 border-t border-brand-200/50">
                                                          <label className="text-xs font-extrabold text-gray-700 uppercase flex items-center gap-1">
@@ -3418,6 +3435,52 @@ export const CustomerView: React.FC = () => {
                                                      </div>
                                                  ))}
                                              </div>
+
+                                             {/* Lalamove Real-time Customer Tracking Widget */}
+                                             {order.lalamoveStatus && order.lalamoveStatus !== 'none' && (
+                                                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3.5 space-y-2 animate-fade-in text-xs text-left">
+                                                     <div className="flex justify-between items-center pb-1.5 border-b border-orange-100">
+                                                         <span className="font-extrabold text-orange-700 flex items-center gap-1">
+                                                             Ref. 🛵 {language === 'th' ? 'ข้อมูลคนขับลาร่ามูฟ (Lalamove)' : 'Lalamove Delivery Tracker'}
+                                                         </span>
+                                                         <span className="font-mono text-[9px] bg-white border border-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-black">
+                                                             {order.lalamoveTrackingId}
+                                                         </span>
+                                                     </div>
+
+                                                     {/* Real-time status display */}
+                                                     <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-orange-100/40 font-bold">
+                                                         <span className="text-xl animate-bounce">
+                                                             {order.lalamoveStatus === 'assigned' ? '🤝' : 
+                                                              order.lalamoveStatus === 'picking_up' ? '🏭' :
+                                                              order.lalamoveStatus === 'in_transit' ? '🛣️' : '🎁'}
+                                                         </span>
+                                                         <div>
+                                                             <div className="text-gray-800 text-[11px] font-extrabold">
+                                                                 {order.lalamoveStatus === 'assigned' && (language === 'th' ? 'จับคู่ไรเดอร์สำเร็จ! กำลังเตรียมตัว' : 'Driver Found! Preparing to start')}
+                                                                 {order.lalamoveStatus === 'picking_up' && (language === 'th' ? 'ไรเดอร์กำลังเดินทางมาที่ร้าน Pizza Damac' : 'Driver is on the way to Pizza Damac')}
+                                                                 {order.lalamoveStatus === 'in_transit' && (language === 'th' ? 'ไรเดอร์ได้รับอาหารแล้ว กำลังรีบส่งไปให้คุณ!' : 'On the way! Driver is heading to your address')}
+                                                                 {order.lalamoveStatus === 'completed' && (language === 'th' ? 'สินค้าจัดส่งเรียบร้อยแล้ว ทานให้อร่อยนะครับ! 🎉' : 'Arrived! Pizza delivered successfully. Enjoy! 🎉')}
+                                                             </div>
+                                                             <div className="text-[9px] text-gray-400 mt-0.5 font-medium">
+                                                                 {order.lalamoveStatus !== 'completed' ? (language === 'th' ? 'อัพเดทสถานะล่าสุดแบบเรียลไทม์' : 'Real-time automatic transit updates') : (language === 'th' ? 'ขอบคุณที่ใช้บริการ' : 'Thank you for ordering')}
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Rider details */}
+                                                     <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600">
+                                                         <div className="bg-white/50 p-1.5 rounded border border-orange-100/30">
+                                                             <span className="text-gray-400 block text-[9px]">{language === 'th' ? 'ชื่อคนขับ' : 'Rider Name'}</span>
+                                                             <span className="text-gray-700 block">{order.lalamoveRiderName}</span>
+                                                         </div>
+                                                         <div className="bg-white/50 p-1.5 rounded border border-orange-100/30">
+                                                             <span className="text-gray-400 block text-[9px]">{language === 'th' ? 'เบอร์โทรศัพท์' : 'Rider Phone'}</span>
+                                                             <a href={`tel:${order.lalamoveRiderPhone}`} className="text-blue-600 block underline">{order.lalamoveRiderPhone}</a>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+                                             )}
                                              
                                              {/* Totals and Metadata */}
                                              <div className="flex justify-between items-end mb-3">

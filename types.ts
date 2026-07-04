@@ -124,6 +124,15 @@ export interface Order {
   discountAmount?: number;
   couponCode?: string;
   couponDiscountAmount?: number;
+
+  // Lalamove & Maps Integration
+  deliveryLat?: number;
+  deliveryLng?: number;
+  lalamoveStatus?: 'none' | 'quoting' | 'assigned' | 'picking_up' | 'in_transit' | 'completed' | 'cancelled';
+  lalamoveTrackingId?: string;
+  lalamoveRiderName?: string;
+  lalamoveRiderPhone?: string;
+  lalamoveVehicleType?: string;
 }
 
 export type CouponDiscountType = 'percentage_most_expensive' | 'fixed_discount' | 'free_delivery' | 'percentage_total';

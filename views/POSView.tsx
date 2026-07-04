@@ -5,6 +5,7 @@ import { Pizza, Topping, CartItem, ProductCategory, OrderSource, ExpenseCategory
 import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
+import LalamoveDispatchPanel from '../src/components/LalamoveDispatchPanel';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
@@ -2544,6 +2545,12 @@ export const POSView: React.FC = () => {
                                                                         </a>
                                                                     </div>
                                                                 )}
+                                                                {/* Lalamove Dispatch Panel */}
+                                                                <LalamoveDispatchPanel 
+                                                                    order={order}
+                                                                    updateOrderFields={updateOrderFields}
+                                                                    language={language}
+                                                                />
                                                             </div>
                                                         </div>
                                                     )}
