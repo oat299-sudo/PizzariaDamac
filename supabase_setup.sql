@@ -90,7 +90,14 @@ CREATE TABLE IF NOT EXISTS orders (
     pickup_time TEXT,
     table_number TEXT,
     rating INTEGER,
-    comment TEXT
+    comment TEXT,
+    delivery_lat NUMERIC,
+    delivery_lng NUMERIC,
+    lalamove_status TEXT,
+    lalamove_tracking_id TEXT,
+    lalamove_rider_name TEXT,
+    lalamove_rider_phone TEXT,
+    lalamove_vehicle_type TEXT
 );
 
 -- 6. Expenses Table

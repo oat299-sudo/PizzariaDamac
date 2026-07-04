@@ -1735,22 +1735,56 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                   return;
               }
           }
-          if (data) setOrders(data.map((d: any) => ({
-              ...d, 
-              customerName: d.customer_name, 
-              customerPhone: d.customer_phone, 
-              totalAmount: d.total_amount,
-              netAmount: d.net_amount || d.total_amount,
-              createdAt: d.created_at,
-              deliveryAddress: d.delivery_address,
-              deliveryZone: d.delivery_zone,
-              deliveryFee: d.type === 'delivery' && d.delivery_fee === null ? 'pending' : d.delivery_fee,
-              paymentMethod: d.payment_method,
-              pickupTime: d.pickup_time,
-              tableNumber: d.table_number,
-              rating: d.rating,
-              comment: d.comment
-          })));
+          if (data) setOrders(data.map((d: any) => {
+              let lalaStatus = undefined;
+              let lalaTrackingId = undefined;
+              let lalaRiderName = undefined;
+              let lalaRiderPhone = undefined;
+              let lalaVehicleType = undefined;
+              let dLat = d.delivery_lat;
+              let dLng = d.delivery_lng;
+              let dZone = d.delivery_zone;
+
+              if (d.delivery_zone && d.delivery_zone.trim().startsWith('{')) {
+                  try {
+                      const parsed = JSON.parse(d.delivery_zone);
+                      lalaStatus = parsed.lalamoveStatus;
+                      lalaTrackingId = parsed.lalamoveTrackingId;
+                      lalaRiderName = parsed.lalamoveRiderName;
+                      lalaRiderPhone = parsed.lalamoveRiderPhone;
+                      lalaVehicleType = parsed.lalamoveVehicleType;
+                      if (parsed.deliveryLat !== undefined) dLat = parsed.deliveryLat;
+                      if (parsed.deliveryLng !== undefined) dLng = parsed.deliveryLng;
+                      dZone = parsed.deliveryZone || '';
+                  } catch (e) {
+                      // fallback
+                  }
+              }
+
+              return {
+                  ...d, 
+                  customerName: d.customer_name, 
+                  customerPhone: d.customer_phone, 
+                  totalAmount: d.total_amount,
+                  netAmount: d.net_amount || d.total_amount,
+                  createdAt: d.created_at,
+                  deliveryAddress: d.delivery_address,
+                  deliveryZone: dZone,
+                  deliveryFee: d.type === 'delivery' && d.delivery_fee === null ? 'pending' : d.delivery_fee,
+                  paymentMethod: d.payment_method,
+                  pickupTime: d.pickup_time,
+                  tableNumber: d.table_number,
+                  rating: d.rating,
+                  comment: d.comment,
+                  lalamoveStatus: lalaStatus,
+                  lalamoveTrackingId: lalaTrackingId,
+                  lalamoveRiderName: lalaRiderName,
+                  lalamoveRiderPhone: lalaRiderPhone,
+                  lalamoveVehicleType: lalaVehicleType,
+                  deliveryLat: dLat,
+                  deliveryLng: dLng
+              };
+          }));
       } catch (err) { console.error("Orders fetch failed", err); }
   };
 
@@ -2650,6 +2684,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
       if (isSupabaseConfigured) {
           try {
+             // Construct delivery_zone JSON if we have delivery coordinates
+             const lalaData: any = {};
+             if (newOrder.deliveryZone) lalaData.deliveryZone = newOrder.deliveryZone;
+             if (newOrder.deliveryLat !== undefined) lalaData.deliveryLat = newOrder.deliveryLat;
+             if (newOrder.deliveryLng !== undefined) lalaData.deliveryLng = newOrder.deliveryLng;
+             if (newOrder.lalamoveStatus) lalaData.lalamoveStatus = newOrder.lalamoveStatus;
+
              const payload: any = {
                  id: newOrder.id,
                  customer_name: newOrder.customerName,
@@ -2663,7 +2704,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                  created_at: newOrder.createdAt,
                  note: newOrder.note,
                  delivery_address: newOrder.deliveryAddress,
-                 delivery_zone: newOrder.deliveryZone,
+                 delivery_zone: Object.keys(lalaData).length > 0 ? JSON.stringify(lalaData) : newOrder.deliveryZone,
                  delivery_fee: newOrder.deliveryFee === 'pending' ? null : newOrder.deliveryFee,
                  payment_method: newOrder.paymentMethod,
                  pickup_time: newOrder.pickupTime,
@@ -2915,6 +2956,9 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const updateOrderFields = async (orderId: string, fields: Partial<Order>) => {
+      const existingOrder = orders.find(o => o.id === orderId);
+      const mergedOrder = existingOrder ? { ...existingOrder, ...fields } : fields;
+
       if (isSupabaseConfigured) {
           const payload: any = {};
           if (fields.customerName !== undefined) payload.customer_name = fields.customerName;
@@ -2928,8 +2972,48 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           if (fields.createdAt !== undefined) payload.created_at = fields.createdAt;
           if (fields.note !== undefined) payload.note = fields.note;
           if (fields.deliveryAddress !== undefined) payload.delivery_address = fields.deliveryAddress;
-          if (fields.deliveryZone !== undefined) payload.delivery_zone = fields.deliveryZone;
-          if (fields.deliveryFee !== undefined) payload.delivery_fee = fields.deliveryFee === 'pending' ? null : fields.deliveryFee;
+          
+          // Construct JSON to put into delivery_zone
+          const lalaData: any = {};
+          if (mergedOrder.deliveryZone !== undefined && !String(mergedOrder.deliveryZone).trim().startsWith('{')) {
+              lalaData.deliveryZone = mergedOrder.deliveryZone;
+          } else if (existingOrder && existingOrder.deliveryZone && !String(existingOrder.deliveryZone).trim().startsWith('{')) {
+              lalaData.deliveryZone = existingOrder.deliveryZone;
+          } else if (existingOrder && existingOrder.deliveryZone && String(existingOrder.deliveryZone).trim().startsWith('{')) {
+              try {
+                  const parsed = JSON.parse(existingOrder.deliveryZone);
+                  if (parsed.deliveryZone) lalaData.deliveryZone = parsed.deliveryZone;
+              } catch (e) {}
+          }
+
+          if (mergedOrder.lalamoveStatus !== undefined) lalaData.lalamoveStatus = mergedOrder.lalamoveStatus;
+          if (mergedOrder.lalamoveTrackingId !== undefined) lalaData.lalamoveTrackingId = mergedOrder.lalamoveTrackingId;
+          if (mergedOrder.lalamoveRiderName !== undefined) lalaData.lalamoveRiderName = mergedOrder.lalamoveRiderName;
+          if (mergedOrder.lalamoveRiderPhone !== undefined) lalaData.lalamoveRiderPhone = mergedOrder.lalamoveRiderPhone;
+          if (mergedOrder.lalamoveVehicleType !== undefined) lalaData.lalamoveVehicleType = mergedOrder.lalamoveVehicleType;
+          if (mergedOrder.deliveryLat !== undefined) lalaData.deliveryLat = mergedOrder.deliveryLat;
+          if (mergedOrder.deliveryLng !== undefined) lalaData.deliveryLng = mergedOrder.deliveryLng;
+
+          if (Object.keys(lalaData).length > 0) {
+              payload.delivery_zone = JSON.stringify(lalaData);
+          } else if (fields.deliveryZone !== undefined) {
+              payload.delivery_zone = fields.deliveryZone;
+          }
+
+          if (fields.deliveryFee !== undefined) {
+              const currentFee = existingOrder && existingOrder.deliveryFee !== 'pending' ? (existingOrder.deliveryFee || 0) : 0;
+              const subtotal = existingOrder ? (existingOrder.totalAmount - currentFee) : 0;
+              const newFee = fields.deliveryFee === 'pending' ? 0 : (fields.deliveryFee || 0);
+              const newTotal = subtotal + newFee;
+              const newNet = newTotal * (1 - (GP_RATES[existingOrder?.source || 'store'] || 0));
+
+              payload.delivery_fee = fields.deliveryFee === 'pending' ? null : fields.deliveryFee;
+              payload.total_amount = newTotal;
+              payload.net_amount = newNet;
+
+              fields.totalAmount = newTotal;
+              fields.netAmount = newNet;
+          }
           if (fields.paymentMethod !== undefined) payload.payment_method = fields.paymentMethod;
           if (fields.pickupTime !== undefined) payload.pickup_time = fields.pickupTime;
           if (fields.tableNumber !== undefined) payload.table_number = fields.tableNumber;
