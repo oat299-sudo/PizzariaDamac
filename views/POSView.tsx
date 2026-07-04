@@ -552,24 +552,6 @@ export const POSView: React.FC = () => {
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
 
-    const posCalculatedDiscount = useMemo(() => {
-        if (!posPromoId) return posDiscount || 0;
-        const promo = promoCodes.find(p => p.id === posPromoId);
-        if (!promo) return posDiscount || 0;
-        
-        let d = 0;
-        if (promo.discountType === 'percentage') {
-            d = Math.round(cartTotal * (promo.discountValue / 100));
-        } else if (promo.discountType === 'fixed_order') {
-            d = Math.min(cartTotal, promo.discountValue);
-        }
-        return d;
-    }, [posPromoId, posDiscount, cartTotal, promoCodes]);
-
-    const posCheckoutTotal = useMemo(() => {
-        return selectedOrder ? selectedOrder.totalAmount : Math.max(0, cartTotal - posCalculatedDiscount);
-    }, [selectedOrder, cartTotal, posCalculatedDiscount]);
-
     // Debounced coordinate extraction & short link resolution for POS Delivery
     useEffect(() => {
         if (posOrderType !== 'delivery' || !posDeliveryAddress) {
@@ -740,6 +722,24 @@ export const POSView: React.FC = () => {
     const [taxInvoice, setTaxInvoice] = useState({ isRequested: false, companyName: '', taxId: '', address: '' });
     const [change, setChange] = useState<number>(0);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+    const posCalculatedDiscount = useMemo(() => {
+        if (!posPromoId) return posDiscount || 0;
+        const promo = promoCodes.find(p => p.id === posPromoId);
+        if (!promo) return posDiscount || 0;
+        
+        let d = 0;
+        if (promo.discountType === 'percentage') {
+            d = Math.round(cartTotal * (promo.discountValue / 100));
+        } else if (promo.discountType === 'fixed_order') {
+            d = Math.min(cartTotal, promo.discountValue);
+        }
+        return d;
+    }, [posPromoId, posDiscount, cartTotal, promoCodes]);
+
+    const posCheckoutTotal = useMemo(() => {
+        return selectedOrder ? selectedOrder.totalAmount : Math.max(0, cartTotal - posCalculatedDiscount);
+    }, [selectedOrder, cartTotal, posCalculatedDiscount]);
 
     // --- EDIT ORDER STATE ---
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
