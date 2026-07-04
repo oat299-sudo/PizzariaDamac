@@ -33,6 +33,12 @@ async function startServer() {
     }
   });
 
+  app.get("/api/config", (req, res) => {
+    res.json({
+      GOOGLE_MAPS_PLATFORM_KEY: process.env.GOOGLE_MAPS_PLATFORM_KEY || process.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || ''
+    });
+  });
+
   // --- LALAMOVE BACKEND INTEGRATION ---
   // We MUST keep the API Key and Secret on the server to prevent them from being stolen.
   app.post("/api/lalamove/quote", async (req, res) => {

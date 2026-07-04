@@ -5,14 +5,6 @@ import { calculateDistanceKm, reverseGeocode } from '../../utils/geo';
 import { getLalamoveQuote, LalamoveQuote } from '../../services/lalamoveService';
 import { RESTAURANT_LOCATION } from '../../constants';
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const hasValidKey = Boolean(API_KEY) && API_KEY.length > 5 && API_KEY !== 'YOUR_API_KEY';
-
 interface DeliveryMapProps {
   lat: number;
   lng: number;
@@ -36,6 +28,21 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
   const [estimatedDistance, setEstimatedDistance] = useState<number>(0);
   const [resolvedAddress, setResolvedAddress] = useState<string>('');
   const [showKeyHelp, setShowKeyHelp] = useState(false);
+  
+  const initialKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
+  const [apiKey, setApiKey] = useState<string>(initialKey);
+  const [hasValidKey, setHasValidKey] = useState<boolean>(Boolean(initialKey) && initialKey.length > 5 && initialKey !== 'YOUR_API_KEY');
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        const key = data.GOOGLE_MAPS_PLATFORM_KEY || (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
+        setApiKey(key);
+        setHasValidKey(Boolean(key) && key.length > 5 && key !== 'YOUR_API_KEY');
+      })
+      .catch(err => console.error("Failed to load config:", err));
+  }, []);
 
   // Sync internal quotes whenever lat/lng changes
   useEffect(() => {
@@ -143,7 +150,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
         {hasValidKey ? (
           // REAL GOOGLE MAP
           <div className="w-full h-[240px] rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50">
-            <APIProvider apiKey={API_KEY} version="weekly">
+            <APIProvider apiKey={apiKey} version="weekly">
               <MapInstance 
                 lat={lat} 
                 lng={lng} 

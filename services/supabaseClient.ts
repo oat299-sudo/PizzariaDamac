@@ -7,8 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // Ideally, these are in a .env file, but for quick setup, we can use them here.
 // It is SAFE to use the ANON key in the client-side code.
-const MANUAL_URL = "https://hecmhlzgihjatutibwca.supabase.co";
-const MANUAL_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlY21obHpnaWhqYXR1dGlid2NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTI4MTgsImV4cCI6MjA3OTcyODgxOH0.w60oUnFw3TQmQwrq4MUFKSk_CYpCUSabHpiy8jKbZF4";
+const MANUAL_URL = "";
+const MANUAL_KEY = "";
 
 let supabaseUrl = MANUAL_URL;
 let supabaseAnonKey = MANUAL_KEY;
