@@ -111,7 +111,8 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
         const realOrder = await createRealLalamoveOrder(
           selectedQuote.quotationId,
           order.customerName || 'Customer',
-          order.customerPhone || ''
+          order.customerPhone || '',
+          selectedQuote.stopIds || []
         );
         if (realOrder) {
           await updateOrderFields(order.id, {

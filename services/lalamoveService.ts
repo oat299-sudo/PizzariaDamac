@@ -10,6 +10,7 @@ export interface LalamoveQuote {
   totalFare: number;
   etaMinutes: number;
   quotationId?: string;
+  stopIds?: string[];
 }
 
 // Lalamove Thailand Pricing Rates
@@ -150,6 +151,7 @@ export async function fetchRealLalamoveQuote(
         const payload = {
           data: {
             serviceType: lalaServiceType,
+            language: "th_TH",
             stops: [
               {
                 coordinates: {
@@ -170,13 +172,7 @@ export async function fetchRealLalamoveQuote(
               quantity: "1",
               weight: "1.0",
               categories: ["FOOD_DELIVERY"],
-              deliveries: [
-                {
-                  toStopId: "1",
-                  toContactName: customerName || "Customer",
-                  toContactPhone: customerPhone || "+66890000000"
-                }
-              ]
+              handlingInstructions: ["KEEP_UPRIGHT"]
             }
           }
         };
@@ -188,6 +184,8 @@ export async function fetchRealLalamoveQuote(
         });
 
         if (!res.ok) {
+          const err = await res.text();
+          console.warn(`Lalamove API quote error for ${v}:`, err);
           return null;
         }
 
@@ -197,6 +195,7 @@ export async function fetchRealLalamoveQuote(
         const distanceMeters = parseFloat(responseData.data.distance.value);
         const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100;
         const baseFare = Math.round(parseFloat(responseData.data.priceBreakdown.base || "33"));
+        const stopIds = responseData.data.stops.map((s: any) => s.stopId);
 
         return {
           vehicleType: v,
@@ -207,7 +206,8 @@ export async function fetchRealLalamoveQuote(
           distanceFee: totalFare - baseFare,
           totalFare: totalFare,
           etaMinutes: Math.round(5 + distanceKm * 2.5),
-          quotationId: quoteId
+          quotationId: quoteId,
+          stopIds: stopIds
         };
       } catch (err) {
         console.warn(`Failed to fetch real Lalamove quote for ${v}`, err);
@@ -227,20 +227,26 @@ export async function fetchRealLalamoveQuote(
 export async function createRealLalamoveOrder(
   quotationId: string,
   customerName: string,
-  customerPhone: string
+  customerPhone: string,
+  stopIds: string[]
 ): Promise<{ orderId: string; shareLink?: string } | null> {
   try {
+    if (!stopIds || stopIds.length < 2) {
+      console.warn("Cannot create Lalamove order without valid stopIds from quotation.");
+      return null;
+    }
+
     const payload = {
       data: {
         quotationId: quotationId,
         sender: {
-          stopId: "0",
+          stopId: stopIds[0],
           name: "Pizza Damac Nonthaburi",
           phone: "+6621234567"
         },
         recipients: [
           {
-            stopId: "1",
+            stopId: stopIds[1],
             name: customerName || "Customer",
             phone: customerPhone || "+66890000000"
           }
@@ -256,7 +262,9 @@ export async function createRealLalamoveOrder(
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to place real Lalamove order`);
+      const err = await res.text();
+      console.warn("Failed to place real Lalamove order:", err);
+      return null;
     }
 
     const responseData = await res.json();
