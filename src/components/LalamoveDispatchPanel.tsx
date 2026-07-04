@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Check, ChevronRight, AlertTriangle, Play, CheckCircle2, User, Phone, Search, Loader2 } from 'lucide-react';
-import { Order, parseGPSCoordinates } from '../../types';
+import { Order, parseGPSCoordinates, parseAnyMapLink } from '../../types';
 import { getLalamoveQuote, getRandomMockRider, LalamoveQuote, fetchRealLalamoveQuote, createRealLalamoveOrder, checkLalamoveStatus } from '../../services/lalamoveService';
 import { RESTAURANT_LOCATION } from '../../constants';
 import { calculateDistanceKm } from '../../utils/geo';
+import { useStore } from '../../context/StoreContext';
 
 interface LalamoveDispatchPanelProps {
   order: Order;
@@ -12,6 +13,7 @@ interface LalamoveDispatchPanelProps {
 }
 
 export default function LalamoveDispatchPanel({ order, updateOrderFields, language }: LalamoveDispatchPanelProps) {
+  const { storeSettings } = useStore();
   const [distance, setDistance] = useState<number>(0);
   const [quotes, setQuotes] = useState<LalamoveQuote[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<'motorcycle' | 'car' | 'pickup'>('motorcycle');
@@ -46,8 +48,11 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
       }
     }
 
+    const storeGps = storeSettings?.storeLocationGps || "13.9239103,100.5220632";
+    const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
+
     const d = lat && lng 
-      ? calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, lat, lng)
+      ? calculateDistanceKm(storeCoords.lat, storeCoords.lng, lat, lng)
       : 5.0;
     
     setDistance(d);
@@ -64,6 +69,7 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
         );
         if (realQuotes && realQuotes.length > 0) {
           setQuotes(realQuotes);
+          setDistance(realQuotes[0].distanceKm);
           return;
         }
       }

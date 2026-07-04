@@ -6,6 +6,7 @@ import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
 import LalamoveDispatchPanel from '../src/components/LalamoveDispatchPanel';
+import { LalamoveSettingsCard } from '../src/components/LalamoveSettingsCard';
 import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, ChevronLeft, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift, Truck } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
@@ -546,8 +547,28 @@ export const POSView: React.FC = () => {
     const [posDeliveryLat, setPosDeliveryLat] = useState<number | null>(null);
     const [posDeliveryLng, setPosDeliveryLng] = useState<number | null>(null);
     const [posResolvingGps, setPosResolvingGps] = useState(false);
+    const [posDiscount, setPosDiscount] = useState<number>(0);
+    const [posPromoId, setPosPromoId] = useState<string>('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
+
+    const posCalculatedDiscount = useMemo(() => {
+        if (!posPromoId) return posDiscount || 0;
+        const promo = promoCodes.find(p => p.id === posPromoId);
+        if (!promo) return posDiscount || 0;
+        
+        let d = 0;
+        if (promo.discountType === 'percentage') {
+            d = Math.round(cartTotal * (promo.discountValue / 100));
+        } else if (promo.discountType === 'fixed_order') {
+            d = Math.min(cartTotal, promo.discountValue);
+        }
+        return d;
+    }, [posPromoId, posDiscount, cartTotal, promoCodes]);
+
+    const posCheckoutTotal = useMemo(() => {
+        return selectedOrder ? selectedOrder.totalAmount : Math.max(0, cartTotal - posCalculatedDiscount);
+    }, [selectedOrder, cartTotal, posCalculatedDiscount]);
 
     // Debounced coordinate extraction & short link resolution for POS Delivery
     useEffect(() => {
@@ -1034,14 +1055,14 @@ export const POSView: React.FC = () => {
 
     // Calculate Change
     useEffect(() => {
-        const total = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const total = posCheckoutTotal;
         if (paymentMethod === 'cash' && cashReceived) {
             const received = parseFloat(cashReceived);
             setChange(received - total);
         } else {
             setChange(0);
         }
-    }, [cashReceived, cartTotal, paymentMethod, selectedOrder]);
+    }, [cashReceived, posCheckoutTotal, paymentMethod, selectedOrder]);
 
     // Stable transition tracker for silent initial load & real-time auto-prints
     const sessionStartTimeRef = React.useRef(Date.now());
@@ -1091,11 +1112,11 @@ export const POSView: React.FC = () => {
     // PromptPay QR Payload Generator
     const promptPayQRUrl = useMemo(() => {
         if (paymentMethod !== 'qr_transfer') return '';
-        const amount = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const amount = posCheckoutTotal;
         const ppNumber = storeSettings.promptPayNumber || '0994979199';
         const payload = generatePromptPayPayload(ppNumber, amount);
         return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}&t=${Date.now()}`;
-    }, [paymentMethod, selectedOrder, cartTotal, storeSettings.promptPayNumber]);
+    }, [paymentMethod, selectedOrder, posCheckoutTotal, storeSettings.promptPayNumber]);
 
     // Helper Functions
     const filterByDate = (dateString: string, filter: 'day'|'month'|'year'|'all') => {
@@ -1348,6 +1369,8 @@ export const POSView: React.FC = () => {
             }
         }
 
+        const selectedPromo = promoCodes.find(p => p.id === posPromoId);
+
         const success = await placeOrder(posOrderType, {
             tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : (posOrderType === 'delivery' ? 'Delivery' : 'Walk-in')),
             source: orderSource, paymentMethod: undefined, status: 'confirmed', 
@@ -1356,6 +1379,8 @@ export const POSView: React.FC = () => {
             isPosOrder: true,
             customerPhone: posCustomerPhone,
             customerName: tableNumber || undefined, // use table/name field as customer name
+            promoCode: selectedPromo ? selectedPromo.code : undefined,
+            discountAmount: posCalculatedDiscount > 0 ? posCalculatedDiscount : undefined,
             delivery: posOrderType === 'delivery' ? {
                 address: finalDeliveryAddress,
                 zoneName: 'Standard',
@@ -1373,7 +1398,9 @@ export const POSView: React.FC = () => {
             setPosDeliveryLng(null);
             setPosOrderType('dine-in');
             setShowMobileCart(false); 
-            setOrderSource('store'); 
+            setOrderSource('store');
+            setPosPromoId('');
+            setPosDiscount(0);
             setActiveTab('tables'); 
         }
     };
@@ -1427,7 +1454,7 @@ export const POSView: React.FC = () => {
             alert("Please update the delivery fee before finalizing payment.");
             return;
         }
-        const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const currentTotal = posCheckoutTotal;
         if (paymentMethod === 'cash' && parseFloat(cashReceived || '0') < currentTotal) { alert("Insufficient cash!"); return; }
         const note = paymentMethod === 'cash' 
             ? `Cash: ${cashReceived}, Change: ${change}` 
@@ -1466,12 +1493,16 @@ export const POSView: React.FC = () => {
                 }
             }
 
+            const selectedPromo = promoCodes.find(p => p.id === posPromoId);
+
             const success = await placeOrder(posOrderType, {
                 tableNumber: tableNumber || (posOrderType === 'delivery' ? 'Delivery' : 'Walk-in'), 
                 source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef,
                 isPosOrder: true,
                 customerPhone: posCustomerPhone,
                 customerName: tableNumber || undefined,
+                promoCode: selectedPromo ? selectedPromo.code : undefined,
+                discountAmount: posCalculatedDiscount > 0 ? posCalculatedDiscount : undefined,
                 delivery: posOrderType === 'delivery' ? {
                     address: finalDeliveryAddress,
                     zoneName: 'Standard',
@@ -1496,6 +1527,8 @@ export const POSView: React.FC = () => {
                 setPosDeliveryLng(null);
                 setPosOrderType('dine-in');
                 setOrderSource('store'); 
+                setPosPromoId('');
+                setPosDiscount(0);
                 setShowMobileCart(false); 
             }
         }
@@ -1511,7 +1544,7 @@ export const POSView: React.FC = () => {
 
     const handlePrintBill = () => {
         const currentItems = selectedOrder ? selectedOrder.items : cart;
-        const currentTotal = selectedOrder ? selectedOrder.totalAmount : cartTotal;
+        const currentTotal = posCheckoutTotal;
         const tableOrType = selectedOrder ? (selectedOrder.tableNumber ? `Table ${selectedOrder.tableNumber}` : selectedOrder.type.toUpperCase()) : (tableNumber ? `Table ${tableNumber}` : 'Walk-in');
         
         // Calculate VAT (7% included if enabled) => Total * 7 / 107
@@ -2582,6 +2615,37 @@ export const POSView: React.FC = () => {
                                     </div>
                                 )}
                                 <div className="space-y-1.5 pt-1.5 border-t border-gray-100">
+                                    <div className="flex justify-between items-center text-xs font-bold text-gray-500 pb-1 border-b border-gray-50">
+                                        <span>{language === 'th' ? 'ส่วนลด / โปรโมชั่น:' : 'Discount / Promo:'}</span>
+                                        <select
+                                            value={posPromoId}
+                                            onChange={e => {
+                                                setPosPromoId(e.target.value);
+                                                if (e.target.value) setPosDiscount(0); // Clear manual discount if promo selected
+                                            }}
+                                            className="border border-brand-200 rounded-lg px-2 py-1 outline-none text-xs w-1/2 bg-white"
+                                        >
+                                            <option value="">{language === 'th' ? 'ไม่มีส่วนลด' : 'No Discount'}</option>
+                                            {promoCodes?.filter(p => p.isActive).map(p => (
+                                                <option key={p.id} value={p.id}>{p.code}</option>
+                                            ))}
+                                            <option value="manual">{language === 'th' ? 'ระบุส่วนลดเอง' : 'Manual Discount'}</option>
+                                        </select>
+                                    </div>
+                                    {posPromoId === 'manual' && (
+                                        <div className="flex justify-between items-center text-xs font-bold text-gray-500 pb-1 border-b border-gray-50">
+                                            <span>{language === 'th' ? 'ลดราคา (บาท):' : 'Discount (THB):'}</span>
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                value={posDiscount || ''} 
+                                                onChange={e => setPosDiscount(Number(e.target.value))}
+                                                className="border border-brand-200 rounded-lg px-2 py-1 outline-none text-xs w-24 text-right bg-white"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between items-center text-xs font-bold text-gray-500">
                                         <span>{language === 'th' ? 'ภาษี 7% (VAT Toggle):' : '7% VAT (VAT Toggle):'}</span>
                                         <button 
@@ -2595,17 +2659,23 @@ export const POSView: React.FC = () => {
                                         <>
                                             <div className="flex justify-between items-center text-xs text-gray-500 font-medium">
                                                 <span>{language === 'th' ? 'ก่อนภาษี (Ex. VAT)' : 'Before VAT (Ex. VAT)'}</span>
-                                                <span>฿{(cartTotal - (cartTotal * 7 / 107)).toFixed(2)}</span>
+                                                <span>฿{(Math.max(0, cartTotal - posCalculatedDiscount) - (Math.max(0, cartTotal - posCalculatedDiscount) * 7 / 107)).toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-xs text-gray-400 font-medium">
                                                 <span>{language === 'th' ? 'ภาษีมูลค่าเพิ่ม (VAT 7%)' : 'Value Added Tax (VAT 7%)'}</span>
-                                                <span>฿{(cartTotal * 7 / 107).toFixed(2)}</span>
+                                                <span>฿{(Math.max(0, cartTotal - posCalculatedDiscount) * 7 / 107).toFixed(2)}</span>
                                             </div>
                                         </>
                                     )}
+                                    {posCalculatedDiscount > 0 && (
+                                        <div className="flex justify-between items-center text-sm font-bold text-red-500">
+                                            <span>{language === 'th' ? 'ส่วนลดที่ได้รับ' : 'Discount Applied'}</span>
+                                            <span>-฿{posCalculatedDiscount}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between items-center text-2xl font-black text-gray-950 pt-1">
                                         <span>{language === 'th' ? 'รวมยอดทั้งหมด' : 'Total'}</span>
-                                        <span>฿{cartTotal}</span>
+                                        <span>฿{Math.max(0, cartTotal - posCalculatedDiscount)}</span>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -4700,6 +4770,9 @@ export const POSView: React.FC = () => {
                                 }} className="mt-4 bg-gray-800 text-white font-bold py-2 px-6 rounded-xl hover:bg-gray-900 shadow transition w-full lg:w-auto">Save Delivery Settings</button>
                             </div>
 
+                            {/* Lalamove Connection Settings */}
+                            <LalamoveSettingsCard />
+
                             {/* Store Operating Status & Holiday Settings */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mt-6">
                                 <h3 className="font-bold text-lg text-gray-800 mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
@@ -6204,11 +6277,11 @@ export const POSView: React.FC = () => {
                             <div className="border-t border-gray-250 pt-4 space-y-2 mt-4 text-xs font-bold text-gray-550 shrink-0">
                                 <div className="flex justify-between">
                                     <span>{language === 'th' ? 'ค่าอาหารและเครื่องดื่ม' : 'Subtotal'}</span>
-                                    <span>฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
+                                    <span>฿{(posCheckoutTotal).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-base font-black text-gray-800 pt-2 border-t border-gray-200">
                                     <span>{language === 'th' ? 'ยอดรวมทั้งสิ้น' : 'Total Amount'}</span>
-                                    <span>฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}</span>
+                                    <span>฿{(posCheckoutTotal).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -6229,7 +6302,7 @@ export const POSView: React.FC = () => {
                             <div className="mb-4 bg-brand-50 p-4 rounded-xl border border-brand-100 flex justify-between items-center">
                                 <span className="font-bold text-gray-655 text-xs">{language === 'th' ? 'ยอดที่ต้องชำระ:' : 'Total Due:'}</span>
                                 <span className="text-2xl font-black text-[#b91c1c]">
-                                    ฿{(selectedOrder ? selectedOrder.totalAmount : cartTotal).toLocaleString()}
+                                    ฿{(posCheckoutTotal).toLocaleString()}
                                 </span>
                             </div>
 
@@ -6284,7 +6357,7 @@ export const POSView: React.FC = () => {
                                         <div className="flex flex-wrap gap-1.5">
                                             <button 
                                                 type="button"
-                                                onClick={() => { playClickSound(); setCashReceived(String(selectedOrder ? selectedOrder.totalAmount : cartTotal)); }}
+                                                onClick={() => { playClickSound(); setCashReceived(String(posCheckoutTotal)); }}
                                                 className="px-2.5 py-1 bg-white border border-gray-200 hover:border-amber-400 text-gray-700 rounded-md text-[10px] font-bold transition shadow-sm cursor-pointer"
                                             >
                                                 Exact (พอดี)
@@ -6318,7 +6391,7 @@ export const POSView: React.FC = () => {
                                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
                                                     generatePromptPayPayload(
                                                         storeSettings.promptPayNumber || "0-9949-7919-9", 
-                                                        selectedOrder ? selectedOrder.totalAmount : cartTotal
+                                                        posCheckoutTotal
                                                     )
                                                 )}`}
                                                 alt="PromptPay QR Code" 
