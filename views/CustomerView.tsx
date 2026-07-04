@@ -112,6 +112,10 @@ export const CustomerView: React.FC = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [promoError, setPromoError] = useState('');
 
+  const storeCoords = useMemo(() => {
+    return parseAnyMapLink(storeSettings.storeLocationGps || "13.9239103,100.5220632") || { lat: 13.9239103, lng: 100.5220632 };
+  }, [storeSettings.storeLocationGps]);
+
   const handleApplyPromoCode = () => {
       setPromoError('');
       if (!promoCodeInput.trim()) {
@@ -402,8 +406,6 @@ export const CustomerView: React.FC = () => {
   useEffect(() => {
       let isMounted = true;
       if (hasMapPin && orderType === 'delivery') {
-          const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
-          const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
           const storeLat = storeCoords.lat;
           const storeLng = storeCoords.lng;
           
@@ -2500,6 +2502,8 @@ export const CustomerView: React.FC = () => {
                                                          <DeliveryMap 
                                                              lat={deliveryLat}
                                                              lng={deliveryLng}
+                                                             storeLat={storeCoords.lat}
+                                                             storeLng={storeCoords.lng}
                                                              language={language}
                                                              onChange={(newLat, newLng, dist, addrName) => {
                                                                  setDeliveryLat(newLat);

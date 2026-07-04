@@ -8,6 +8,8 @@ import { RESTAURANT_LOCATION } from '../../constants';
 interface DeliveryMapProps {
   lat: number;
   lng: number;
+  storeLat?: number;
+  storeLng?: number;
   onChange: (lat: number, lng: number, distanceKm: number, addressName: string) => void;
   language: 'en' | 'th';
 }
@@ -21,7 +23,7 @@ const MOCK_DESTINATIONS = [
   { name: 'Central Chaengwattana (เซ็นทรัล แจ้งวัฒนะ)', lat: 13.9038, lng: 100.5284, distance: 2.3 }
 ];
 
-export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMapProps) {
+export default function DeliveryMap({ lat, lng, storeLat = RESTAURANT_LOCATION.lat, storeLng = RESTAURANT_LOCATION.lng, onChange, language }: DeliveryMapProps) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [localQuotes, setLocalQuotes] = useState<LalamoveQuote[]>([]);
@@ -46,7 +48,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
 
   // Sync internal quotes whenever lat/lng changes
   useEffect(() => {
-    const dist = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, lat, lng);
+    const dist = calculateDistanceKm(storeLat, storeLng, lat, lng);
     setEstimatedDistance(dist);
     const quotes = getLalamoveQuote(dist);
     setLocalQuotes(quotes);
@@ -69,7 +71,7 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
       (pos) => {
         const userLat = pos.coords.latitude;
         const userLng = pos.coords.longitude;
-        const dist = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, userLat, userLng);
+        const dist = calculateDistanceKm(storeLat, storeLng, userLat, userLng);
         
         reverseGeocode(userLat, userLng).then(addr => {
           const addrName = addr || `GPS Pin: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
@@ -162,58 +164,31 @@ export default function DeliveryMap({ lat, lng, onChange, language }: DeliveryMa
             </APIProvider>
           </div>
         ) : (
-          // MOCK Sandbox Map
-          <div className="w-full rounded-xl border border-gray-200 overflow-hidden bg-sky-50 relative p-4 flex flex-col justify-between h-[350px] bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
-            {/* Simulation Shop Center Indicator */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-              <div className="w-4 h-4 bg-red-600 animate-ping rounded-full absolute"></div>
-              <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-white border-2 border-white shadow-md z-10 font-bold text-sm">🍕</div>
-              <span className="text-sm bg-brand-900 text-white font-extrabold px-2 py-0.5 rounded shadow mt-1 whitespace-nowrap">Pizza Damac (Shop)</span>
+          <div className="w-full flex flex-col gap-2">
+            <div className="w-full rounded-xl border border-gray-200 overflow-hidden relative h-[250px] md:h-[350px]">
+              <iframe
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                src={`https://maps.google.com/maps?q=${lat},${lng}&hl=${language === 'th' ? 'th' : 'en'}&z=14&output=embed`}
+              ></iframe>
             </div>
-
-            {/* Simulation Destination Marker */}
-            <div 
-              className="absolute flex flex-col items-center transition-all duration-300"
-              style={{
-                top: '25%',
-                right: '20%',
-              }}
-            >
-              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white border-2 border-white shadow-md z-10 font-bold text-xs">📍</div>
-              <span className="text-sm bg-emerald-900 text-white font-extrabold px-1.5 py-0.5 rounded shadow mt-1 max-w-[120px] truncate">
-                {language === 'th' ? 'จุดส่งสินค้า' : 'Dropoff'}
-              </span>
-            </div>
-
-            {/* Dotted path representing route */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <svg className="w-full h-full opacity-60">
-                <line x1="50%" y1="50%" x2="80%" y2="25%" stroke="#059669" strokeWidth="3" strokeDasharray="6,6" />
-              </svg>
-            </div>
-
-            <div className="z-10 bg-white/95 backdrop-blur-sm border border-gray-200/50 p-2 rounded-lg max-w-full shadow-sm">
-              <p className="text-sm font-extrabold text-gray-500 uppercase">{language === 'th' ? 'จำลองค้นหาพิกัด / เลือกสถานที่จัดส่งหลัก' : 'Mock Search / Select Location'}</p>
-              <div className="grid grid-cols-2 gap-1.5 mt-1.5 max-h-[160px] overflow-y-auto pr-1">
+            
+            <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
+              <p className="text-xs font-extrabold text-gray-500 uppercase mb-2">{language === 'th' ? 'จำลองสถานที่จัดส่ง (ไม่มี API Key)' : 'Mock Locations (No API Key)'}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto">
                 {MOCK_DESTINATIONS.map((dest) => (
                   <button
                     key={dest.name}
                     type="button"
                     onClick={() => handleSelectMockDestination(dest)}
-                    className="p-1 px-1.5 rounded bg-gray-50 border border-gray-200 hover:bg-emerald-50 hover:border-emerald-300 text-left text-sm font-semibold text-gray-700 truncate"
+                    className="p-2 rounded bg-white border border-gray-200 hover:bg-emerald-50 hover:border-emerald-300 text-left text-xs font-semibold text-gray-700 truncate shadow-sm transition"
                   >
-                    🚀 {dest.name}
+                    📍 {dest.name}
                   </button>
                 ))}
-              </div>
-            </div>
-
-            <div className="z-10 flex justify-between items-end">
-              <div className="bg-emerald-900 text-white rounded px-2 py-1 text-sm font-extrabold shadow flex items-center gap-1">
-                <span>⚡ {estimatedDistance.toFixed(2)} km</span>
-              </div>
-              <div className="bg-white px-2 py-1 rounded text-sm text-gray-500 border border-gray-200 max-w-[150px] truncate shadow-sm">
-                📌 {resolvedAddress || 'Bangkok, Thailand'}
               </div>
             </div>
           </div>
@@ -309,7 +284,7 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
     // Clear previous polylines
     polylinesRef.current.forEach(p => p.setMap(null));
 
-    const origin = { lat: RESTAURANT_LOCATION.lat, lng: RESTAURANT_LOCATION.lng };
+    const origin = { lat: storeLat, lng: storeLng };
     const destination = { lat, lng };
 
     routesLib.Route.computeRoutes({
@@ -343,7 +318,7 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
     if (e.latLng) {
       const clickLat = e.latLng.lat();
       const clickLng = e.latLng.lng();
-      const dist = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, clickLat, clickLng);
+      const dist = calculateDistanceKm(storeLat, storeLng, clickLat, clickLng);
       
       reverseGeocode(clickLat, clickLng).then(addr => {
         onChange(clickLat, clickLng, dist, addr || `Coordinate Pin: ${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}`);
@@ -361,8 +336,8 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
       style={{ width: '100%', height: '100%' }}
     >
       {/* Pizza Store Location Marker */}
-      <AdvancedMarker position={{ lat: RESTAURANT_LOCATION.lat, lng: RESTAURANT_LOCATION.lng }} title="Pizza Damac (Store)">
-        <Pin background="#ea580c" glyphColor="#fff" borderColor="#c2410c" scale={1.2} />
+      <AdvancedMarker position={{ lat: storeLat, lng: storeLng }} title="Pizza Damac (Store)">
+        <Pin background="#ea580c" glyphColor="#fff" borderColor="#c2410c" scale={1.2}>🍕</Pin>
       </AdvancedMarker>
 
       {/* Customer Delivery Pin */}
@@ -373,16 +348,14 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
           if (e.latLng) {
             const dragLat = e.latLng.lat();
             const dragLng = e.latLng.lng();
-            const dist = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, dragLat, dragLng);
+            const dist = calculateDistanceKm(storeLat, storeLng, dragLat, dragLng);
             reverseGeocode(dragLat, dragLng).then(addr => {
               onChange(dragLat, dragLng, dist, addr || `Dragged Pin: ${dragLat.toFixed(5)}, ${dragLng.toFixed(5)}`);
             });
           }
         }}
         title="Delivery Destination"
-      >
-        <Pin background="#059669" glyphColor="#fff" borderColor="#047857" scale={1.2} />
-      </AdvancedMarker>
+      />
     </Map>
   );
 }
