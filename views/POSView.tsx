@@ -6,7 +6,7 @@ import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
 import LalamoveDispatchPanel from '../src/components/LalamoveDispatchPanel';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift, Truck } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -540,6 +540,9 @@ export const POSView: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [tableNumber, setTableNumber] = useState('');
     const [deliveryPlatformRef, setDeliveryPlatformRef] = useState('');
+    const [posOrderType, setPosOrderType] = useState<OrderType>('dine-in');
+    const [posDeliveryAddress, setPosDeliveryAddress] = useState('');
+    const [posCustomerPhone, setPosCustomerPhone] = useState('');
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
 
@@ -1265,16 +1268,51 @@ export const POSView: React.FC = () => {
 
     // POS Order Logic
     const handleSendToKitchen = async () => {
-        if (!tableNumber && orderSource === 'store') { alert("Please enter a Table Number for store orders."); return; }
+        if (!tableNumber && posOrderType === 'dine-in' && orderSource === 'store') { alert("Please enter a Table Number for store orders."); return; }
+        if (posOrderType === 'delivery' && !posDeliveryAddress) { alert("Please enter a delivery address."); return; }
         playSuccessFeedback();
-        const success = await placeOrder('dine-in', {
-            tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : 'Walk-in'),
+
+        let finalDeliveryAddress = posDeliveryAddress;
+        if (posOrderType === 'delivery') {
+            if (posCustomerPhone && !finalDeliveryAddress.includes('[Phone:')) {
+                finalDeliveryAddress += ` [Phone: ${posCustomerPhone}]`;
+            }
+            // Just let `parseAnyMapLink` in `types.ts` pick up raw Google Maps links.
+            if (finalDeliveryAddress.includes('maps') || finalDeliveryAddress.includes('goo.gl')) {
+                if (!finalDeliveryAddress.includes('[Google Maps Link:')) {
+                    // Extract the link and wrap it
+                    const linkMatch = finalDeliveryAddress.match(/(https?:\/\/[^\s]+)/);
+                    if (linkMatch) {
+                        finalDeliveryAddress += ` [Google Maps Link: ${linkMatch[1]}]`;
+                    }
+                }
+            }
+        }
+
+        const success = await placeOrder(posOrderType, {
+            tableNumber: tableNumber || (orderSource !== 'store' ? orderSource.toUpperCase() : (posOrderType === 'delivery' ? 'Delivery' : 'Walk-in')),
             source: orderSource, paymentMethod: undefined, status: 'confirmed', 
             note: orderSource === 'store' ? 'Pay Later' : `${orderSource.toUpperCase()} Order`,
             deliveryPlatformRef: deliveryPlatformRef,
-            isPosOrder: true
+            isPosOrder: true,
+            customerPhone: posCustomerPhone,
+            customerName: tableNumber || undefined, // use table/name field as customer name
+            delivery: posOrderType === 'delivery' ? {
+                address: finalDeliveryAddress,
+                zoneName: 'Standard',
+                fee: 'pending'
+            } : undefined
         });
-        if (success) { setTableNumber(''); setDeliveryPlatformRef(''); setShowMobileCart(false); setOrderSource('store'); setActiveTab('tables'); }
+        if (success) { 
+            setTableNumber(''); 
+            setDeliveryPlatformRef(''); 
+            setPosCustomerPhone('');
+            setPosDeliveryAddress('');
+            setPosOrderType('dine-in');
+            setShowMobileCart(false); 
+            setOrderSource('store'); 
+            setActiveTab('tables'); 
+        }
     };
 
     const handleCheckBill = () => {
@@ -1346,9 +1384,33 @@ export const POSView: React.FC = () => {
             );
         } else {
             playSuccessFeedback();
-            const success = await placeOrder('dine-in', {
-                tableNumber: tableNumber || 'Walk-in', source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef,
-                isPosOrder: true
+
+            let finalDeliveryAddress = posDeliveryAddress;
+            if (posOrderType === 'delivery') {
+                if (posCustomerPhone && !finalDeliveryAddress.includes('[Phone:')) {
+                    finalDeliveryAddress += ` [Phone: ${posCustomerPhone}]`;
+                }
+                if (finalDeliveryAddress.includes('maps') || finalDeliveryAddress.includes('goo.gl')) {
+                    if (!finalDeliveryAddress.includes('[Google Maps Link:')) {
+                        const linkMatch = finalDeliveryAddress.match(/(https?:\/\/[^\s]+)/);
+                        if (linkMatch) {
+                            finalDeliveryAddress += ` [Google Maps Link: ${linkMatch[1]}]`;
+                        }
+                    }
+                }
+            }
+
+            const success = await placeOrder(posOrderType, {
+                tableNumber: tableNumber || (posOrderType === 'delivery' ? 'Delivery' : 'Walk-in'), 
+                source: orderSource, paymentMethod: paymentMethod, status: 'completed', note: note, deliveryPlatformRef: deliveryPlatformRef,
+                isPosOrder: true,
+                customerPhone: posCustomerPhone,
+                customerName: tableNumber || undefined,
+                delivery: posOrderType === 'delivery' ? {
+                    address: finalDeliveryAddress,
+                    zoneName: 'Standard',
+                    fee: 'pending'
+                } : undefined
             });
             if (success) { 
                 alert(
@@ -1360,6 +1422,9 @@ export const POSView: React.FC = () => {
                 ); 
                 setTableNumber(''); 
                 setDeliveryPlatformRef(''); 
+                setPosCustomerPhone('');
+                setPosDeliveryAddress('');
+                setPosOrderType('dine-in');
                 setOrderSource('store'); 
                 setShowMobileCart(false); 
             }
@@ -2341,19 +2406,26 @@ export const POSView: React.FC = () => {
                             </div>
                             <div className="p-4 bg-white border-t space-y-3 pb-24 lg:pb-4">
                                 <div className="grid grid-cols-2 gap-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder={language === 'th' ? 'เลขโต๊ะ / ชื่อลูกค้า' : 'Table No. / Name'} 
+                                    <select 
                                         className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" 
-                                        value={tableNumber} 
-                                        onChange={e => setTableNumber(e.target.value)}
-                                    />
+                                        value={posOrderType} 
+                                        onChange={e => {
+                                            const v = e.target.value as OrderType;
+                                            setPosOrderType(v);
+                                            if (v === 'delivery' && orderSource === 'store') {
+                                                // Delivery requires a phone and address, handled below
+                                            }
+                                        }}
+                                    >
+                                        <option value="dine-in">{language === 'th' ? 'ทานในร้าน/รับกลับ' : 'Dine-In/Takeaway'}</option>
+                                        <option value="delivery">{language === 'th' ? 'เดลิเวอรี่ (ส่งถึงที่)' : 'Delivery'}</option>
+                                    </select>
                                     <select 
                                         className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" 
                                         value={orderSource} 
                                         onChange={e => setOrderSource(e.target.value as OrderSource)}
                                     >
-                                        <option value="store">{language === 'th' ? 'ทานในร้าน (In-Store)' : 'In-Store'}</option>
+                                        <option value="store">{language === 'th' ? 'สั่งตรงกับร้าน (Store)' : 'Store Direct'}</option>
                                         <option value="grab">Grab</option>
                                         <option value="lineman">Lineman</option>
                                         <option value="robinhood">Robinhood</option>
@@ -2362,6 +2434,35 @@ export const POSView: React.FC = () => {
                                         <option value="other">{language === 'th' ? 'อื่นๆ (Other)' : 'Other / อื่นๆ'}</option>
                                     </select>
                                 </div>
+                                <div className="w-full">
+                                    <input 
+                                        type="text" 
+                                        placeholder={language === 'th' ? 'ชื่อลูกค้า / โต๊ะ' : 'Customer Name / Table No.'} 
+                                        className="border-2 border-gray-200 rounded-xl px-4 py-3 text-base font-bold focus:border-brand-500 outline-none w-full" 
+                                        value={tableNumber} 
+                                        onChange={e => setTableNumber(e.target.value)}
+                                    />
+                                </div>
+                                
+                                {posOrderType === 'delivery' && (
+                                    <div className="space-y-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                                        <h4 className="text-sm font-bold text-blue-800 flex items-center gap-1"><Truck size={14} /> {language === 'th' ? 'ข้อมูลจัดส่ง' : 'Delivery Details'}</h4>
+                                        <input 
+                                            type="tel" 
+                                            placeholder={language === 'th' ? 'เบอร์โทรศัพท์ลูกค้า' : 'Customer Phone'} 
+                                            className="border-2 border-blue-200 rounded-xl px-4 py-2.5 text-base font-bold focus:border-blue-500 outline-none w-full bg-white" 
+                                            value={posCustomerPhone} 
+                                            onChange={e => setPosCustomerPhone(e.target.value)}
+                                        />
+                                        <textarea 
+                                            placeholder={language === 'th' ? 'ที่อยู่จัดส่ง / ลิงก์ Google Maps' : 'Delivery Address / Map Link'} 
+                                            className="border-2 border-blue-200 rounded-xl px-4 py-2.5 text-base font-bold focus:border-blue-500 outline-none w-full bg-white min-h-[80px]" 
+                                            value={posDeliveryAddress} 
+                                            onChange={e => setPosDeliveryAddress(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+
                                 {orderSource !== 'store' && (
                                     <div className="w-full">
                                         <input 

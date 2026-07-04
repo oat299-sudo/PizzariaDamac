@@ -930,7 +930,9 @@ export const CustomerView: React.FC = () => {
         delivery: orderType === 'delivery' ? {
             address: finalDeliveryAddress,
             zoneName: deliveryLocationName || 'Standard',
-            fee: 'pending' // As per requirement: force staff to confirm fee
+            fee: 'pending', // As per requirement: force staff to confirm fee
+            lat: deliveryLat,
+            lng: deliveryLng
         } : undefined,
         paymentMethod: paymentMethod,
         pickupTime: asapOrder ? 'ASAP' : `Pre-order: ${orderDate === 'today' ? 'Today' : 'Tomorrow'} ${pickupTime || 'asap'}`,

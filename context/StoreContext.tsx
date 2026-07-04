@@ -66,7 +66,7 @@ interface StoreContextType {
     type: OrderType, 
     details?: {
       note?: string;
-      delivery?: { address: string; zoneName: string; fee: number | 'pending' };
+      delivery?: { address: string; zoneName: string; fee: number | 'pending'; lat?: number; lng?: number; };
       paymentMethod?: PaymentMethod;
       pickupTime?: string;
       tableNumber?: string;
@@ -2421,7 +2421,7 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     type: OrderType, 
     details?: {
       note?: string;
-      delivery?: { address: string; zoneName: string; fee: number | 'pending' };
+      delivery?: { address: string; zoneName: string; fee: number | 'pending'; lat?: number; lng?: number; };
       paymentMethod?: PaymentMethod;
       pickupTime?: string;
       tableNumber?: string;
@@ -2634,6 +2634,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           deliveryAddress: details?.delivery?.address,
           deliveryZone: details?.delivery?.zoneName,
           deliveryFee: details?.delivery?.fee,
+          deliveryLat: details?.delivery?.lat,
+          deliveryLng: details?.delivery?.lng,
           paymentMethod: details?.paymentMethod,
           pickupTime: details?.pickupTime,
           tableNumber: details?.tableNumber,
