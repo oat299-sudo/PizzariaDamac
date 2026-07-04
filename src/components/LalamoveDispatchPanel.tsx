@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Check, ChevronRight, AlertTriangle, Play, CheckCircle2, User, Phone, Search, Loader2 } from 'lucide-react';
 import { Order, parseGPSCoordinates } from '../../types';
-import { getLalamoveQuote, getRandomMockRider, LalamoveQuote } from '../../services/lalamoveService';
+import { getLalamoveQuote, getRandomMockRider, LalamoveQuote, fetchRealLalamoveQuote, createRealLalamoveOrder, checkLalamoveStatus } from '../../services/lalamoveService';
 import { RESTAURANT_LOCATION } from '../../constants';
 import { calculateDistanceKm } from '../../utils/geo';
 
@@ -16,6 +16,22 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
   const [quotes, setQuotes] = useState<LalamoveQuote[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<'motorcycle' | 'car' | 'pickup'>('motorcycle');
   const [isBooking, setIsBooking] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [apiMessage, setApiMessage] = useState<string>('');
+
+  // Check Lalamove API status on mount
+  useEffect(() => {
+    let active = true;
+    const fetchStatus = async () => {
+      const res = await checkLalamoveStatus();
+      if (active) {
+        setApiStatus(res.status);
+        setApiMessage(res.message);
+      }
+    };
+    fetchStatus();
+    return () => { active = false; };
+  }, []);
 
   // Extract coordinates and compute distance
   useEffect(() => {
@@ -30,16 +46,33 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
       }
     }
 
-    if (lat && lng) {
-      const d = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, lat, lng);
-      setDistance(d);
+    const d = lat && lng 
+      ? calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, lat, lng)
+      : 5.0;
+    
+    setDistance(d);
+
+    // Fetch real Lalamove quotes if coordinates exist, fallback to simulation
+    const loadQuotes = async () => {
+      if (lat && lng) {
+        const realQuotes = await fetchRealLalamoveQuote(
+          lat, 
+          lng, 
+          order.deliveryAddress || '', 
+          order.customerName || 'Customer', 
+          order.customerPhone || ''
+        );
+        if (realQuotes && realQuotes.length > 0) {
+          setQuotes(realQuotes);
+          return;
+        }
+      }
+      // Fallback
       setQuotes(getLalamoveQuote(d));
-    } else {
-      // Fallback distance calculation if no coordinates, assume 5km standard
-      setDistance(5.0);
-      setQuotes(getLalamoveQuote(5.0));
-    }
-  }, [order.deliveryAddress, order.deliveryLat, order.deliveryLng]);
+    };
+
+    loadQuotes();
+  }, [order.deliveryAddress, order.deliveryLat, order.deliveryLng, order.customerName, order.customerPhone]);
 
   // Simulation effect
   useEffect(() => {
@@ -71,10 +104,32 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
   const handleDispatch = async () => {
     setIsBooking(true);
     const selectedQuote = quotes.find(q => q.vehicleType === selectedVehicle) || quotes[0];
-    const rider = getRandomMockRider();
-    const trackingId = `LALA-${Math.floor(100000000 + Math.random() * 900000000)}`;
 
     try {
+      // If the selected quote contains a real quotationId, we try to book it via real API!
+      if (selectedQuote.quotationId) {
+        const realOrder = await createRealLalamoveOrder(
+          selectedQuote.quotationId,
+          order.customerName || 'Customer',
+          order.customerPhone || ''
+        );
+        if (realOrder) {
+          await updateOrderFields(order.id, {
+            lalamoveStatus: 'assigned',
+            lalamoveTrackingId: realOrder.orderId,
+            lalamoveRiderName: 'Real Lalamove Courier',
+            lalamoveRiderPhone: 'Lalamove Helpdesk',
+            lalamoveVehicleType: selectedQuote.vehicleNameTh,
+            deliveryFee: selectedQuote.totalFare
+          });
+          return;
+        }
+      }
+
+      // Fallback simulator behavior
+      const rider = getRandomMockRider();
+      const trackingId = `LALA-${Math.floor(100000000 + Math.random() * 900000000)}`;
+
       await updateOrderFields(order.id, {
         lalamoveStatus: 'assigned',
         lalamoveTrackingId: trackingId,
@@ -111,9 +166,30 @@ export default function LalamoveDispatchPanel({ order, updateOrderFields, langua
           <Truck size={14} className="animate-pulse" />
           {language === 'th' ? 'Lalamove Delivery Dispatch' : 'Lalamove Dispatch Hub'}
         </span>
-        <span className="text-sm bg-white border border-orange-200 text-orange-600 px-2 py-0.5 rounded font-bold">
-          {distance.toFixed(2)} km
-        </span>
+        <div className="flex items-center gap-1.5">
+          {apiStatus === 'checking' ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse"></span>
+              {language === 'th' ? 'กำลังเช็ค...' : 'Checking...'}
+            </span>
+          ) : apiStatus === 'online' ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs cursor-help" title={apiMessage}>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              {language === 'th' ? 'ต่อจริง (Online)' : 'Real API (Online)'}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-700 border border-gray-300 shadow-xs cursor-help" title={apiMessage || "Lalamove keys are missing."}>
+              <span className="w-2 h-2 rounded-full bg-gray-500"></span>
+              {language === 'th' ? 'จำลอง (Offline)' : 'Simulator (Offline)'}
+            </span>
+          )}
+          <span className="text-sm bg-white border border-orange-200 text-orange-600 px-2 py-0.5 rounded font-bold">
+            {distance.toFixed(2)} km
+          </span>
+        </div>
       </div>
 
       {status === 'none' ? (

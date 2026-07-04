@@ -1,3 +1,5 @@
+import { RESTAURANT_LOCATION } from '../constants';
+
 export interface LalamoveQuote {
   vehicleType: 'motorcycle' | 'car' | 'pickup';
   vehicleName: string;
@@ -7,6 +9,7 @@ export interface LalamoveQuote {
   distanceFee: number;
   totalFare: number;
   etaMinutes: number;
+  quotationId?: string;
 }
 
 // Lalamove Thailand Pricing Rates
@@ -128,4 +131,168 @@ const MOCK_RIDERS: MockRider[] = [
 export function getRandomMockRider(): MockRider {
   const index = Math.floor(Math.random() * MOCK_RIDERS.length);
   return MOCK_RIDERS[index];
+}
+
+export async function fetchRealLalamoveQuote(
+  lat: number,
+  lng: number,
+  address: string,
+  customerName: string,
+  customerPhone: string
+): Promise<LalamoveQuote[] | null> {
+  try {
+    const vehicles: ('motorcycle' | 'car' | 'pickup')[] = ['motorcycle', 'car', 'pickup'];
+    
+    const quotePromises = vehicles.map(async (v) => {
+      try {
+        const lalaServiceType = v === 'motorcycle' ? 'MOTORCYCLE' : v === 'car' ? 'CAR' : 'PICKUP';
+        
+        const payload = {
+          data: {
+            serviceType: lalaServiceType,
+            stops: [
+              {
+                coordinates: {
+                  lat: String(RESTAURANT_LOCATION.lat),
+                  lng: String(RESTAURANT_LOCATION.lng)
+                },
+                address: "Pizza Damac Nonthaburi"
+              },
+              {
+                coordinates: {
+                  lat: String(lat),
+                  lng: String(lng)
+                },
+                address: address || "Customer Address"
+              }
+            ],
+            item: {
+              quantity: "1",
+              weight: "1.0",
+              categories: ["FOOD_DELIVERY"],
+              deliveries: [
+                {
+                  toStopId: "1",
+                  toContactName: customerName || "Customer",
+                  toContactPhone: customerPhone || "+66890000000"
+                }
+              ]
+            }
+          }
+        };
+
+        const res = await fetch('/api/lalamove/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          return null;
+        }
+
+        const responseData = await res.json();
+        const quoteId = responseData.data.quotationId;
+        const totalFare = Math.round(parseFloat(responseData.data.priceBreakdown.total));
+        const distanceMeters = parseFloat(responseData.data.distance.value);
+        const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100;
+        const baseFare = Math.round(parseFloat(responseData.data.priceBreakdown.base || "33"));
+
+        return {
+          vehicleType: v,
+          vehicleName: v === 'motorcycle' ? 'Motorcycle (Real Lalamove)' : v === 'car' ? 'Car (Real Lalamove)' : 'Pickup (Real Lalamove)',
+          vehicleNameTh: v === 'motorcycle' ? 'รถจักรยานยนต์ (Lalamove จริง)' : v === 'car' ? 'รถยนต์ 4 ล้อ (Lalamove จริง)' : 'รถกระบะขนส่ง (Lalamove จริง)',
+          baseFare: baseFare,
+          distanceKm: distanceKm,
+          distanceFee: totalFare - baseFare,
+          totalFare: totalFare,
+          etaMinutes: Math.round(5 + distanceKm * 2.5),
+          quotationId: quoteId
+        };
+      } catch (err) {
+        console.warn(`Failed to fetch real Lalamove quote for ${v}`, err);
+        return null;
+      }
+    });
+
+    const results = await Promise.all(quotePromises);
+    const validQuotes = results.filter((q): q is LalamoveQuote => q !== null);
+    return validQuotes.length > 0 ? validQuotes : null;
+  } catch (error) {
+    console.warn("Real Lalamove API Quoting failed, falling back to simulator.", error);
+    return null;
+  }
+}
+
+export async function createRealLalamoveOrder(
+  quotationId: string,
+  customerName: string,
+  customerPhone: string
+): Promise<{ orderId: string; shareLink?: string } | null> {
+  try {
+    const payload = {
+      data: {
+        quotationId: quotationId,
+        sender: {
+          stopId: "0",
+          name: "Pizza Damac Nonthaburi",
+          phone: "+6621234567"
+        },
+        recipients: [
+          {
+            stopId: "1",
+            name: customerName || "Customer",
+            phone: customerPhone || "+66890000000"
+          }
+        ],
+        isConfirmByCustomer: false
+      }
+    };
+
+    const res = await fetch('/api/lalamove/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to place real Lalamove order`);
+    }
+
+    const responseData = await res.json();
+    return {
+      orderId: responseData.data.orderId,
+      shareLink: responseData.data.shareLink
+    };
+  } catch (error) {
+    console.warn("Real Lalamove order failed, falling back to simulator.", error);
+    return null;
+  }
+}
+
+export interface LalamoveStatusResponse {
+  configured: boolean;
+  status: 'online' | 'offline';
+  message: string;
+  error?: any;
+}
+
+export async function checkLalamoveStatus(): Promise<LalamoveStatusResponse> {
+  try {
+    const res = await fetch('/api/lalamove/status');
+    if (!res.ok) {
+      return {
+        configured: false,
+        status: 'offline',
+        message: `HTTP error status: ${res.status}`
+      };
+    }
+    return await res.json();
+  } catch (error: any) {
+    return {
+      configured: false,
+      status: 'offline',
+      message: `Connection failed: ${error.message}`
+    };
+  }
 }

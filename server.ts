@@ -49,6 +49,63 @@ async function startServer() {
   });
 
   // --- LALAMOVE BACKEND INTEGRATION ---
+  // Status check to see if Lalamove real connection is active (configured & reachable)
+  app.get("/api/lalamove/status", async (req, res) => {
+    try {
+      const apiKey = process.env.LALAMOVE_API_KEY;
+      const apiSecret = process.env.LALAMOVE_API_SECRET;
+      
+      if (!apiKey || !apiSecret) {
+        return res.json({
+          configured: false,
+          status: 'offline',
+          message: 'Lalamove API Keys are missing. Please add LALAMOVE_API_KEY and LALAMOVE_API_SECRET to the environment.'
+        });
+      }
+
+      // Perform a real query to GET /v3/cities to verify connection
+      const time = new Date().getTime().toString();
+      const method = 'GET';
+      const requestPath = '/v3/cities';
+      const body = '';
+      const rawSignature = `${time}\r\n${method}\r\n${requestPath}\r\n\r\n${body}`;
+      const signature = crypto.createHmac('sha256', apiSecret).update(rawSignature).digest('hex');
+      const requestId = `REQ-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+      const response = await fetch('https://rest.lalamove.com/v3/cities', {
+        method: 'GET',
+        headers: {
+          'Authorization': `hmac ${apiKey}:${time}:${signature}`,
+          'Market': 'TH',
+          'Request-ID': requestId
+        }
+      });
+
+      if (response.ok) {
+        return res.json({
+          configured: true,
+          status: 'online',
+          message: 'Connected to Lalamove Production API successfully!'
+        });
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return res.json({
+          configured: true,
+          status: 'offline',
+          message: 'Lalamove API returned error status ' + response.status,
+          error: errData
+        });
+      }
+    } catch (e: any) {
+      console.error("Lalamove status check failed", e);
+      return res.json({
+        configured: true,
+        status: 'offline',
+        message: `Connection error: ${e.message}`
+      });
+    }
+  });
+
   // We MUST keep the API Key and Secret on the server to prevent them from being stolen.
   app.post("/api/lalamove/quote", async (req, res) => {
     try {
@@ -65,13 +122,15 @@ async function startServer() {
       const body = JSON.stringify(req.body);
       const rawSignature = `${time}\r\n${method}\r\n${requestPath}\r\n\r\n${body}`;
       const signature = crypto.createHmac('sha256', apiSecret).update(rawSignature).digest('hex');
+      const requestId = `REQ-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
       const response = await fetch('https://rest.lalamove.com/v3/quotations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `hmac ${apiKey}:${time}:${signature}`,
-          'Market': 'TH'
+          'Market': 'TH',
+          'Request-ID': requestId
         },
         body: body
       });
@@ -104,13 +163,15 @@ async function startServer() {
       const body = JSON.stringify(req.body);
       const rawSignature = `${time}\r\n${method}\r\n${requestPath}\r\n\r\n${body}`;
       const signature = crypto.createHmac('sha256', apiSecret).update(rawSignature).digest('hex');
+      const requestId = `REQ-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
       const response = await fetch('https://rest.lalamove.com/v3/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `hmac ${apiKey}:${time}:${signature}`,
-          'Market': 'TH'
+          'Market': 'TH',
+          'Request-ID': requestId
         },
         body: body
       });
