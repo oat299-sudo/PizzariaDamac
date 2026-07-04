@@ -362,9 +362,7 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
     >
       {/* Pizza Store Location Marker */}
       <AdvancedMarker position={{ lat: RESTAURANT_LOCATION.lat, lng: RESTAURANT_LOCATION.lng }} title="Pizza Damac (Store)">
-        <Pin background="#ea580c" glyphColor="#fff" borderColor="#c2410c" scale={1.2}>
-          🍕
-        </Pin>
+        <Pin background="#ea580c" glyphColor="#fff" borderColor="#c2410c" scale={1.2} />
       </AdvancedMarker>
 
       {/* Customer Delivery Pin */}
@@ -383,9 +381,7 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
         }}
         title="Delivery Destination"
       >
-        <Pin background="#059669" glyphColor="#fff" borderColor="#047857" scale={1.2}>
-          📍
-        </Pin>
+        <Pin background="#059669" glyphColor="#fff" borderColor="#047857" scale={1.2} />
       </AdvancedMarker>
     </Map>
   );
