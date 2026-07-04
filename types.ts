@@ -248,22 +248,39 @@ export function parseAnyMapLink(text?: string): { lat: number, lng: number } | n
       return { lat: 13.9239103, lng: 100.5220632 };
   }
 
-  // Google Maps URL with 3d...4d, query=, @, or ll=
+  // Google Maps URL with 3d...4d, query=, q=, @, ll=, cbll=, or path place/dir/search
   const urlMatch = text.match(/3d(-?\d+(?:\.\d+)?).*?4d(-?\d+(?:\.\d+)?)/) || 
-                   text.match(/query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/\/place\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/\/dir\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/\/search\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/[?&]query=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
                    text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
-                   text.match(/ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+                   text.match(/[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/) ||
+                   text.match(/[?&]cbll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
   if (urlMatch) {
       return { lat: parseFloat(urlMatch[1]), lng: parseFloat(urlMatch[2]) };
   }
 
-  // Look for any raw "lat,lng" string
-  // Use a heuristic: check if two numbers are separated by comma and look like coords
-  const coordMatch = text.match(/(-?\d{1,2}(?:\.\d{3,10})?)\s*,\s*(-?\d{1,3}(?:\.\d{3,10})?)/);
+  // Look for any raw "lat,lng" string (e.g. 13.9239103, 100.5220632)
+  // Use a refined heuristic requiring at least 3 decimal places to prevent clashing with street names or house numbers
+  const coordMatch = text.match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
   if (coordMatch) {
       const lat = parseFloat(coordMatch[1]);
       const lng = parseFloat(coordMatch[2]);
       if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+      }
+  }
+
+  // Fallback to more permissive match ONLY if no other numbers exist, but protect common integer cases
+  const looseMatch = text.match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+  if (looseMatch) {
+      const lat = parseFloat(looseMatch[1]);
+      const lng = parseFloat(looseMatch[2]);
+      // Only treat as lat/lng if at least one of them has a decimal, to avoid plain integers
+      if ((looseMatch[1].includes('.') || looseMatch[2].includes('.')) && 
+          (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)) {
           return { lat, lng };
       }
   }
@@ -292,6 +309,17 @@ export function parseGPSCoordinates(address?: string) {
       url: linkMatch[1]
     };
   }
+
+  // EXTRA RESILIENT FALLBACK: Try parsing coordinates directly from the raw address string
+  const directCoords = parseAnyMapLink(address);
+  if (directCoords) {
+    return {
+      lat: directCoords.lat,
+      lng: directCoords.lng,
+      url: address.includes('http') ? address : `https://www.google.com/maps/search/?api=1&query=${directCoords.lat},${directCoords.lng}`
+    };
+  }
+
   return null;
 }
 

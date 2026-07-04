@@ -2511,9 +2511,7 @@ export const CustomerView: React.FC = () => {
                                                                  setDeliveryLat(newLat);
                                                                  setDeliveryLng(newLng);
                                                                  setHasMapPin(true);
-                                                                 if (!deliveryAddress) {
-                                                                     setDeliveryAddress(addrName);
-                                                                 }
+                                                                 setDeliveryAddress(addrName);
                                                              }}
                                                          />
                                                      </div>

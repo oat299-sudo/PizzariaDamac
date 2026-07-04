@@ -108,3 +108,60 @@ html, body {
   }
 }
 
+/* Custom Google Places Autocomplete dropdown styling to match the brand identity */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  font-family: 'Inter', 'Sarabun', sans-serif !important;
+  margin-top: 4px !important;
+  padding: 4px 0 !important;
+}
+
+.pac-item {
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border-top: 1px solid #f1f5f9 !important;
+  color: #334155 !important;
+}
+
+.pac-item:first-child {
+  border-top: none !important;
+}
+
+.pac-item:hover, .pac-item-selected {
+  background-color: #fff7ed !important; /* light brand orange */
+}
+
+.pac-icon {
+  margin-top: 0 !important;
+  background-image: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Use a custom location pin icon for the pac items */
+.pac-icon::before {
+  content: "📍";
+  font-size: 13px !important;
+}
+
+.pac-item-query {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+}
+
+.pac-matched {
+  color: #ea580c !important; /* brand-600 */
+}
+
+

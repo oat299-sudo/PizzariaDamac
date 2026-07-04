@@ -18,15 +18,24 @@ async function startServer() {
         return res.status(400).json({ error: "Missing url" });
       }
 
-      // We use our own node fetch to follow redirects or just get the location header if manual redirect used
-      const fetchRes = await fetch(url, { redirect: 'manual' });
-      const location = fetchRes.headers.get('location');
-      
-      if (location) {
-        return res.json({ targetUrl: location });
-      } else {
-        return res.json({ targetUrl: url }); // maybe it wasn't a shortlink
+      let finalUrl = url;
+      try {
+        // Follow redirects to get the ultimate destination URL which contains coordinates
+        const response = await fetch(url, { 
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        finalUrl = response.url;
+      } catch (err) {
+        // Fallback to manual redirect if follow fails
+        const response = await fetch(url, { method: 'GET', redirect: 'manual' });
+        finalUrl = response.headers.get('location') || url;
       }
+
+      return res.json({ targetUrl: finalUrl });
     } catch (e: any) {
       console.error(e);
       return res.status(500).json({ error: e.message });

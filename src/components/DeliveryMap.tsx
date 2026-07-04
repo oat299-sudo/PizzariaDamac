@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { MapPin, Navigation, Search, AlertTriangle, CheckCircle2, Info, RefreshCw, HelpCircle, Truck, Info as InfoIcon } from 'lucide-react';
+import { MapPin, Navigation, Search, AlertTriangle, CheckCircle2, Info, RefreshCw, HelpCircle, Truck, Info as InfoIcon, X } from 'lucide-react';
 import { calculateDistanceKm, reverseGeocode } from '../../utils/geo';
 import { getLalamoveQuote, LalamoveQuote } from '../../services/lalamoveService';
 import { RESTAURANT_LOCATION } from '../../constants';
@@ -93,6 +93,15 @@ export default function DeliveryMap({ lat, lng, storeLat = RESTAURANT_LOCATION.l
     onChange(dest.lat, dest.lng, dest.distance, dest.name);
   };
 
+  const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
+    if (!place.geometry || !place.geometry.location) return;
+    const placeLat = place.geometry.location.lat();
+    const placeLng = place.geometry.location.lng();
+    const addressName = place.formatted_address || place.name || '';
+    const dist = calculateDistanceKm(storeLat, storeLng, placeLat, placeLng);
+    onChange(placeLat, placeLng, dist, addressName);
+  };
+
   return (
     <div className="space-y-4 border border-brand-100 rounded-xl bg-white p-4 shadow-sm" id="delivery-map-container">
       <div className="flex justify-between items-center">
@@ -150,19 +159,27 @@ export default function DeliveryMap({ lat, lng, storeLat = RESTAURANT_LOCATION.l
       {/* MAP AND ROUTE BLOCK */}
       <div className="relative">
         {hasValidKey ? (
-          // REAL GOOGLE MAP
-          <div className="w-full h-[350px] rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50">
-            <APIProvider apiKey={apiKey} version="weekly">
-              <MapInstance 
-                lat={lat} 
-                lng={lng} 
-                onChange={onChange} 
-                language={language} 
-                estimatedDistance={estimatedDistance}
-                resolvedAddress={resolvedAddress}
+          // REAL GOOGLE MAP WITH PLACES AUTOCOMPLETE
+          <APIProvider apiKey={apiKey} version="weekly">
+            <div className="space-y-3">
+              <PlacesAutocomplete 
+                language={language}
+                onPlaceSelect={handlePlaceSelect}
               />
-            </APIProvider>
-          </div>
+              <div className="w-full h-[350px] rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50">
+                <MapInstance 
+                  lat={lat} 
+                  lng={lng} 
+                  storeLat={storeLat}
+                  storeLng={storeLng}
+                  onChange={onChange} 
+                  language={language} 
+                  estimatedDistance={estimatedDistance}
+                  resolvedAddress={resolvedAddress}
+                />
+              </div>
+            </div>
+          </APIProvider>
         ) : (
           <div className="w-full flex flex-col gap-2">
             <div className="w-full rounded-xl border border-gray-200 overflow-hidden relative h-[250px] md:h-[350px]">
@@ -272,7 +289,16 @@ export default function DeliveryMap({ lat, lng, storeLat = RESTAURANT_LOCATION.l
 }
 
 // Separate component to handle internal Vis.gl Google Map logic to prevent load-time dependency errors
-function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolvedAddress }: DeliveryMapProps & { estimatedDistance: number, resolvedAddress: string }) {
+function MapInstance({ 
+  lat, 
+  lng, 
+  storeLat = RESTAURANT_LOCATION.lat, 
+  storeLng = RESTAURANT_LOCATION.lng, 
+  onChange, 
+  language, 
+  estimatedDistance, 
+  resolvedAddress 
+}: DeliveryMapProps & { estimatedDistance: number, resolvedAddress: string }) {
   const map = useMap();
   const routesLib = useMapsLibrary('routes');
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
@@ -312,7 +338,7 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
     return () => {
       polylinesRef.current.forEach(p => p.setMap(null));
     };
-  }, [routesLib, map, lat, lng]);
+  }, [routesLib, map, lat, lng, storeLat, storeLng]);
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
@@ -359,3 +385,88 @@ function MapInstance({ lat, lng, onChange, language, estimatedDistance, resolved
     </Map>
   );
 }
+
+interface PlacesAutocompleteProps {
+  language: 'en' | 'th';
+  onPlaceSelect: (place: google.maps.places.PlaceResult) => void;
+}
+
+function PlacesAutocomplete({ language, onPlaceSelect }: PlacesAutocompleteProps) {
+  const [hasValue, setHasValue] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const placesLib = useMapsLibrary('places');
+
+  useEffect(() => {
+    if (!placesLib || !inputRef.current) return;
+
+    // Restrict predictions to Thailand for relevance
+    const options: google.maps.places.AutocompleteOptions = {
+      fields: ['geometry', 'name', 'formatted_address'],
+      componentRestrictions: { country: 'th' }
+    };
+
+    const autocomplete = new placesLib.Autocomplete(inputRef.current, options);
+
+    // Prevent form submission on press Enter
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+      }
+    };
+    
+    const handleInput = () => {
+      setHasValue(!!inputRef.current?.value);
+    };
+
+    const inputEl = inputRef.current;
+    inputEl.addEventListener('keydown', handleKeyDown);
+    inputEl.addEventListener('input', handleInput);
+
+    const listener = autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place && place.geometry) {
+        onPlaceSelect(place);
+      }
+    });
+
+    return () => {
+      inputEl.removeEventListener('keydown', handleKeyDown);
+      inputEl.removeEventListener('input', handleInput);
+      google.maps.event.removeListener(listener);
+    };
+  }, [placesLib, onPlaceSelect]);
+
+  const handleClear = () => {
+    if (inputRef.current) {
+      inputRef.current.value = '';
+      setHasValue(false);
+      inputRef.current.focus();
+    }
+  };
+
+  return (
+    <div className="relative w-full z-10">
+      <div className="relative">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <Search size={16} />
+        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          className="w-full border border-gray-300 hover:border-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 rounded-xl pl-10 pr-10 py-2.5 text-xs outline-none transition font-medium shadow-sm bg-white"
+          placeholder={language === 'th' ? 'พิมพ์ค้นหาที่อยู่จัดส่งของคุณ (ชื่อหมู่บ้าน/ซอย/ถนน)...' : 'Search delivery address, condo, street...'}
+        />
+        {hasValue && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition animate-fade-in"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+

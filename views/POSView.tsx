@@ -6,7 +6,7 @@ import { CATEGORIES, EXPENSE_CATEGORIES, PRESET_EXPENSES } from '../constants';
 import { generatePromptPayPayload } from '../utils/promptpay';
 import { calculateDistanceKm } from '../utils/geo';
 import LalamoveDispatchPanel from '../src/components/LalamoveDispatchPanel';
-import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift, Truck } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingBag, DollarSign, Settings, User, X, Edit2, Power, LogOut, Upload, Image as ImageIcon, Bike, Store, List, PieChart, Calculator, Globe, ToggleLeft, ToggleRight, Camera, ChevronUp, ChevronDown, ChevronLeft, AlertCircle, Calendar, Link, Star, Layers, Database, MousePointerClick, MessageCircle, MapPin, Facebook, Phone, CheckCircle, Video, PlayCircle, Newspaper, Save, Download, QrCode, Printer, CheckCircle2, ChefHat, Banknote, CreditCard, Lock, Unlock, ArrowRight, Utensils, RefreshCw, Send, Check, ChevronRight, ArrowLeft, Filter, FileSpreadsheet, Maximize2, Sparkles, Receipt, Eye, Volume2, VolumeX, Clock, Search, Tag, Ticket, Gift, Truck } from 'lucide-react';
 
 const convertGoogleDriveUrl = (url: string): string => {
     if (!url) return '';
@@ -543,8 +543,61 @@ export const POSView: React.FC = () => {
     const [posOrderType, setPosOrderType] = useState<OrderType>('dine-in');
     const [posDeliveryAddress, setPosDeliveryAddress] = useState('');
     const [posCustomerPhone, setPosCustomerPhone] = useState('');
+    const [posDeliveryLat, setPosDeliveryLat] = useState<number | null>(null);
+    const [posDeliveryLng, setPosDeliveryLng] = useState<number | null>(null);
+    const [posResolvingGps, setPosResolvingGps] = useState(false);
     const [tempClosedMsg, setTempClosedMsg] = useState(storeSettings.closedMessage);
     const [orderSource, setOrderSource] = useState<OrderSource>('store');
+
+    // Debounced coordinate extraction & short link resolution for POS Delivery
+    useEffect(() => {
+        if (posOrderType !== 'delivery' || !posDeliveryAddress) {
+            setPosDeliveryLat(null);
+            setPosDeliveryLng(null);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            const trimmed = posDeliveryAddress.trim();
+            // Try parsing coordinates directly first from the address
+            const direct = parseAnyMapLink(trimmed);
+            if (direct) {
+                setPosDeliveryLat(direct.lat);
+                setPosDeliveryLng(direct.lng);
+                return;
+            }
+
+            // Look for any link inside the text
+            const linkMatch = trimmed.match(/(https?:\/\/[^\s]+)/);
+            if (linkMatch) {
+                const url = linkMatch[1].replace(/[\]]/g, ''); // strip any trailing brackets
+                if (url.includes('maps') || url.includes('goo.gl')) {
+                    setPosResolvingGps(true);
+                    try {
+                        const res = await fetch('/api/resolve-link', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url })
+                        });
+                        const data = await res.json();
+                        if (data && data.targetUrl) {
+                            const resolvedCoords = parseAnyMapLink(data.targetUrl);
+                            if (resolvedCoords) {
+                                setPosDeliveryLat(resolvedCoords.lat);
+                                setPosDeliveryLng(resolvedCoords.lng);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Failed to resolve POS maps link:", err);
+                    } finally {
+                        setPosResolvingGps(false);
+                    }
+                }
+            }
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [posDeliveryAddress, posOrderType]);
 
     const getPizzaPrice = (pizza: Pizza, source: OrderSource): number => {
         if (source === 'grab' && pizza.grabPrice !== undefined && pizza.grabPrice > 0) {
@@ -558,6 +611,7 @@ export const POSView: React.FC = () => {
     
     // Reporting State
     const [salesFilter, setSalesFilter] = useState<'day' | 'month' | 'year' | 'all'>('day');
+    const [selectedSalesDate, setSelectedSalesDate] = useState<Date>(new Date());
     
     // Add/Edit Item State
     const [showItemModal, setShowItemModal] = useState(false);
@@ -1047,8 +1101,10 @@ export const POSView: React.FC = () => {
     const filterByDate = (dateString: string, filter: 'day'|'month'|'year'|'all') => {
         if (filter === 'all') return true;
         const d = new Date(dateString);
+        if (filter === 'day') {
+            return d.toDateString() === selectedSalesDate.toDateString();
+        }
         const now = new Date();
-        if (filter === 'day') return d.toDateString() === now.toDateString();
         if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         if (filter === 'year') return d.getFullYear() === now.getFullYear();
         return true;
@@ -1277,6 +1333,9 @@ export const POSView: React.FC = () => {
             if (posCustomerPhone && !finalDeliveryAddress.includes('[Phone:')) {
                 finalDeliveryAddress += ` [Phone: ${posCustomerPhone}]`;
             }
+            if (posDeliveryLat && posDeliveryLng && !finalDeliveryAddress.includes('[GPS Pin:')) {
+                finalDeliveryAddress += ` [GPS Pin: ${posDeliveryLat.toFixed(7)}, ${posDeliveryLng.toFixed(7)}]`;
+            }
             // Just let `parseAnyMapLink` in `types.ts` pick up raw Google Maps links.
             if (finalDeliveryAddress.includes('maps') || finalDeliveryAddress.includes('goo.gl')) {
                 if (!finalDeliveryAddress.includes('[Google Maps Link:')) {
@@ -1300,7 +1359,9 @@ export const POSView: React.FC = () => {
             delivery: posOrderType === 'delivery' ? {
                 address: finalDeliveryAddress,
                 zoneName: 'Standard',
-                fee: 'pending'
+                fee: 'pending',
+                lat: posDeliveryLat || undefined,
+                lng: posDeliveryLng || undefined
             } : undefined
         });
         if (success) { 
@@ -1308,6 +1369,8 @@ export const POSView: React.FC = () => {
             setDeliveryPlatformRef(''); 
             setPosCustomerPhone('');
             setPosDeliveryAddress('');
+            setPosDeliveryLat(null);
+            setPosDeliveryLng(null);
             setPosOrderType('dine-in');
             setShowMobileCart(false); 
             setOrderSource('store'); 
@@ -1390,6 +1453,9 @@ export const POSView: React.FC = () => {
                 if (posCustomerPhone && !finalDeliveryAddress.includes('[Phone:')) {
                     finalDeliveryAddress += ` [Phone: ${posCustomerPhone}]`;
                 }
+                if (posDeliveryLat && posDeliveryLng && !finalDeliveryAddress.includes('[GPS Pin:')) {
+                    finalDeliveryAddress += ` [GPS Pin: ${posDeliveryLat.toFixed(7)}, ${posDeliveryLng.toFixed(7)}]`;
+                }
                 if (finalDeliveryAddress.includes('maps') || finalDeliveryAddress.includes('goo.gl')) {
                     if (!finalDeliveryAddress.includes('[Google Maps Link:')) {
                         const linkMatch = finalDeliveryAddress.match(/(https?:\/\/[^\s]+)/);
@@ -1409,7 +1475,9 @@ export const POSView: React.FC = () => {
                 delivery: posOrderType === 'delivery' ? {
                     address: finalDeliveryAddress,
                     zoneName: 'Standard',
-                    fee: 'pending'
+                    fee: 'pending',
+                    lat: posDeliveryLat || undefined,
+                    lng: posDeliveryLng || undefined
                 } : undefined
             });
             if (success) { 
@@ -1424,6 +1492,8 @@ export const POSView: React.FC = () => {
                 setDeliveryPlatformRef(''); 
                 setPosCustomerPhone('');
                 setPosDeliveryAddress('');
+                setPosDeliveryLat(null);
+                setPosDeliveryLng(null);
                 setPosOrderType('dine-in');
                 setOrderSource('store'); 
                 setShowMobileCart(false); 
@@ -2460,6 +2530,43 @@ export const POSView: React.FC = () => {
                                             value={posDeliveryAddress} 
                                             onChange={e => setPosDeliveryAddress(e.target.value)}
                                         />
+
+                                        {posResolvingGps && (
+                                            <div className="text-xs font-bold text-blue-600 animate-pulse flex items-center gap-1 mt-1">
+                                                <RefreshCw size={12} className="animate-spin" />
+                                                {language === 'th' ? 'กำลังดึงพิกัด GPS...' : 'Resolving GPS coordinates...'}
+                                            </div>
+                                        )}
+                                        {!posResolvingGps && posDeliveryLat && posDeliveryLng && (
+                                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-lg text-xs font-bold space-y-1 mt-1">
+                                                <div className="flex items-center gap-1 text-emerald-700">
+                                                    <CheckCircle size={14} className="shrink-0" />
+                                                    <span>{language === 'th' ? 'ดึงพิกัด GPS สำเร็จ!' : 'GPS coordinates parsed!'}</span>
+                                                </div>
+                                                <div className="text-[10px] font-mono text-emerald-600">
+                                                    Lat: {posDeliveryLat.toFixed(6)}, Lng: {posDeliveryLng.toFixed(6)}
+                                                </div>
+                                                <div className="text-[11px] font-black text-emerald-900">
+                                                    {language === 'th' ? 'ระยะทางจากร้าน:' : 'Distance from store:'} {
+                                                        (() => {
+                                                            const storeGps = storeSettings.storeLocationGps || "13.9239103,100.5220632";
+                                                            const storeCoords = parseAnyMapLink(storeGps) || { lat: 13.9239103, lng: 100.5220632 };
+                                                            return calculateDistanceKm(storeCoords.lat, storeCoords.lng, posDeliveryLat, posDeliveryLng).toFixed(2);
+                                                        })()
+                                                    } กม. (km)
+                                                </div>
+                                            </div>
+                                        )}
+                                        {!posResolvingGps && !posDeliveryLat && posDeliveryAddress && (
+                                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg text-xs font-bold flex items-start gap-1.5 mt-1">
+                                                <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                                                <div className="leading-tight">
+                                                    {language === 'th' 
+                                                        ? 'ยังไม่พบพิกัด (กรุณาพิมพ์พิกัด เช่น 13.88, 100.52 หรือวางลิงก์ Google Maps)' 
+                                                        : 'No coordinates found (please type coords like 13.88, 100.52 or paste a Google Maps link)'}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -2862,6 +2969,31 @@ export const POSView: React.FC = () => {
                         );
                     }
 
+                    const formatSelectedDateString = (date: Date) => {
+                        const dStr = date.toDateString();
+                        const today = new Date();
+                        const yesterday = new Date();
+                        yesterday.setDate(today.getDate() - 1);
+                        const dayBeforeYesterday = new Date();
+                        dayBeforeYesterday.setDate(today.getDate() - 2);
+
+                        if (dStr === today.toDateString()) {
+                            return language === 'th' ? 'วันนี้' : 'Today';
+                        }
+                        if (dStr === yesterday.toDateString()) {
+                            return language === 'th' ? 'เมื่อวาน' : 'Yesterday';
+                        }
+                        if (dStr === dayBeforeYesterday.toDateString()) {
+                            return language === 'th' ? 'เมื่อวานซืน' : '2 Days Ago';
+                        }
+
+                        if (language === 'th') {
+                            return date.toLocaleDateString('th-TH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                        } else {
+                            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                        }
+                    };
+
                     const filteredOrders = (orders || []).filter(o => o && filterByDate(o.createdAt, salesFilter));
                     const filteredExpenses = (expenses || []).filter(e => e && filterByDate(e.date, salesFilter));
                     const totalSales = filteredOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
@@ -2912,7 +3044,7 @@ export const POSView: React.FC = () => {
                                                     onClick={() => setSalesFilter(f)} 
                                                     className={`px-4 py-1.5 rounded-lg text-xs font-black transition capitalize ${salesFilter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:bg-gray-300'}`}
                                                 >
-                                                    {f === 'day' ? (language === 'th' ? 'วันนี้' : 'Today') : 
+                                                    {f === 'day' ? (language === 'th' ? 'รายวัน' : 'Daily') : 
                                                      f === 'month' ? (language === 'th' ? 'เดือนนี้' : 'Month') : 
                                                      f === 'year' ? (language === 'th' ? 'ปีนี้' : 'Year') : (language === 'th' ? 'ทั้งหมด' : 'All')}
                                                 </button>
@@ -2926,6 +3058,110 @@ export const POSView: React.FC = () => {
                                         </button>
                                     </div>
                                 </div>
+
+                                {salesFilter === 'day' && (
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-gray-200 rounded-2xl p-4 shadow-sm w-full animate-fade-in font-sans">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-black text-gray-700 flex items-center gap-1.5">
+                                                📅 {language === 'th' ? 'เลือกวันที่ดูยอดขาย:' : 'Choose Date:'}
+                                            </span>
+                                            <span className="text-sm font-black text-brand-600 bg-brand-50 px-3 py-1 rounded-lg">
+                                                {formatSelectedDateString(selectedSalesDate)}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {/* Quick select presets */}
+                                            <button 
+                                                onClick={() => { playClickSound(); setSelectedSalesDate(new Date()); }}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${selectedSalesDate.toDateString() === new Date().toDateString() ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200/50'}`}
+                                            >
+                                                {language === 'th' ? 'วันนี้' : 'Today'}
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    playClickSound();
+                                                    const d = new Date();
+                                                    d.setDate(d.getDate() - 1);
+                                                    setSelectedSalesDate(d);
+                                                }}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${(() => {
+                                                    const yesterday = new Date();
+                                                    yesterday.setDate(yesterday.getDate() - 1);
+                                                    return selectedSalesDate.toDateString() === yesterday.toDateString();
+                                                })() ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200/50'}`}
+                                            >
+                                                {language === 'th' ? 'เมื่อวาน' : 'Yesterday'}
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    playClickSound();
+                                                    const d = new Date();
+                                                    d.setDate(d.getDate() - 2);
+                                                    setSelectedSalesDate(d);
+                                                }}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${(() => {
+                                                    const dayBefore = new Date();
+                                                    dayBefore.setDate(dayBefore.getDate() - 2);
+                                                    return selectedSalesDate.toDateString() === dayBefore.toDateString();
+                                                })() ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/20' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200/50'}`}
+                                            >
+                                                {language === 'th' ? 'เมื่อวานซืน' : '2 Days Ago'}
+                                            </button>
+
+                                            <div className="h-6 w-[1px] bg-gray-200 mx-1 hidden sm:block"></div>
+
+                                            {/* Day-by-day navigation */}
+                                            <div className="flex items-center gap-1 bg-gray-100 border border-gray-200/50 rounded-xl p-0.5 shadow-inner">
+                                                <button 
+                                                    onClick={() => {
+                                                        playClickSound();
+                                                        const d = new Date(selectedSalesDate);
+                                                        d.setDate(d.getDate() - 1);
+                                                        setSelectedSalesDate(d);
+                                                    }}
+                                                    className="p-1.5 text-gray-600 hover:text-brand-600 hover:bg-white rounded-lg transition"
+                                                    title={language === 'th' ? 'วันก่อนหน้า' : 'Previous Day'}
+                                                >
+                                                    <ChevronLeft size={16} />
+                                                </button>
+                                                
+                                                <span className="text-[11px] font-extrabold px-2 text-gray-800 min-w-[70px] text-center select-none">
+                                                    {language === 'th' ? 'เลื่อนวัน' : 'Navigate'}
+                                                </span>
+
+                                                <button 
+                                                    onClick={() => {
+                                                        playClickSound();
+                                                        const d = new Date(selectedSalesDate);
+                                                        d.setDate(d.getDate() + 1);
+                                                        setSelectedSalesDate(d);
+                                                    }}
+                                                    className="p-1.5 text-gray-600 hover:text-brand-600 hover:bg-white rounded-lg transition"
+                                                    title={language === 'th' ? 'วันถัดไป' : 'Next Day'}
+                                                >
+                                                    <ChevronRight size={16} />
+                                                </button>
+                                            </div>
+
+                                            <div className="h-6 w-[1px] bg-gray-200 mx-1 hidden sm:block"></div>
+
+                                            {/* Date Picker Input */}
+                                            <div className="relative flex items-center gap-1 bg-gray-100 hover:bg-gray-200 border border-gray-200/50 rounded-xl px-3 py-1.5 shadow-inner cursor-pointer">
+                                                <input 
+                                                    type="date"
+                                                    value={selectedSalesDate.toISOString().split('T')[0]}
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            playClickSound();
+                                                            setSelectedSalesDate(new Date(e.target.value));
+                                                        }
+                                                    }}
+                                                    className="text-xs font-black text-gray-700 outline-none bg-transparent cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* KPIs Grid */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
