@@ -2671,12 +2671,9 @@ export const CustomerView: React.FC = () => {
                                 </div>
                             </>
                         )}
-                    </div>
-                    
-                    {/* Footer */}
-                    <div className="p-6 bg-white border-t shrink-0 pb-safe">
+                        
                         {/* Promo Code Input */}
-                        <div className="mb-4 border-b border-gray-100 pb-4">
+                        <div className="mb-4 pt-6 border-t border-gray-100">
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                                 {language === 'th' ? 'รหัสส่วนลด / โปรโมชั่น' : 'Promo Code / Discount'}
                             </label>
@@ -2831,6 +2828,10 @@ export const CustomerView: React.FC = () => {
                                 )}
                             </div>
                         )}
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="p-6 bg-white border-t shrink-0 pb-safe">
 
                         {orderType === 'delivery' && deliveryFee !== null ? (
                             <>
