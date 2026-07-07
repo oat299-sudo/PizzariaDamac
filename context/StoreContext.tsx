@@ -1330,7 +1330,8 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Persist Menu to LocalStorage
   useEffect(() => {
       try {
-        localStorage.setItem('damac_menu', JSON.stringify(menu));
+        const menuWithoutImages = menu.map(item => ({ ...item, imageUrl: '' }));
+        localStorage.setItem('damac_menu', JSON.stringify(menuWithoutImages));
       } catch(e) { console.warn("Menu Storage Full", e); }
   }, [menu]);
 
@@ -1556,18 +1557,13 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return DEFAULT_STORE_SETTINGS;
   });
 
-  // Persist Settings to LocalStorage
+ // Persist Settings to LocalStorage
   useEffect(() => {
       try {
-        localStorage.setItem('damac_store_settings', JSON.stringify(storeSettings));
-      } catch(e) { 
-          console.warn("Settings Storage Full, retrying without large images", e); 
-          try {
-              const lighterSettings = { ...storeSettings, eventGalleryUrls: [], promoBannerUrl: '' };
-              localStorage.setItem('damac_store_settings', JSON.stringify(lighterSettings));
-          } catch (e2) {
-              console.error("Critical Storage Error", e2);
-          }
+          const lighterSettings = { ...storeSettings, eventGalleryUrls: [], promoBannerUrl: '' };
+          localStorage.setItem('damac_store_settings', JSON.stringify(lighterSettings));
+      } catch (e2) {
+          console.error("Critical Storage Error", e2);
       }
   }, [storeSettings]);
 
