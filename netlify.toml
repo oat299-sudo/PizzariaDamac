@@ -1,0 +1,8 @@
+# Redirect ALL traffic from pizzariadamac.com (old Netlify site)
+# to the new app running on Google Cloud Run at pizzadamac.com.
+# status 302 = temporary (easy to undo later if you do the full domain move).
+[[redirects]]
+  from = "/*"
+  to = "https://pizzadamac.com/:splat"
+  status = 302
+  force = true
